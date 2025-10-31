@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可编辑甘特图</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f8f9fa;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container-fluid {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .gantt-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        .controls {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .task-form {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+        .log-area {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .log-time {
+            color: #6c757d;
+            font-size: 0.75rem;
+        }
+        /* 甘特图核心样式 */
+        .gantt-wrapper {
+            display: flex;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            overflow: hidden;
+            min-height: 400px;
+        }
+        .gantt-sidebar {
+            width: 200px;
+            min-width: 200px;
+            border-right: 2px solid #dee2e6;
+            background: #f8f9fa;
+            flex-shrink: 0;
+        }
+        .gantt-sidebar-header {
+            padding: 15px 10px;
+            background: #e9ecef;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .gantt-task-name {
+            padding: 15px 10px;
+            border-bottom: 1px solid #dee2e6;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 0.9rem;
+        }
+        .gantt-task-name:hover {
+            background: #e9ecef;
+        }
+        .gantt-task-name.selected {
+            background: #cfe2ff;
+            font-weight: 600;
+        }
+        .gantt-task-name.editing {
+            background: #fff3cd !important;
+            border: 2px solid #ffc107;
+            padding: 13px 8px;
+        }
+        .gantt-task-name input {
+            border: 1px solid #007bff;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+        .gantt-timeline-wrapper {
+            flex: 1;
+            overflow-x: auto;
+            position: relative;
+        }
+        .gantt-timeline {
+            min-width: 100%;
+        }
+        .gantt-timeline-header {
+            display: flex;
+            background: #e9ecef;
+            border-bottom: 2px solid #dee2e6;
+            height: 60px;
+        }
+        .gantt-date-cell {
+            width: 60px;
+            min-width: 60px;
+            padding: 8px 4px;
+            text-align: center;
+            border-right: 1px solid #dee2e6;
+            font-size: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .gantt-date-day {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 2px;
+        }
+        .gantt-date-weekday {
+            font-size: 0.7rem;
+            color: #6c757d;
+        }
+        .gantt-date-cell.weekend {
+            background: #f1f3f5;
+        }
+        .gantt-date-cell.today {
+            background: #fff3cd;
+            border-left: 2px solid #ffc107;
+            border-right: 2px solid #ffc107;
+        }
+        .gantt-rows {
+            position: relative;
+        }
+        .gantt-row {
+            display: flex;
+            border-bottom: 1px solid #e9ecef;
+            height: 60px;
+            position: relative;
+        }
+        .gantt-cell {
+            width: 60px;
+            min-width: 60px;
+            border-right: 1px solid #f0f0f0;
+            position: relative;
+        }
+        .gantt-cell.weekend {
+            background: #f8f9fa;
+        }
+        .gantt-cell.today {
+            background: #fffbeb;
+        }
+        .gantt-bar {
+            position: absolute;
+            height: 36px;
+            top: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            transition: all 0.2s;
+            user-select: none;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        .gantt-bar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
+            z-index: 10;
+        }
+        .gantt-bar.selected {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 4px 16px rgba(240, 147, 251, 0.6);
+            transform: translateY(-2px);
+            z-index: 15;
+        }
+        .gantt-bar.dragging {
+            opacity: 0.8;
+            cursor: grabbing;
+            z-index: 100;
+        }
+        .gantt-bar-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 8px 0 0 8px;
+            pointer-events: none;
+            transition: width 0.3s;
+        }
+        .gantt-bar-label {
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .gantt-bar-handle {
+            position: absolute;
+            width: 10px;
+            height: 100%;
+            top: 0;
+            background: rgba(255, 255, 255, 0.3);
+            cursor: ew-resize;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .gantt-bar:hover .gantt-bar-handle {
+            opacity: 1;
+        }
+        .gantt-bar-handle.left {
+            left: 0;
+            border-radius: 8px 0 0 8px;
+        }
+        .gantt-bar-handle.right {
+            right: 0;
+            border-radius: 0 8px 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <h1 class="text-center mb-4">📊 可编辑甘特图演示</h1>
+        
+        <div class="controls">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>🎯 任务管理</h5>
+                    <div class="btn-group mb-3" role="group">
+                        <button class="btn btn-primary btn-sm" id="addTask">
+                            ➕ 添加任务
+                        </button>
+                        <button class="btn btn-danger btn-sm" id="deleteTask">
+                            🗑️ 删除任务
+                        </button>
+                        <button class="btn btn-success btn-sm" id="saveData">
+                            💾 保存
+                        </button>
+                        <button class="btn btn-info btn-sm" id="loadData">
+                            📂 加载
+                        </button>
+                    </div>
+                    <div id="taskFormContainer"></div>
+                </div>
+                <div class="col-md-6">
+                    <h5>⚙️ 编辑设置</h5>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="enableEdit" checked>
+                        <label class="form-check-label" for="enableEdit">
+                            🖱️ 启用拖拽移动任务
+                        </label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="enableResize" checked>
+                        <label class="form-check-label" for="enableResize">
+                            ↔️ 启用拖拽调整时长
+                        </label>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="showWeekends" checked>
+                        <label class="form-check-label" for="showWeekends">
+                            📅 显示周末
+                        </label>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">📏 时间轴密度: <span id="cellWidthValue">60</span>px</label>
+                        <input type="range" class="form-range" id="cellWidth" min="40" max="100" value="60" step="10">
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h5>📋 操作日志</h5>
+                    <div class="log-area" id="logArea"></div>
+                </div>
+            </div>
+        </div>
+        <div class="gantt-container">
+            <div id="gantt"></div>
+        </div>
+    </div>
+    <script>
+        // 日期工具函数
+        function formatDate(date) {
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        function addDays(date, days) {
+            const d = new Date(date);
+            d.setDate(d.getDate() + days);
+            return d;
+        }
+        function daysBetween(date1, date2) {
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            d1.setHours(0, 0, 0, 0);
+            d2.setHours(0, 0, 0, 0);
+            const diff = d2 - d1;
+            return Math.round(diff / (1000 * 60 * 60 * 24));
+        }
+        function isWeekend(date) {
+            const day = new Date(date).getDay();
+            return day === 0 || day === 6;
+        }
+        function isToday(date) {
+            const d1 = formatDate(date);
+            const d2 = formatDate(new Date());
+            return d1 === d2;
+        }
+        // 甘特图类
+        class GanttChart {
+            constructor(selector, tasks, options = {}) {
+                this.selector = selector;
+                this.tasks = tasks || [];
+                this.options = {
+                    cellWidth: 60,
+                    showWeekends: true,
+                    enableEdit: true,
+                    enableResize: true,
+                    ...options
+                };
+                this.selectedTask = null;
+                this.dragState = null;
+                this.init();
+            }
+            init() {
+                this.container = document.querySelector(this.selector);
+                this.calculateDateRange();
+                this.render();
+            }
+            calculateDateRange() {
+                if (this.tasks.length === 0) {
+                    this.startDate = new Date();
+                    this.endDate = addDays(this.startDate, 30);
+                    return;
+                }
+                let minDate = new Date(this.tasks[0].start);
+                let maxDate = new Date(this.tasks[0].end || this.tasks[0].start);
+                this.tasks.forEach(task => {
+                    const start = new Date(task.start);
+                    const end = new Date(task.end || task.start);
+                    if (start < minDate) minDate = start;
+                    if (end > maxDate) maxDate = end;
+                });
+                this.startDate = addDays(minDate, -3);
+                this.endDate = addDays(maxDate, 10);
+            }
+            generateDates() {
+                const dates = [];
+                let current = new Date(this.startDate);
+                while (current <= this.endDate) {
+                    dates.push(new Date(current));
+                    current = addDays(current, 1);
+                }
+                return dates;
+            }
+            render() {
+                const dates = this.generateDates();
+                const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+                
+                let html = `
+                    <div class="gantt-wrapper">
+                        <div class="gantt-sidebar">
+                            <div class="gantt-sidebar-header">任务名称</div>
+                            ${this.tasks.map(task => `
+                                <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''}" 
+                                     data-task-id="${task.id}">
+                                    ${task.name}
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="gantt-timeline-wrapper">
+                            <div class="gantt-timeline">
+                                <div class="gantt-timeline-header">
+                                    ${dates.map(date => `
+                                        <div class="gantt-date-cell ${isWeekend(date) && this.options.showWeekends ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}" 
+                                             style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;">
+                                            <div class="gantt-date-day">${date.getDate()}</div>
+                                            <div class="gantt-date-weekday">${weekdays[date.getDay()]}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div class="gantt-rows">
+                                    ${this.tasks.map((task, i) => this.renderRow(task, dates)).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                this.container.innerHTML = html;
+                this.attachEvents();
+            }
+            renderRow(task, dates) {
+                const start = new Date(task.start);
+                const end = new Date(task.end || task.start);
+                const startOffset = daysBetween(this.startDate, start);
+                const duration = daysBetween(start, end) + 1;
+                
+                const left = startOffset * this.options.cellWidth;
+                const width = Math.max(duration * this.options.cellWidth, 80);
+                const progress = task.progress || 0;
+                return `
+                    <div class="gantt-row">
+                        ${dates.map(date => `
+                            <div class="gantt-cell ${isWeekend(date) && this.options.showWeekends ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}" 
+                                 style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;"></div>
+                        `).join('')}
+                        <div class="gantt-bar ${this.selectedTask === task.id ? 'selected' : ''}" 
+                             data-task-id="${task.id}"
+                             style="left: ${left}px; width: ${width}px;">
+                            <div class="gantt-bar-progress" style="width: ${progress}%"></div>
+                            ${this.options.enableResize ? '<div class="gantt-bar-handle left"></div>' : ''}
+                            <div class="gantt-bar-label">${task.name} (${progress}%)</div>
+                            ${this.options.enableResize ? '<div class="gantt-bar-handle right"></div>' : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            attachEvents() {
+                // 选择任务
+                this.container.querySelectorAll('.gantt-task-name').forEach(el => {
+                    el.onclick = (e) => {
+                        // 如果正在编辑，不触发选择
+                        if (el.classList.contains('editing')) {
+                            return;
+                        }
+                        this.selectTask(el.dataset.taskId);
+                    };
+                    
+                    // 添加双击编辑功能
+                    el.ondblclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.editTaskName(el);
+                    };
+                });
+                // 拖拽任务条
+                this.container.querySelectorAll('.gantt-bar').forEach(bar => {
+                    // 点击选中任务
+                    bar.onclick = (e) => {
+                        if (!e.target.classList.contains('gantt-bar-handle')) {
+                            const taskId = bar.dataset.taskId;
+                            this.selectTask(taskId);
+                        }
+                    };
+                    
+                    // 双击任务条编辑名称
+                    bar.ondblclick = (e) => {
+                        if (!e.target.classList.contains('gantt-bar-handle')) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const taskId = bar.dataset.taskId;
+                            const taskNameElement = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
+                            if (taskNameElement) {
+                                this.editTaskName(taskNameElement);
+                            }
+                        }
+                    };
+                    
+                    bar.onmousedown = (e) => {
+                        if (e.target.classList.contains('gantt-bar-handle')) {
+                            if (!this.options.enableResize) return;
+                            const isRight = e.target.classList.contains('right');
+                            const taskId = bar.dataset.taskId;
+                            const task = this.tasks.find(t => t.id === taskId);
+                            this.startResize(e, task, bar, isRight);
+                        } else {
+                            if (!this.options.enableEdit) return;
+                            const taskId = bar.dataset.taskId;
+                            const task = this.tasks.find(t => t.id === taskId);
+                            this.startDrag(e, task, bar);
+                        }
+                        e.preventDefault();
+                        e.stopPropagation();
+                    };
+                });
+                document.onmousemove = (e) => this.onMouseMove(e);
+                document.onmouseup = (e) => this.onMouseUp(e);
+            }
+            // 新增任务名称编辑方法
+            editTaskName(element) {
+                // 防止重复编辑
+                if (element.classList.contains('editing')) {
+                    return;
+                }
+                
+                const taskId = element.dataset.taskId;
+                const task = this.tasks.find(t => t.id === taskId);
+                const originalName = task.name;
+                
+                // 创建输入框
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = originalName;
+                input.style.border = '1px solid #007bff';
+                input.style.borderRadius = '4px';
+                input.style.padding = '4px 8px';
+                input.style.fontSize = '0.9rem';
+                input.style.width = '100%';
+                input.style.outline = 'none';
+                
+                // 替换元素内容
+                element.innerHTML = '';
+                element.appendChild(input);
+                element.classList.add('editing');
+                
+                // 延迟聚焦，确保输入框已渲染
+                setTimeout(() => {
+                    input.focus();
+                    input.select();
+                }, 10);
+                
+                // 保存编辑
+                const saveEdit = () => {
+                    const newName = input.value.trim();
+                    if (newName && newName !== originalName) {
+                        task.name = newName;
+                        addLog(`✏️ 任务名称从 "${originalName}" 改为 "${newName}"`);
+                    }
+                    element.textContent = task.name;
+                    element.classList.remove('editing');
+                    // 更新任务条显示
+                    const bar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
+                    if (bar) {
+                        const label = bar.querySelector('.gantt-bar-label');
+                        if (label) {
+                            label.textContent = `${task.name} (${task.progress || 0}%)`;
+                        }
+                    }
+                };
+                
+                // 取消编辑
+                const cancelEdit = () => {
+                    element.textContent = originalName;
+                    element.classList.remove('editing');
+                };
+                
+                // 事件处理
+                input.onblur = () => {
+                    // 延迟执行，避免与其他事件冲突
+                    setTimeout(saveEdit, 100);
+                };
+                
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveEdit();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        cancelEdit();
+                    }
+                };
+                
+                // 阻止输入框的点击事件冒泡
+                input.onclick = (e) => {
+                    e.stopPropagation();
+                };
+            }
+            startDrag(e, task, bar) {
+                this.dragState = {
+                    type: 'move',
+                    task: task,
+                    bar: bar,
+                    startX: e.clientX,
+                    originalStart: task.start,
+                    originalEnd: task.end
+                };
+                bar.classList.add('dragging');
+                addLog(`🖱️ 开始拖动任务 "${task.name}"`);
+            }
+            startResize(e, task, bar, isRight) {
+                this.dragState = {
+                    type: 'resize',
+                    task: task,
+                    bar: bar,
+                    isRight: isRight,
+                    startX: e.clientX,
+                    originalStart: task.start,
+                    originalEnd: task.end
+                };
+                bar.classList.add('dragging');
+                addLog(`↔️ 开始调整任务 "${task.name}" ${isRight ? '结束' : '开始'}日期`);
+            }
+            onMouseMove(e) {
+                if (!this.dragState) return;
+                const deltaX = e.clientX - this.dragState.startX;
+                const deltaDays = Math.round(deltaX / this.options.cellWidth);
+                if (this.dragState.type === 'move') {
+                    const newStart = addDays(new Date(this.dragState.originalStart), deltaDays);
+                    const duration = daysBetween(this.dragState.originalStart, this.dragState.originalEnd);
+                    const newEnd = addDays(newStart, duration);
+                    
+                    this.dragState.task.start = formatDate(newStart);
+                    this.dragState.task.end = formatDate(newEnd);
+                    
+                    const startOffset = daysBetween(this.startDate, newStart);
+                    const left = startOffset * this.options.cellWidth;
+                    this.dragState.bar.style.left = left + 'px';
+                } else if (this.dragState.type === 'resize') {
+                    if (this.dragState.isRight) {
+                        const newEnd = addDays(new Date(this.dragState.originalEnd), deltaDays);
+                        const start = new Date(this.dragState.task.start);
+                        if (newEnd >= start) {
+                            this.dragState.task.end = formatDate(newEnd);
+                            const duration = daysBetween(start, newEnd) + 1;
+                            const width = Math.max(duration * this.options.cellWidth, 80);
+                            this.dragState.bar.style.width = width + 'px';
+                        }
+                    } else {
+                        const newStart = addDays(new Date(this.dragState.originalStart), deltaDays);
+                        const end = new Date(this.dragState.task.end);
+                        if (newStart <= end) {
+                            this.dragState.task.start = formatDate(newStart);
+                            const startOffset = daysBetween(this.startDate, newStart);
+                            const left = startOffset * this.options.cellWidth;
+                            const duration = daysBetween(newStart, end) + 1;
+                            const width = Math.max(duration * this.options.cellWidth, 80);
+                            this.dragState.bar.style.left = left + 'px';
+                            this.dragState.bar.style.width = width + 'px';
+                        }
+                    }
+                }
+            }
+            onMouseUp(e) {
+                if (!this.dragState) return;
+                const task = this.dragState.task;
+                this.dragState.bar.classList.remove('dragging');
+                
+                if (this.dragState.type === 'move') {
+                    addLog(`✅ 任务 "${task.name}" 已移动到 ${task.start} ~ ${task.end}`);
+                } else {
+                    addLog(`✅ 任务 "${task.name}" 时长已调整为 ${task.start} ~ ${task.end}`);
+                }
+                
+                this.dragState = null;
+                this.calculateDateRange();
+                this.render();
+            }
+            selectTask(taskId) {
+                this.selectedTask = taskId;
+                const task = this.tasks.find(t => t.id === taskId);
+                
+                // 更新任务条的选中状态
+                this.container.querySelectorAll('.gantt-bar').forEach(bar => {
+                    if (bar.dataset.taskId === taskId) {
+                        bar.classList.add('selected');
+                    } else {
+                        bar.classList.remove('selected');
+                    }
+                });
+                // 更新侧边栏的选中状态
+                this.container.querySelectorAll('.gantt-task-name').forEach(el => {
+                    if (el.dataset.taskId === taskId) {
+                        el.classList.add('selected');
+                    } else {
+                        el.classList.remove('selected');
+                    }
+                });
+                showTaskForm(task);
+                addLog(`📌 已选择任务 "${task.name}"`);
+            }
+            addTask(task) {
+                this.tasks.push(task);
+                this.calculateDateRange();
+                this.render();
+            }
+            deleteTask(taskId) {
+                this.tasks = this.tasks.filter(t => t.id !== taskId);
+                if (this.selectedTask === taskId) {
+                    this.selectedTask = null;
+                }
+                this.calculateDateRange();
+                this.render();
+            }
+            updateOptions(options) {
+                Object.assign(this.options, options);
+                this.render();
+            }
+            getSelectedTask() {
+                return this.tasks.find(t => t.id === this.selectedTask);
+            }
+        }
+        // 初始化
+        const today = new Date();
+        let tasks = [
+            {
+                id: 'task-1',
+                name: '网站设计',
+                start: formatDate(addDays(today, -5)),
+                end: formatDate(addDays(today, 2)),
+                progress: 65
+            },
+            {
+                id: 'task-2',
+                name: '内容编写',
+                start: formatDate(addDays(today, 3)),
+                end: formatDate(addDays(today, 10)),
+                progress: 30
+            },
+            {
+                id: 'task-3',
+                name: '样式开发',
+                start: formatDate(addDays(today, 5)),
+                end: formatDate(addDays(today, 8)),
+                progress: 45
+            },
+            {
+                id: 'task-4',
+                name: '测试审核',
+                start: formatDate(addDays(today, -2)),
+                end: formatDate(addDays(today, 1)),
+                progress: 80
+            },
+            {
+                id: 'task-5',
+                name: '项目上线',
+                start: formatDate(addDays(today, 12)),
+                end: formatDate(addDays(today, 14)),
+                progress: 0
+            }
+        ];
+        const gantt = new GanttChart('#gantt', tasks);
+        // 日志
+        function addLog(message) {
+            const logArea = document.getElementById('logArea');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+        // 任务表单
+        function showTaskForm(task) {
+            const container = document.getElementById('taskFormContainer');
+            const duration = daysBetween(task.start, task.end) + 1;
+            container.innerHTML = `
+                <div class="task-form">
+                    <h6 class="mb-3">📝 编辑任务</h6>
+                    <div class="mb-2">
+                        <label class="form-label">任务名称</label>
+                        <input type="text" class="form-control form-control-sm" id="editName" value="${task.name}">
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-2">
+                            <label class="form-label">开始日期</label>
+                            <input type="date" class="form-control form-control-sm" id="editStart" value="${task.start}">
+                        </div>
+                        <div class="col-6 mb-2">
+                            <label class="form-label">结束日期</label>
+                            <input type="date" class="form-control form-control-sm" id="editEnd" value="${task.end}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">完成进度: <strong id="progressVal">${task.progress}%</strong></label>
+                        <input type="range" class="form-range" id="editProgress" value="${task.progress}" min="0" max="100" step="5">
+                    </div>
+                    <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 0.85rem;">
+                        <div><strong>📅 持续时间:</strong> ${duration} 天</div>
+                        <div><strong>📍 当前状态:</strong> ${task.progress}% 完成</div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary btn-sm" id="updateTask">
+                            ✓ 保存更改
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" id="cancelEdit">
+                            ✕ 取消编辑
+                        </button>
+                    </div>
+                </div>
+            `;
+            // 实时更新进度显示
+            document.getElementById('editProgress').oninput = (e) => {
+                const progress = e.target.value;
+                document.getElementById('progressVal').textContent = progress + '%';
+                
+                // 实时更新任务进度（不保存）
+                task.progress = parseInt(progress);
+                const bar = gantt.container.querySelector(`.gantt-bar[data-task-id="${task.id}"]`);
+                if (bar) {
+                    const progressBar = bar.querySelector('.gantt-bar-progress');
+                    const label = bar.querySelector('.gantt-bar-label');
+                    progressBar.style.width = progress + '%';
+                    label.textContent = `${task.name} (${progress}%)`;
+                }
+            };
+            // 实时更新日期
+            const updateDatePreview = () => {
+                const start = document.getElementById('editStart').value;
+                const end = document.getElementById('editEnd').value;
+                if (start && end) {
+                    const days = daysBetween(start, end) + 1;
+                    container.querySelector('.alert-info').innerHTML = `
+                        <div><strong>📅 持续时间:</strong> ${days} 天</div>
+                        <div><strong>📍 当前状态:</strong> ${task.progress}% 完成</div>
+                    `;
+                }
+            };
+            document.getElementById('editStart').onchange = updateDatePreview;
+            document.getElementById('editEnd').onchange = updateDatePreview;
+            document.getElementById('updateTask').onclick = () => {
+                const oldName = task.name;
+                task.name = document.getElementById('editName').value;
+                task.start = document.getElementById('editStart').value;
+                task.end = document.getElementById('editEnd').value;
+                task.progress = parseInt(document.getElementById('editProgress').value);
+                
+                gantt.calculateDateRange();
+                gantt.render();
+                
+                addLog(`✅ 任务 "${oldName}" 已更新为 "${task.name}"`);
+                addLog(`   📅 ${task.start} ~ ${task.end}, 进度: ${task.progress}%`);
+                container.innerHTML = '';
+            };
+            document.getElementById('cancelEdit').onclick = () => {
+                gantt.render();  // 恢复原始状态
+                container.innerHTML = '';
+                addLog(`❌ 已取消对任务 "${task.name}" 的编辑`);
+            };
+        }
+        // 按钮事件
+        document.getElementById('addTask').onclick = () => {
+            const newTask = {
+                id: `task-${Date.now()}`,
+                name: '新任务',
+                start: formatDate(new Date()),
+                end: formatDate(addDays(new Date(), 3)),
+                progress: 0
+            };
+            gantt.addTask(newTask);
+            addLog(`✅ 已添加任务 "${newTask.name}"`);
+        };
+        document.getElementById('deleteTask').onclick = () => {
+            const task = gantt.getSelectedTask();
+            if (task) {
+                if (confirm(`确定删除任务 "${task.name}"?`)) {
+                    gantt.deleteTask(task.id);
+                    addLog(`🗑️ 已删除任务 "${task.name}"`);
+                    document.getElementById('taskFormContainer').innerHTML = '';
+                }
+            } else {
+                alert('请先选择一个任务');
+            }
+        };
+        document.getElementById('saveData').onclick = () => {
+            const data = JSON.stringify(gantt.tasks, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gantt-${formatDate(new Date())}.json`;
+            a.click();
+            addLog('💾 数据已导出');
+        };
+        document.getElementById('loadData').onclick = () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        gantt.tasks = JSON.parse(event.target.result);
+                        gantt.calculateDateRange();
+                        gantt.render();
+                        addLog(`📂 已加载 ${gantt.tasks.length} 个任务`);
+                    } catch (err) {
+                        alert('文件格式错误');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        };
+        document.getElementById('enableEdit').onchange = (e) => {
+            gantt.updateOptions({ enableEdit: e.target.checked });
+            addLog(`${e.target.checked ? '✅ 已启用' : '❌ 已禁用'}拖拽移动`);
+        };
+        document.getElementById('enableResize').onchange = (e) => {
+            gantt.updateOptions({ enableResize: e.target.checked });
+            addLog(`${e.target.checked ? '✅ 已启用' : '❌ 已禁用'}大小调整`);
+        };
+        document.getElementById('showWeekends').onchange = (e) => {
+            gantt.updateOptions({ showWeekends: e.target.checked });
+            addLog(`${e.target.checked ? '✅ 已显示' : '❌ 已隐藏'}周末`);
+        };
+        document.getElementById('cellWidth').oninput = (e) => {
+            gantt.updateOptions({ cellWidth: parseInt(e.target.value) });
+            document.getElementById('cellWidthValue').textContent = e.target.value;
+        };
+        addLog('🎉 甘特图已就绪！拖动任务条可编辑日期，拖动两端可调整时长');
+        addLog('💡 提示：双击任务名称或任务条可以快速编辑任务名称');
+    </script>
+</body>
+</html>
