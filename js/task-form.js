@@ -91,32 +91,64 @@ function showTaskForm(task, gantt) {
         const oldProgress = task.progress;
         const oldDependencies = task.dependencies ? [...task.dependencies] : [];
         
-        task.name = document.getElementById('editName').value;
-        task.start = document.getElementById('editStart').value;
-        task.end = document.getElementById('editEnd').value;
-        task.progress = parseInt(document.getElementById('editProgress').value);
-        task.dependencies = document.getElementById('editDependencies').value.split(',').map(id => id.trim()).filter(id => id);
+        const newName = document.getElementById('editName').value;
+        const newStart = document.getElementById('editStart').value;
+        const newEnd = document.getElementById('editEnd').value;
+        const newProgress = parseInt(document.getElementById('editProgress').value);
+        const newDependencies = document.getElementById('editDependencies').value.split(',').map(id => id.trim()).filter(id => id);
         
+        task.name = newName;
+        task.start = newStart;
+        task.end = newEnd;
+        task.progress = newProgress;
+        task.dependencies = newDependencies;
+        
+        let hasError = false;
+        
+        // 检查开始日期是否晚于结束日期
+        if (new Date(newStart) > new Date(newEnd)) {
+            alert('开始日期不能晚于结束日期');
+            addLog(`⚠️ 无效日期: 开始日期 (${newStart}) 晚于结束日期 (${newEnd})`);
+            hasError = true;
+        }
+        
+        // 检查依赖冲突
         const conflict = gantt.checkDependencies(task);
         if (conflict) {
-            alert(`时间冲突: 依赖任务 "${conflict.depName}" 结束日期 (${conflict.depEnd}) 晚于本任务开始日期 (${task.start})`);
-            addLog(`⚠️ 时间冲突: 任务 "${task.name}" 与依赖 "${conflict.depName}" 冲突`);
-            
-            // 回滚到旧值
+            alert(`时间冲突: 依赖任务 "${conflict.depName}" 结束日期 (${conflict.depEnd}) 晚于本任务开始日期 (${newStart})`);
+            addLog(`⚠️ 时间冲突: 任务 "${newName}" 与依赖 "${conflict.depName}" 冲突`);
+            hasError = true;
+        }
+        
+        if (hasError) {
+            // 回滚任务数据
             task.name = oldName;
             task.start = oldStart;
             task.end = oldEnd;
             task.progress = oldProgress;
             task.dependencies = oldDependencies;
+            
+            // 回滚表单输入
+            document.getElementById('editName').value = oldName;
+            document.getElementById('editStart').value = oldStart;
+            document.getElementById('editEnd').value = oldEnd;
+            document.getElementById('editProgress').value = oldProgress;
+            document.getElementById('editDependencies').value = oldDependencies.join(',');
+            document.getElementById('progressVal').textContent = oldProgress + '%';
+            
+            updateDatePreview();
+            gantt.calculateDateRange();
+            gantt.render();
+            // 不关闭表单，允许用户修正
         } else {
-            addLog(`✅ 任务 "${oldName}" 已更新为 "${task.name}"`);
-            addLog(`   📅 ${task.start} ~ ${task.end}, 进度: ${task.progress}%`);
+            gantt.calculateDateRange();
+            gantt.render();
+            
+            addLog(`✅ 任务 "${oldName}" 已更新为 "${newName}"`);
+            addLog(`   📅 ${newStart} ~ ${newEnd}, 进度: ${newProgress}%`);
+            
+            container.innerHTML = '';
         }
-        
-        // 无论是否有冲突，都刷新图表并关闭表单
-        gantt.calculateDateRange();
-        gantt.render();
-        container.innerHTML = '';
     };
     
     // 取消按钮
