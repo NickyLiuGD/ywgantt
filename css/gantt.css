@@ -303,3 +303,11 @@ body {
     right: 0;
     border-radius: 0 8px 8px 0;
 }
+
+/* ======================
+   依赖箭头样式
+   ====================== */
+.gantt-dependency-arrow {
+    pointer-events: none;
+    z-index: 5;
+}
