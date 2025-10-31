@@ -17,6 +17,7 @@ class GanttChart {
             showWeekends: true,
             enableEdit: true,
             enableResize: true,
+            showDependencies: true,
             ...options
         };
         this.selectedTask = null;
@@ -132,12 +133,34 @@ class GanttChart {
         const width = Math.max(duration * this.options.cellWidth, 80);
         const progress = task.progress || 0;
 
+        let dependenciesHtml = '';
+        if (this.options.showDependencies && task.dependencies && task.dependencies.length > 0) {
+            task.dependencies.forEach(depId => {
+                const depTask = this.tasks.find(t => t.id === depId);
+                if (depTask) {
+                    const depEnd = new Date(depTask.end);
+                    const depEndOffset = daysBetween(this.startDate, depEnd);
+                    const depLeft = depEndOffset * this.options.cellWidth + this.options.cellWidth;  // 依赖结束点右侧
+                    const startOffset = daysBetween(this.startDate, start);
+                    const arrowLeft = Math.min(depLeft, startOffset * this.options.cellWidth);
+                    const arrowWidth = Math.abs(startOffset * this.options.cellWidth - depLeft);
+                    
+                    dependenciesHtml += `
+                        <svg class="gantt-dependency-arrow" style="position: absolute; left: ${arrowLeft}px; top: 18px; width: ${arrowWidth}px; height: 24px;">
+                            <path d="M0,12 H${arrowWidth - 10} L${arrowWidth - 10},0 L${arrowWidth},12 L${arrowWidth - 10},24" stroke="#dc3545" fill="none" stroke-width="2"/>
+                        </svg>
+                    `;
+                }
+            });
+        }
+
         return `
             <div class="gantt-row">
                 ${dates.map(date => `
                     <div class="gantt-cell ${isWeekend(date) && this.options.showWeekends ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}" 
                          style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;"></div>
                 `).join('')}
+                ${dependenciesHtml}
                 <div class="gantt-bar ${this.selectedTask === task.id ? 'selected' : ''}" 
                      data-task-id="${task.id}"
                      style="left: ${left}px; width: ${width}px;">
@@ -354,15 +377,44 @@ class GanttChart {
         const task = this.dragState.task;
         this.dragState.bar.classList.remove('dragging');
         
-        if (this.dragState.type === 'move') {
-            addLog(`✅ 任务 "${task.name}" 已移动到 ${task.start} ~ ${task.end}`);
+        const conflict = this.checkDependencies(task);
+        if (conflict) {
+            alert(`时间冲突: 依赖任务 "${conflict.depName}" 结束日期 (${conflict.depEnd}) 晚于本任务开始日期 (${task.start})`);
+            addLog(`⚠️ 时间冲突: 任务 "${task.name}" 与依赖 "${conflict.depName}" 冲突`);
+            // 回滚到原始日期
+            task.start = this.dragState.originalStart;
+            task.end = this.dragState.originalEnd;
         } else {
-            addLog(`✅ 任务 "${task.name}" 时长已调整为 ${task.start} ~ ${task.end}`);
+            if (this.dragState.type === 'move') {
+                addLog(`✅ 任务 "${task.name}" 已移动到 ${task.start} ~ ${task.end}`);
+            } else {
+                addLog(`✅ 任务 "${task.name}" 时长已调整为 ${task.start} ~ ${task.end}`);
+            }
         }
         
         this.dragState = null;
         this.calculateDateRange();
         this.render();
+    }
+
+    /**
+     * 检查依赖冲突
+     * @param {Object} task - 任务对象
+     * @returns {Object|null} 冲突信息或null
+     */
+    checkDependencies(task) {
+        if (!task.dependencies || task.dependencies.length === 0) return null;
+        
+        for (const depId of task.dependencies) {
+            const depTask = this.tasks.find(t => t.id === depId);
+            if (depTask && new Date(depTask.end) > new Date(task.start)) {
+                return {
+                    depName: depTask.name,
+                    depEnd: depTask.end
+                };
+            }
+        }
+        return null;
     }
 
     /**
