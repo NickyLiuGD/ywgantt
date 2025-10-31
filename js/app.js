@@ -134,7 +134,6 @@ window.showTaskForm = function(task) {
     // 保存按钮
     document.getElementById('updateTask').onclick = () => {
         const oldName = task.name;
-
         task.name = document.getElementById('editName').value;
         task.start = document.getElementById('editStart').value;
         task.end = document.getElementById('editEnd').value;

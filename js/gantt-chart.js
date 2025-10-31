@@ -377,44 +377,15 @@ class GanttChart {
         const task = this.dragState.task;
         this.dragState.bar.classList.remove('dragging');
         
-        const conflict = this.checkDependencies(task);
-        if (conflict) {
-            alert(`时间冲突: 依赖任务 "${conflict.depName}" 结束日期 (${conflict.depEnd}) 晚于本任务开始日期 (${task.start})`);
-            addLog(`⚠️ 时间冲突: 任务 "${task.name}" 与依赖 "${conflict.depName}" 冲突`);
-            // 回滚到原始日期
-            task.start = this.dragState.originalStart;
-            task.end = this.dragState.originalEnd;
+        if (this.dragState.type === 'move') {
+            addLog(`✅ 任务 "${task.name}" 已移动到 ${task.start} ~ ${task.end}`);
         } else {
-            if (this.dragState.type === 'move') {
-                addLog(`✅ 任务 "${task.name}" 已移动到 ${task.start} ~ ${task.end}`);
-            } else {
-                addLog(`✅ 任务 "${task.name}" 时长已调整为 ${task.start} ~ ${task.end}`);
-            }
+            addLog(`✅ 任务 "${task.name}" 时长已调整为 ${task.start} ~ ${task.end}`);
         }
         
         this.dragState = null;
         this.calculateDateRange();
         this.render();
-    }
-
-    /**
-     * 检查依赖冲突
-     * @param {Object} task - 任务对象
-     * @returns {Object|null} 冲突信息或null
-     */
-    checkDependencies(task) {
-        if (!task.dependencies || task.dependencies.length === 0) return null;
-        
-        for (const depId of task.dependencies) {
-            const depTask = this.tasks.find(t => t.id === depId);
-            if (depTask && new Date(depTask.end) > new Date(task.start)) {
-                return {
-                    depName: depTask.name,
-                    depEnd: depTask.end
-                };
-            }
-        }
-        return null;
     }
 
     /**
