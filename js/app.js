@@ -1,59 +1,156 @@
 /**
- * 应用主文件
- * 负责初始化甘特图和绑定所有事件
+ * 任务表单模块
+ * 负责任务编辑表单的显示和交互
  */
 
-// ==================== 初始化任务数据 ====================
-const today = new Date();
-const initialTasks = [
-    {
-        id: generateId(),
-        name: '网站设计',
-        start: formatDate(addDays(today, -5)),
-        end: formatDate(addDays(today, 2)),
-        progress: 65,
-        dependencies: []
-    },
-    {
-        id: generateId(),
-        name: '内容编写',
-        start: formatDate(addDays(today, 3)),
-        end: formatDate(addDays(today, 10)),
-        progress: 30,
-        dependencies: []
-    },
-    {
-        id: generateId(),
-        name: '样式开发',
-        start: formatDate(addDays(today, 5)),
-        end: formatDate(addDays(today, 8)),
-        progress: 45,
-        dependencies: []
-    },
-    {
-        id: generateId(),
-        name: '测试审核',
-        start: formatDate(addDays(today, -2)),
-        end: formatDate(addDays(today, 1)),
-        progress: 80,
-        dependencies: []
-    },
-    {
-        id: generateId(),
-        name: '项目上线',
-        start: formatDate(addDays(today, 12)),
-        end: formatDate(addDays(today, 14)),
-        progress: 0,
-        dependencies: []
-    }
-];
+/**
+ * 显示任务编辑表单
+ * @param {Object} task - 任务对象
+ * @param {Object} gantt - 甘特图实例
+ */
+function showTaskForm(task, gantt) {
+    const container = document.getElementById('taskFormContainer');
+    const duration = daysBetween(task.start, task.end) + 1;
+    
+    container.innerHTML = `
+        <div class="task-form">
+            <h6 class="mb-3">📝 编辑任务</h6>
+            <div class="mb-2">
+                <label class="form-label">任务名称</label>
+                <input type="text" class="form-control form-control-sm" id="editName" value="${task.name}">
+            </div>
+            <div class="row">
+                <div class="col-6 mb-2">
+                    <label class="form-label">开始日期</label>
+                    <input type="date" class="form-control form-control-sm" id="editStart" value="${task.start}">
+                </div>
+                <div class="col-6 mb-2">
+                    <label class="form-label">结束日期</label>
+                    <input type="date" class="form-control form-control-sm" id="editEnd" value="${task.end}">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">完成进度: <strong id="progressVal">${task.progress}%</strong></label>
+                <input type="range" class="form-range" id="editProgress" value="${task.progress}" min="0" max="100" step="5">
+            </div>
+            <div class="mb-2">
+                <label class="form-label">依赖任务 (ID,逗号分隔)</label>
+                <input type="text" class="form-control form-control-sm" id="editDependencies" value="${task.dependencies ? task.dependencies.join(',') : ''}">
+            </div>
+            <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 0.85rem;">
+                <div><strong>📅 持续时间:</strong> ${duration} 天</div>
+                <div><strong>📍 当前状态:</strong> ${task.progress}% 完成</div>
+            </div>
+            <div class="d-grid gap-2">
+                <button class="btn btn-primary btn-sm" id="updateTask">
+                    ✓ 保存更改
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" id="cancelEdit">
+                    ✕ 取消编辑
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // 实时更新进度显示
+    document.getElementById('editProgress').oninput = (e) => {
+        const progress = e.target.value;
+        document.getElementById('progressVal').textContent = progress + '%';
+        
+        const bar = gantt.container.querySelector(`.gantt-bar[data-task-id="${task.id}"]`);
+        if (bar) {
+            const progressBar = bar.querySelector('.gantt-bar-progress');
+            const label = bar.querySelector('.gantt-bar-label');
+            if (progressBar) progressBar.style.width = progress + '%';
+            if (label) label.textContent = `${task.name} (${progress}%)`;
+        }
+    };
+    
+    // 实时更新日期预览
+    const updateDatePreview = () => {
+        const start = document.getElementById('editStart').value;
+        const end = document.getElementById('editEnd').value;
+        if (start && end) {
+            const days = daysBetween(start, end) + 1;
+            container.querySelector('.alert-info').innerHTML = `
+                <div><strong>📅 持续时间:</strong> ${days} 天</div>
+                <div><strong>📍 当前状态:</strong> ${document.getElementById('editProgress').value}% 完成</div>
+            `;
+        }
+    };
+    
+    document.getElementById('editStart').onchange = updateDatePreview;
+    document.getElementById('editEnd').onchange = updateDatePreview;
+    
+    // 保存按钮
+    document.getElementById('updateTask').onclick = () => {
+        const oldName = task.name;
+        const oldStart = task.start;
+        const oldEnd = task.end;
+        const oldProgress = task.progress;
+        const oldDependencies = task.dependencies ? [...task.dependencies] : [];
+        
+        const newName = document.getElementById('editName').value;
+        const newStart = document.getElementById('editStart').value;
+        const newEnd = document.getElementById('editEnd').value;
+        const newProgress = parseInt(document.getElementById('editProgress').value);
+        const newDependencies = document.getElementById('editDependencies').value.split(',').map(id => id.trim()).filter(id => id);
+        
+        // 临时更新任务以检查
+        task.name = newName;
+        task.start = newStart;
+        task.end = newEnd;
+        task.progress = newProgress;
+        task.dependencies = newDependencies;
+        
+        let hasError = false;
+        
+        // 检查开始日期是否晚于结束日期
+        if (new Date(newStart) > new Date(newEnd)) {
+            alert('开始日期不能晚于结束日期');
+            addLog(`⚠️ 无效日期: 开始日期 (${newStart}) 晚于结束日期 (${newEnd})`);
+            hasError = true;
+        }
+        
+        // 检查依赖冲突
+        const conflict = gantt.checkDependencies(task);
+        if (conflict) {
+            alert(`时间冲突: 依赖任务 "${conflict.depName}" 结束日期 (${conflict.depEnd}) 晚于本任务开始日期 (${newStart})`);
+            addLog(`⚠️ 时间冲突: 任务 "${newName}" 与依赖 "${conflict.depName}" 冲突`);
+            hasError = true;
+        }
+        
+        if (hasError) {
+            // 回滚任务数据
+            task.name = oldName;
+            task.start = oldStart;
+            task.end = oldEnd;
+            task.progress = oldProgress;
+            task.dependencies = oldDependencies;
+            
+            // 刷新甘特图以反映回滚
+            gantt.calculateDateRange();
+            gantt.render();
+            
+            // 不关闭表单，允许修正
+        } else {
+            // 无错误，记录日志，刷新甘特图，关闭表单
+            addLog(`✅ 任务 "${oldName}" 已更新为 "${newName}"`);
+            addLog(`   📅 ${newStart} ~ ${newEnd}, 进度: ${newProgress}%`);
+            
+            gantt.calculateDateRange();
+            gantt.render();
+            container.innerHTML = '';
+        }
+    };
+    
+    // 取消按钮
+    document.getElementById('cancelEdit').onclick = () => {
+        gantt.render();
+        container.innerHTML = '';
+        addLog(`❌ 已取消对任务 "${task.name}" 的编辑`);
+    };
+}
 
-// ==================== 创建甘特图实例 ====================
-const gantt = new GanttChart('#gantt', initialTasks);
-
-// ==================== 初始化 ====================
-bindEvents(gantt);  // 从 event-bindings.js 调用
-
-// ==================== 初始化日志 ====================
-addLog('🎉 甘特图已就绪！拖动任务条可编辑日期，拖动两端可调整时长');
-addLog('💡 提示：双击任务名称或任务条可以快速编辑任务名称');
+// 暴露给全局
+window.showTaskForm = showTaskForm;
