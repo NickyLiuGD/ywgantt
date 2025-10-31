@@ -11,35 +11,40 @@ const initialTasks = [
         name: '网站设计',
         start: formatDate(addDays(today, -5)),
         end: formatDate(addDays(today, 2)),
-        progress: 65
+        progress: 65,
+        dependencies: []
     },
     {
         id: generateId(),
         name: '内容编写',
         start: formatDate(addDays(today, 3)),
         end: formatDate(addDays(today, 10)),
-        progress: 30
+        progress: 30,
+        dependencies: []
     },
     {
         id: generateId(),
         name: '样式开发',
         start: formatDate(addDays(today, 5)),
         end: formatDate(addDays(today, 8)),
-        progress: 45
+        progress: 45,
+        dependencies: []
     },
     {
         id: generateId(),
         name: '测试审核',
         start: formatDate(addDays(today, -2)),
         end: formatDate(addDays(today, 1)),
-        progress: 80
+        progress: 80,
+        dependencies: []
     },
     {
         id: generateId(),
         name: '项目上线',
         start: formatDate(addDays(today, 12)),
         end: formatDate(addDays(today, 14)),
-        progress: 0
+        progress: 0,
+        dependencies: []
     }
 ];
 
@@ -75,6 +80,10 @@ window.showTaskForm = function(task) {
             <div class="mb-3">
                 <label class="form-label">完成进度: <strong id="progressVal">${task.progress}%</strong></label>
                 <input type="range" class="form-range" id="editProgress" value="${task.progress}" min="0" max="100" step="5">
+            </div>
+            <div class="mb-2">
+                <label class="form-label">依赖任务 (ID,逗号分隔)</label>
+                <input type="text" class="form-control form-control-sm" id="editDependencies" value="${task.dependencies ? task.dependencies.join(',') : ''}">
             </div>
             <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 0.85rem;">
                 <div><strong>📅 持续时间:</strong> ${duration} 天</div>
@@ -129,12 +138,21 @@ window.showTaskForm = function(task) {
         task.start = document.getElementById('editStart').value;
         task.end = document.getElementById('editEnd').value;
         task.progress = parseInt(document.getElementById('editProgress').value);
+        task.dependencies = document.getElementById('editDependencies').value.split(',').map(id => id.trim()).filter(id => id);
         
-        gantt.calculateDateRange();
-        gantt.render();
-        
-        addLog(`✅ 任务 "${oldName}" 已更新为 "${task.name}"`);
-        addLog(`   📅 ${task.start} ~ ${task.end}, 进度: ${task.progress}%`);
+        const conflict = gantt.checkDependencies(task);
+        if (conflict) {
+            alert(`时间冲突: 依赖任务 "${conflict.depName}" 结束日期 (${conflict.depEnd}) 晚于本任务开始日期 (${task.start})`);
+            addLog(`⚠️ 时间冲突: 任务 "${task.name}" 与依赖 "${conflict.depName}" 冲突`);
+            // 可选: 回滚日期
+            // task.start = oldStart; 等
+        } else {
+            gantt.calculateDateRange();
+            gantt.render();
+            
+            addLog(`✅ 任务 "${oldName}" 已更新为 "${task.name}"`);
+            addLog(`   📅 ${task.start} ~ ${task.end}, 进度: ${task.progress}%`);
+        }
         container.innerHTML = '';
     };
     
@@ -155,7 +173,8 @@ document.getElementById('addTask').onclick = () => {
         name: '新任务',
         start: formatDate(new Date()),
         end: formatDate(addDays(new Date(), 3)),
-        progress: 0
+        progress: 0,
+        dependencies: []
     };
     gantt.addTask(newTask);
     addLog(`✅ 已添加任务 "${newTask.name}"`);
@@ -224,6 +243,12 @@ document.getElementById('enableResize').onchange = (e) => {
 document.getElementById('showWeekends').onchange = (e) => {
     gantt.updateOptions({ showWeekends: e.target.checked });
     addLog(`${e.target.checked ? '✅ 已显示' : '❌ 已隐藏'}周末`);
+};
+
+// 显示/隐藏依赖箭头
+document.getElementById('showDependencies').onchange = (e) => {
+    gantt.updateOptions({ showDependencies: e.target.checked });
+    addLog(`${e.target.checked ? '✅ 已显示' : '❌ 已隐藏'}依赖箭头`);
 };
 
 // 调整时间轴密度
