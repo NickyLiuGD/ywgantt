@@ -116,5 +116,5 @@ function showTaskForm(task, gantt) {
     };
 }
 
-// 暴露给全局（因为原项目使用 window.showTaskForm）
-window.showTaskForm = (task) => showTaskForm(task, gantt);
+// 暴露给全局
+window.showTaskForm = showTaskForm;
