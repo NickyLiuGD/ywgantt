@@ -52,6 +52,20 @@ function showTaskForm(task, gantt) {
         </div>
     `;
     
+    const updateTaskBar = () => {
+        const bar = gantt.container.querySelector(`.gantt-bar[data-task-id="${task.id}"]`);
+        if (bar) {
+            const label = bar.querySelector('.gantt-bar-label');
+            if (label) label.textContent = `${task.name} (${task.progress}%)`;
+        }
+    };
+    
+    // 实时更新名称
+    document.getElementById('editName').oninput = (e) => {
+        task.name = e.target.value;
+        updateTaskBar();
+    };
+    
     // 实时更新进度显示
     document.getElementById('editProgress').oninput = (e) => {
         const progress = e.target.value;
@@ -61,13 +75,21 @@ function showTaskForm(task, gantt) {
         const bar = gantt.container.querySelector(`.gantt-bar[data-task-id="${task.id}"]`);
         if (bar) {
             const progressBar = bar.querySelector('.gantt-bar-progress');
-            const label = bar.querySelector('.gantt-bar-label');
             if (progressBar) progressBar.style.width = progress + '%';
-            if (label) label.textContent = `${task.name} (${progress}%)`;
         }
+        updateTaskBar();
     };
     
-    // 实时更新日期预览
+    // 实时更新依赖
+    document.getElementById('editDependencies').oninput = (e) => {
+        task.dependencies = e.target.value.split(',').map(id => id.trim()).filter(id => id);
+        setTimeout(() => {
+            gantt.calculateDateRange();
+            gantt.render();
+        }, 0);
+    };
+    
+    // 实时更新日期预览和甘特图
     const updateDatePreview = () => {
         const start = document.getElementById('editStart').value;
         const end = document.getElementById('editEnd').value;
@@ -80,28 +102,30 @@ function showTaskForm(task, gantt) {
         }
     };
     
-    document.getElementById('editStart').onchange = updateDatePreview;
-    document.getElementById('editEnd').onchange = updateDatePreview;
+    document.getElementById('editStart').onchange = (e) => {
+        task.start = e.target.value;
+        updateDatePreview();
+        setTimeout(() => {
+            gantt.calculateDateRange();
+            gantt.render();
+        }, 0);
+    };
+    
+    document.getElementById('editEnd').onchange = (e) => {
+        task.end = e.target.value;
+        updateDatePreview();
+        setTimeout(() => {
+            gantt.calculateDateRange();
+            gantt.render();
+        }, 0);
+    };
     
     // 保存按钮
     document.getElementById('updateTask').onclick = () => {
         const oldName = task.name;
-        const oldStart = task.start;
-        const oldEnd = task.end;
-        const oldProgress = task.progress;
-        const oldDependencies = task.dependencies ? [...task.dependencies] : [];
-        
-        const newName = document.getElementById('editName').value;
-        const newStart = document.getElementById('editStart').value;
-        const newEnd = document.getElementById('editEnd').value;
-        const newProgress = parseInt(document.getElementById('editProgress').value);
-        const newDependencies = document.getElementById('editDependencies').value.split(',').map(id => id.trim()).filter(id => id);
-        
-        task.name = newName;
-        task.start = newStart;
-        task.end = newEnd;
-        task.progress = newProgress;
-        task.dependencies = newDependencies;
+        const newStart = task.start;
+        const newEnd = task.end;
+        const newProgress = task.progress;
         
         let hasError = false;
         
@@ -116,45 +140,36 @@ function showTaskForm(task, gantt) {
         const conflict = gantt.checkDependencies(task);
         if (conflict) {
             alert(`时间冲突: 依赖任务 "${conflict.depName}" 结束日期 (${conflict.depEnd}) 晚于本任务开始日期 (${newStart})`);
-            addLog(`⚠️ 时间冲突: 任务 "${newName}" 与依赖 "${conflict.depName}" 冲突`);
+            addLog(`⚠️ 时间冲突: 任务 "${task.name}" 与依赖 "${conflict.depName}" 冲突`);
             hasError = true;
         }
         
         if (hasError) {
-            // 回滚任务数据
-            task.name = oldName;
-            task.start = oldStart;
-            task.end = oldEnd;
-            task.progress = oldProgress;
-            task.dependencies = oldDependencies;
-            
-            // 回滚表单输入
-            document.getElementById('editName').value = oldName;
-            document.getElementById('editStart').value = oldStart;
-            document.getElementById('editEnd').value = oldEnd;
-            document.getElementById('editProgress').value = oldProgress;
-            document.getElementById('editDependencies').value = oldDependencies.join(',');
-            document.getElementById('progressVal').textContent = oldProgress + '%';
-            
-            updateDatePreview();
-            gantt.calculateDateRange();
-            gantt.render();
-            // 不关闭表单，允许用户修正
+            // 在实时更新中已处理任务数据，无需回滚
+            // 只需刷新图表
+            setTimeout(() => {
+                gantt.calculateDateRange();
+                gantt.render();
+            }, 0);
+            // 不关闭表单
         } else {
-            gantt.calculateDateRange();
-            gantt.render();
-            
-            addLog(`✅ 任务 "${oldName}" 已更新为 "${newName}"`);
+            addLog(`✅ 任务 "${oldName}" 已更新为 "${task.name}"`);
             addLog(`   📅 ${newStart} ~ ${newEnd}, 进度: ${newProgress}%`);
             
             container.innerHTML = '';
+            setTimeout(() => {
+                gantt.calculateDateRange();
+                gantt.render();
+            }, 0);
         }
     };
     
     // 取消按钮
     document.getElementById('cancelEdit').onclick = () => {
-        gantt.render();
         container.innerHTML = '';
+        setTimeout(() => {
+            gantt.render();
+        }, 0);
         addLog(`❌ 已取消对任务 "${task.name}" 的编辑`);
     };
 }
