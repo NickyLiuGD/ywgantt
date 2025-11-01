@@ -266,7 +266,7 @@ toggleButton.onclick = () => {
     }
 };
 
-// ==================== 新增：渲染PERT视图 ====================
+// ==================== 新增:渲染PERT视图 ====================
 function renderPertView() {
     const pertContainer = document.getElementById('pertContainer');
     pertContainer.innerHTML = ''; // 清空
@@ -281,22 +281,187 @@ function renderPertView() {
                 <p>PERT视图需要至少一个任务依赖关系才能渲染网络图。请在任务编辑中添加依赖后重试。</p>
             </div>
         `;
-        addLog('PERT视图：无依赖，无法渲染。请添加任务依赖。');
+        addLog('PERT视图:无依赖,无法渲染。请添加任务依赖。');
         return;
     }
 
-    const pertData = gantt.tasks.map(task => ({
-        id: task.id,
-        duration: daysBetween(task.start, task.end) + 1,
-        name: task.name,
-        dependsOn: task.dependencies || []
-    }));
+    // 创建SVG画布
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.style.width = '100%';
+    svg.style.height = '600px';
+    svg.style.border = '1px solid #dee2e6';
+    svg.style.backgroundColor = '#f8f9fa';
+    pertContainer.appendChild(svg);
 
-    const chart = anychart.pert();
-    chart.data(pertData, "asTable");
-    chart.title("PERT 图");
-    chart.container(pertContainer);
-    chart.draw();
+    // 计算节点位置 (使用层级布局)
+    const nodes = calculatePertLayout(gantt.tasks);
+    const svgWidth = pertContainer.clientWidth;
+    const svgHeight = 600;
+
+    // 绘制连接线
+    gantt.tasks.forEach(task => {
+        if (task.dependencies && task.dependencies.length > 0) {
+            task.dependencies.forEach(depId => {
+                const fromNode = nodes.find(n => n.id === depId);
+                const toNode = nodes.find(n => n.id === task.id);
+                if (fromNode && toNode) {
+                    drawArrow(svg, fromNode.x, fromNode.y, toNode.x, toNode.y);
+                }
+            });
+        }
+    });
+
+    // 绘制节点
+    nodes.forEach(node => {
+        drawPertNode(svg, node);
+    });
+
+    addLog('PERT视图已渲染');
+}
+
+// 计算PERT节点布局
+function calculatePertLayout(tasks) {
+    const nodes = [];
+    const taskMap = new Map(tasks.map(t => [t.id, t]));
+    
+    // 计算每个任务的层级
+    const levels = new Map();
+    const visited = new Set();
+    
+    function getLevel(taskId) {
+        if (levels.has(taskId)) return levels.get(taskId);
+        if (visited.has(taskId)) return 0; // 避免循环依赖
+        
+        visited.add(taskId);
+        const task = taskMap.get(taskId);
+        if (!task || !task.dependencies || task.dependencies.length === 0) {
+            levels.set(taskId, 0);
+            return 0;
+        }
+        
+        const maxDepLevel = Math.max(...task.dependencies.map(depId => getLevel(depId)));
+        const level = maxDepLevel + 1;
+        levels.set(taskId, level);
+        return level;
+    }
+    
+    tasks.forEach(task => getLevel(task.id));
+    
+    // 按层级分组
+    const levelGroups = new Map();
+    tasks.forEach(task => {
+        const level = levels.get(task.id) || 0;
+        if (!levelGroups.has(level)) levelGroups.set(level, []);
+        levelGroups.get(level).push(task);
+    });
+    
+    // 计算位置
+    const svgWidth = document.getElementById('pertContainer').clientWidth;
+    const svgHeight = 600;
+    const nodeWidth = 120;
+    const nodeHeight = 80;
+    const maxLevel = Math.max(...levels.values(), 0);
+    const levelWidth = svgWidth / (maxLevel + 2);
+    
+    levelGroups.forEach((tasksInLevel, level) => {
+        const levelHeight = svgHeight / (tasksInLevel.length + 1);
+        tasksInLevel.forEach((task, index) => {
+            const duration = daysBetween(task.start, task.end) + 1;
+            nodes.push({
+                id: task.id,
+                name: task.name,
+                duration: duration,
+                progress: task.progress,
+                x: levelWidth * (level + 1),
+                y: levelHeight * (index + 1),
+                width: nodeWidth,
+                height: nodeHeight
+            });
+        });
+    });
+    
+    return nodes;
+}
+
+// 绘制PERT节点
+function drawPertNode(svg, node) {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    
+    // 节点矩形
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', node.x - node.width / 2);
+    rect.setAttribute('y', node.y - node.height / 2);
+    rect.setAttribute('width', node.width);
+    rect.setAttribute('height', node.height);
+    rect.setAttribute('fill', '#ffffff');
+    rect.setAttribute('stroke', '#0d6efd');
+    rect.setAttribute('stroke-width', '2');
+    rect.setAttribute('rx', '5');
+    g.appendChild(rect);
+    
+    // 任务名称
+    const text1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text1.setAttribute('x', node.x);
+    text1.setAttribute('y', node.y - 15);
+    text1.setAttribute('text-anchor', 'middle');
+    text1.setAttribute('font-size', '12');
+    text1.setAttribute('font-weight', 'bold');
+    text1.setAttribute('fill', '#212529');
+    text1.textContent = node.name.length > 12 ? node.name.substring(0, 12) + '...' : node.name;
+    g.appendChild(text1);
+    
+    // 工期
+    const text2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text2.setAttribute('x', node.x);
+    text2.setAttribute('y', node.y + 5);
+    text2.setAttribute('text-anchor', 'middle');
+    text2.setAttribute('font-size', '11');
+    text2.setAttribute('fill', '#6c757d');
+    text2.textContent = `工期: ${node.duration}天`;
+    g.appendChild(text2);
+    
+    // 进度
+    const text3 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text3.setAttribute('x', node.x);
+    text3.setAttribute('y', node.y + 20);
+    text3.setAttribute('text-anchor', 'middle');
+    text3.setAttribute('font-size', '11');
+    text3.setAttribute('fill', '#198754');
+    text3.textContent = `完成: ${node.progress}%`;
+    g.appendChild(text3);
+    
+    svg.appendChild(g);
+}
+
+// 绘制箭头
+function drawArrow(svg, x1, y1, x2, y2) {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x1);
+    line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2);
+    line.setAttribute('y2', y2);
+    line.setAttribute('stroke', '#6c757d');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('marker-end', 'url(#arrowhead)');
+    svg.appendChild(line);
+    
+    // 确保箭头标记存在
+    if (!svg.querySelector('#arrowhead')) {
+        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+        marker.setAttribute('id', 'arrowhead');
+        marker.setAttribute('markerWidth', '10');
+        marker.setAttribute('markerHeight', '10');
+        marker.setAttribute('refX', '9');
+        marker.setAttribute('refY', '3');
+        marker.setAttribute('orient', 'auto');
+        const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        polygon.setAttribute('points', '0 0, 10 3, 0 6');
+        polygon.setAttribute('fill', '#6c757d');
+        marker.appendChild(polygon);
+        defs.appendChild(marker);
+        svg.appendChild(defs);
+    }
 }
 
 // ==================== 初始化日志 ====================
