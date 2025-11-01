@@ -129,12 +129,9 @@ class GanttChart {
         `;
 
         if (this.options.showDependencies) {
-            const rowHeight = 60;
+            const rowHeight = 60; // h
             const w = this.options.cellWidth;
             const h = rowHeight;
-            const horizontal_offset = w / 4;
-            const vertical_bump = h / 8;
-            const horizontal_back = w;
             const radius = 10;
 
             this.tasks.forEach((task, taskIndex) => {
@@ -145,34 +142,33 @@ class GanttChart {
                     const depIndex = this.tasks.findIndex(t => t.id === depId);
                     const depEndOffset = daysBetween(this.startDate, depTask.end);
                     const taskStartOffset = daysBetween(this.startDate, task.start);
-                    const x1 = depEndOffset * w + w;
-                    const x2 = taskStartOffset * w;
-                    const y1 = rowHeight + depIndex * rowHeight + rowHeight / 2;
-                    const y2 = rowHeight + taskIndex * rowHeight + rowHeight / 2;
+                    const x1 = depEndOffset * w + w; // 前置最右侧
+                    const x2 = taskStartOffset * w; // 后继左侧
+                    const y1 = rowHeight + depIndex * rowHeight + rowHeight / 2; // 前置中心
+                    const y2 = rowHeight + taskIndex * rowHeight + rowHeight / 2; // 后继中心
+                    const d = Math.abs(taskIndex - depIndex); // 距离d，相邻1，隔一2等
 
                     let coords;
-                    if (y1 < y2) {
-                        // 前置在上方
+                    if (depIndex < taskIndex) { // 前置在上方 (y1 < y2)
                         coords = [
-                            {x: x1, y: y1},
-                            {x: x1 + horizontal_offset, y: y1},
-                            {x: x1 + horizontal_offset, y: y1 + vertical_bump},
-                            {x: x1 + horizontal_offset - horizontal_back, y: y1 + vertical_bump},
-                            {x: x1 + horizontal_offset - horizontal_back, y: y2},
-                            {x: x2, y: y2}
+                            {x: x1, y: y1}, // start
+                            {x: x1 + w / 2, y: y1}, // 右 w/2
+                            {x: x1 + w / 2, y: y1 + h / 8}, // 下 h/8
+                            {x: x1 + w / 2 - w / d, y: y1 + h / 8}, // 左 w/d
+                            {x: x1 + w / 2 - w / d, y: y2}, // 下 to y2
+                            {x: x2, y: y2} // 水平 to x2
                         ];
-                    } else if (y1 > y2) {
-                        // 前置在下方
+                    } else if (depIndex > taskIndex) { // 前置在下方 (y1 > y2)
                         coords = [
-                            {x: x1, y: y1},
-                            {x: x1 + horizontal_offset, y: y1},
-                            {x: x1 + horizontal_offset, y: y1 - vertical_bump},
-                            {x: x1 + horizontal_offset - horizontal_back, y: y1 - vertical_bump},
-                            {x: x1 + horizontal_offset - horizontal_back, y: y2},
-                            {x: x2, y: y2}
+                            {x: x1, y: y1}, // start
+                            {x: x1 + w / 2, y: y1}, // 右 w/2
+                            {x: x1 + w / 2, y: y1 - h / 8}, // 上 h/8 (负方向)
+                            {x: x1 + w / 2 - w / d, y: y1 - h / 8}, // 左 w/d
+                            {x: x1 + w / 2 - w / d, y: y2}, // 上 to y2 (负方向)
+                            {x: x2, y: y2} // 水平 to x2
                         ];
                     } else {
-                        // 同行，回退到简单路径
+                        // 同行，使用简单弯曲路径
                         const sign = x2 > x1 ? 1 : -1;
                         const bend = 20;
                         coords = [
@@ -183,9 +179,9 @@ class GanttChart {
                         ];
                     }
 
-                    const d = createRoundedPath(coords, radius, false);
+                    const dPath = createRoundedPath(coords, radius, false);
 
-                    depSVG.innerHTML += `<path d="${d}" stroke="#dc3545" fill="none" stroke-width="2" marker-end="url(#arrow)" />`;
+                    depSVG.innerHTML += `<path d="${dPath}" stroke="#dc3545" fill="none" stroke-width="2" marker-end="url(#arrow)" />`;
                 });
             });
         }
