@@ -84,6 +84,7 @@ window.showTaskForm = function(task) {
             <div class="mb-2">
                 <label class="form-label">依赖任务 (ID,逗号分隔)</label>
                 <input type="text" class="form-control form-control-sm" id="editDependencies" value="${task.dependencies ? task.dependencies.join(',') : ''}">
+                <small class="text-muted">可用任务ID: ${gantt.tasks.filter(t => t.id !== task.id).map(t => t.id).join(', ')}</small>
             </div>
             <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 0.85rem;">
                 <div><strong>📅 持续时间:</strong> ${duration} 天</div>
@@ -138,13 +139,19 @@ window.showTaskForm = function(task) {
         task.start = document.getElementById('editStart').value;
         task.end = document.getElementById('editEnd').value;
         task.progress = parseInt(document.getElementById('editProgress').value);
-        task.dependencies = document.getElementById('editDependencies').value.split(',').map(id => id.trim()).filter(id => id);
+        task.dependencies = document.getElementById('editDependencies').value
+            .split(',')
+            .map(id => id.trim())
+            .filter(id => id);
         
         gantt.calculateDateRange();
         gantt.render();
         
         addLog(`✅ 任务 "${oldName}" 已更新为 "${task.name}"`);
         addLog(`   📅 ${task.start} ~ ${task.end}, 进度: ${task.progress}%`);
+        if (task.dependencies.length > 0) {
+            addLog(`   🔗 依赖: ${task.dependencies.join(', ')}`);
+        }
         container.innerHTML = '';
     };
     
@@ -219,6 +226,27 @@ document.getElementById('loadData').onclick = () => {
     input.click();
 };
 
+// ==================== 冲突检测按钮 ====================
+
+// 检测时间冲突
+document.getElementById('checkConflicts').onclick = () => {
+    gantt.checkConflicts();
+};
+
+// 自动修复冲突
+document.getElementById('autoFixConflicts').onclick = () => {
+    if (confirm('确定要自动修复所有时间冲突吗？\n\n这会调整冲突任务的开始和结束时间，\n使其在依赖任务完成后开始。')) {
+        gantt.autoFixConflicts();
+    }
+};
+
+// 清除冲突高亮
+document.getElementById('clearHighlights').onclick = () => {
+    gantt.clearConflictHighlights();
+};
+
+// ==================== 编辑设置 ====================
+
 // 启用/禁用拖拽编辑
 document.getElementById('enableEdit').onchange = (e) => {
     gantt.updateOptions({ enableEdit: e.target.checked });
@@ -252,3 +280,4 @@ document.getElementById('cellWidth').oninput = (e) => {
 // ==================== 初始化日志 ====================
 addLog('🎉 甘特图已就绪！拖动任务条可编辑日期，拖动两端可调整时长');
 addLog('💡 提示：双击任务名称或任务条可以快速编辑任务名称');
+addLog('🔍 新功能：点击"检测时间冲突"按钮可以检查依赖关系是否合理');

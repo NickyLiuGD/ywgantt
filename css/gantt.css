@@ -311,3 +311,55 @@ body {
     pointer-events: none;
     z-index: 5;
 }
+
+/* ======================
+   冲突检测样式
+   添加到 gantt.css 文件末尾
+   ====================== */
+
+/* 冲突任务高亮样式 */
+.gantt-bar.conflict {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%) !important;
+    box-shadow: 0 4px 16px rgba(255, 107, 107, 0.6) !important;
+    animation: pulse-conflict 2s infinite;
+    z-index: 20 !important;
+}
+
+.gantt-bar.conflict:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.8) !important;
+}
+
+/* 冲突脉动动画 */
+@keyframes pulse-conflict {
+    0%, 100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% { 
+        transform: scale(1.02);
+        opacity: 0.9;
+    }
+}
+
+/* 冲突任务的进度条 */
+.gantt-bar.conflict .gantt-bar-progress {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+/* 冲突任务名称高亮 */
+.gantt-task-name.conflict {
+    background: #fff5f5 !important;
+    border-left: 4px solid #ff6b6b !important;
+    color: #c92a2a;
+    font-weight: 600;
+}
+
+/* 冲突报告列表样式优化 */
+.list-group-item-danger {
+    border-left: 4px solid #dc3545;
+}
+
+.list-group-item-warning {
+    border-left: 4px solid #ffc107;
+}
