@@ -37,9 +37,15 @@ function detectTaskConflicts(task, allTasks) {
         
         const depEnd = new Date(depTask.end);
         
-        // 检查时间冲突：任务开始时间 < 依赖任务结束时间
-        if (taskStart < depEnd) {
+        // 修正判断逻辑：任务开始时间 <= 依赖任务结束时间 就是冲突
+        // 因为任务应该在依赖任务结束后的次日开始
+        if (taskStart <= depEnd) {
             const daysDiff = daysBetween(taskStart, depEnd);
+            
+            // 计算正确的开始日期应该是什么
+            const correctStart = addDays(depEnd, 1);
+            const correctStartStr = formatDate(correctStart);
+            
             conflicts.push({
                 type: 'TIME_CONFLICT',
                 taskId: task.id,
@@ -48,8 +54,9 @@ function detectTaskConflicts(task, allTasks) {
                 dependencyId: depTask.id,
                 dependencyName: depTask.name,
                 dependencyEnd: depTask.end,
-                daysDiff: daysDiff,
-                message: `任务"${task.name}"(${task.start})早于依赖任务"${depTask.name}"(结束于${depTask.end})，冲突${daysDiff}天`
+                daysDiff: daysDiff + 1, // 加1表示包含结束当天
+                correctStart: correctStartStr,
+                message: `任务"${task.name}"(${task.start}开始)与依赖任务"${depTask.name}"(${depTask.end}结束)冲突，应在${correctStartStr}之后开始，当前冲突${daysDiff + 1}天`
             });
         }
     });
@@ -116,9 +123,10 @@ function generateConflictReport(result) {
                     </div>
                     <p class="mb-1">
                         <strong>任务：</strong>${conflict.taskName}<br>
-                        <strong>开始时间：</strong>${conflict.taskStart}<br>
+                        <strong>当前开始时间：</strong><span class="text-danger">${conflict.taskStart}</span><br>
                         <strong>依赖任务：</strong>${conflict.dependencyName}<br>
-                        <strong>依赖结束时间：</strong>${conflict.dependencyEnd}
+                        <strong>依赖结束时间：</strong>${conflict.dependencyEnd}<br>
+                        <strong>建议开始时间：</strong><span class="text-success">${conflict.correctStart}</span>
                     </p>
                     <small class="text-danger">${conflict.message}</small>
                 </div>
@@ -164,7 +172,7 @@ function highlightConflictTasks(conflictTaskIds, container) {
 }
 
 /**
- * 自动修复时间冲突（将任务移动到依赖任务结束后）
+ * 自动修复时间冲突（将任务移动到依赖任务结束后的次日）
  * @param {Array} tasks - 任务数组
  * @returns {Object} 修复结果
  */
@@ -181,18 +189,20 @@ function autoFixConflicts(tasks) {
         
         // 找出所有依赖任务中最晚的结束时间
         let latestDepEnd = null;
+        let latestDepName = '';
         task.dependencies.forEach(depId => {
             const depTask = tasks.find(t => t.id === depId);
             if (depTask) {
                 const depEnd = new Date(depTask.end);
                 if (!latestDepEnd || depEnd > latestDepEnd) {
                     latestDepEnd = depEnd;
+                    latestDepName = depTask.name;
                 }
             }
         });
         
-        // 如果任务开始早于依赖结束，则修复
-        if (latestDepEnd && taskStart < latestDepEnd) {
+        // 修正判断逻辑：如果任务开始 <= 依赖结束，则需要修复
+        if (latestDepEnd && taskStart <= latestDepEnd) {
             const oldStart = task.start;
             const oldEnd = task.end;
             
@@ -210,7 +220,9 @@ function autoFixConflicts(tasks) {
                 oldEnd: oldEnd,
                 newStart: task.start,
                 newEnd: task.end,
-                message: `任务"${task.name}"从 ${oldStart}~${oldEnd} 调整为 ${task.start}~${task.end}`
+                dependencyName: latestDepName,
+                dependencyEnd: formatDate(latestDepEnd),
+                message: `任务"${task.name}"从 ${oldStart}~${oldEnd} 调整为 ${task.start}~${task.end} (依赖任务"${latestDepName}"结束于${formatDate(latestDepEnd)})`
             });
         }
     });
@@ -241,6 +253,13 @@ GanttChart.prototype.checkConflicts = function() {
     if (result.hasConflicts) {
         highlightConflictTasks(result.conflictTaskIds, this.container);
         addLog(`⚠️ 发现 ${result.conflictCount} 个时间冲突，涉及 ${result.conflictTaskCount} 个任务`);
+        
+        // 在日志中列出每个冲突的详细信息
+        result.conflicts.forEach((conflict, index) => {
+            if (conflict.type === 'TIME_CONFLICT') {
+                addLog(`   ${index + 1}. "${conflict.taskName}"应在"${conflict.dependencyName}"完成后（${conflict.correctStart}）开始`);
+            }
+        });
     } else {
         addLog('✅ 所有任务时间安排合理，无冲突');
     }
@@ -264,6 +283,16 @@ GanttChart.prototype.autoFixConflicts = function() {
         this.render();
         
         addLog(`✅ 已自动修复 ${fixResult.fixCount} 个时间冲突`);
+        
+        // 修复后再次检测，确认无遗留冲突
+        setTimeout(() => {
+            const recheckResult = detectAllConflicts(this.tasks);
+            if (recheckResult.hasConflicts) {
+                addLog(`⚠️ 警告：仍存在 ${recheckResult.conflictCount} 个冲突（可能存在循环依赖）`);
+            } else {
+                addLog(`✅ 验证通过：所有冲突已解决`);
+            }
+        }, 100);
     } else {
         addLog('✅ 无需修复，所有任务时间安排合理');
     }
