@@ -363,3 +363,30 @@ body {
 .list-group-item-warning {
     border-left: 4px solid #ffc107;
 }
+/* ======================
+   依赖选择器样式
+   ====================== */
+.dep-list {
+    background: #f8f9fa;
+    font-size: 0.875rem;
+    min-height: 40px;
+}
+
+.dep-item {
+    margin: 2px 4px;
+    padding: 2px 6px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    display: inline-block;
+}
+
+.dep-item input:checked + label {
+    font-weight: 600;
+    color: #007bff;
+}
+
+.dep-item:hover {
+    background: #e9ecef;
+    border-color: #007bff;
+}

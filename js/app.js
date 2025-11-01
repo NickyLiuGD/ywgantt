@@ -51,18 +51,17 @@ const initialTasks = [
 // ==================== 创建甘特图实例 ====================
 const gantt = new GanttChart('#gantt', initialTasks);
 
-// ==================== 任务表单函数 ====================
-/**
- * 显示任务编辑表单
- * @param {Object} task - 任务对象
- */
+// ==================== 任务表单函数（图形化依赖）===================
 window.showTaskForm = function(task) {
     const container = document.getElementById('taskFormContainer');
     const duration = daysBetween(task.start, task.end) + 1;
     
+    // 可用任务（排除自身）
+    const availableTasks = gantt.tasks.filter(t => t.id !== task.id);
+
     container.innerHTML = `
         <div class="task-form">
-            <h6 class="mb-3">📝 编辑任务</h6>
+            <h6 class="mb-3">编辑任务</h6>
             <div class="mb-2">
                 <label class="form-label">任务名称</label>
                 <input type="text" class="form-control form-control-sm" id="editName" value="${task.name}">
@@ -81,102 +80,80 @@ window.showTaskForm = function(task) {
                 <label class="form-label">完成进度: <strong id="progressVal">${task.progress}%</strong></label>
                 <input type="range" class="form-range" id="editProgress" value="${task.progress}" min="0" max="100" step="5">
             </div>
-            <div class="mb-2">
-                <label class="form-label">依赖任务 (ID,逗号分隔)</label>
-                <input type="text" class="form-control form-control-sm" id="editDependencies" value="${task.dependencies ? task.dependencies.join(',') : ''}">
-                <small class="text-muted">可用任务ID: ${gantt.tasks.filter(t => t.id !== task.id).map(t => t.id).join(', ')}</small>
+
+            <!-- 图形化依赖选择器 -->
+            <div class="mb-3">
+                <label class="form-label">依赖任务（点击甘特图任务条选择）</label>
+                <div id="depList" class="dep-list border rounded p-2" style="max-height:120px;overflow-y:auto;">
+                    ${availableTasks.length > 0 ? availableTasks.map(t => `
+                        <div class="dep-item form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" value="${t.id}" id="dep_${t.id}"
+                                ${task.dependencies?.includes(t.id) ? 'checked' : ''}>
+                            <label class="form-check-label small" for="dep_${t.id}">${t.name}</label>
+                        </div>
+                    `).join('') : '<small class="text-muted">无其他任务</small>'}
+                </div>
+                <small class="text-muted">提示：点击甘特图任务条可快速切换依赖</small>
             </div>
-            <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 0.85rem;">
-                <div><strong>📅 持续时间:</strong> ${duration} 天</div>
-                <div><strong>📍 当前状态:</strong> ${task.progress}% 完成</div>
-            </div>
-            <div class="d-grid gap-2">
-                <button class="btn btn-primary btn-sm" id="updateTask">
-                    ✓ 保存更改
-                </button>
-                <button class="btn btn-outline-secondary btn-sm" id="cancelEdit">
-                    ✕ 取消编辑
-                </button>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary btn-sm" id="saveTask">保存</button>
+                <button class="btn btn-secondary btn-sm" id="cancelEdit">取消</button>
             </div>
         </div>
     `;
-    
-    // 实时更新进度显示
-    document.getElementById('editProgress').oninput = (e) => {
-        const progress = e.target.value;
-        document.getElementById('progressVal').textContent = progress + '%';
-        
-        task.progress = parseInt(progress);
-        const bar = gantt.container.querySelector(`.gantt-bar[data-task-id="${task.id}"]`);
-        if (bar) {
-            const progressBar = bar.querySelector('.gantt-bar-progress');
-            const label = bar.querySelector('.gantt-bar-label');
-            if (progressBar) progressBar.style.width = progress + '%';
-            if (label) label.textContent = `${task.name} (${progress}%)`;
-        }
+
+    // 进度滑块实时显示
+    const progressInput = document.getElementById('editProgress');
+    const progressVal = document.getElementById('progressVal');
+    progressInput.oninput = () => {
+        progressVal.textContent = progressInput.value + '%';
     };
-    
-    // 实时更新日期预览
-    const updateDatePreview = () => {
-        const start = document.getElementById('editStart').value;
-        const end = document.getElementById('editEnd').value;
-        if (start && end) {
-            const days = daysBetween(start, end) + 1;
-            container.querySelector('.alert-info').innerHTML = `
-                <div><strong>📅 持续时间:</strong> ${days} 天</div>
-                <div><strong>📍 当前状态:</strong> ${task.progress}% 完成</div>
-            `;
+
+    // 保存任务
+    document.getElementById('saveTask').onclick = () => {
+        const newName = document.getElementById('editName').value.trim();
+        if (!newName) {
+            alert('任务名称不能为空');
+            return;
         }
-    };
-    
-    document.getElementById('editStart').onchange = updateDatePreview;
-    document.getElementById('editEnd').onchange = updateDatePreview;
-    
-    // 保存按钮
-    document.getElementById('updateTask').onclick = () => {
-        const oldName = task.name;
-        task.name = document.getElementById('editName').value;
+
+        task.name = newName;
         task.start = document.getElementById('editStart').value;
         task.end = document.getElementById('editEnd').value;
-        task.progress = parseInt(document.getElementById('editProgress').value);
-        task.dependencies = document.getElementById('editDependencies').value
-            .split(',')
-            .map(id => id.trim())
-            .filter(id => id);
-        
+        task.progress = parseInt(progressInput.value);
+
+        // 收集选中的依赖ID
+        task.dependencies = Array.from(document.querySelectorAll('#depList input[type="checkbox"]:checked'))
+            .map(cb => cb.value);
+
         gantt.calculateDateRange();
         gantt.render();
-        
-        addLog(`✅ 任务 "${oldName}" 已更新为 "${task.name}"`);
-        addLog(`   📅 ${task.start} ~ ${task.end}, 进度: ${task.progress}%`);
-        if (task.dependencies.length > 0) {
-            addLog(`   🔗 依赖: ${task.dependencies.join(', ')}`);
-        }
+        addLog(`任务 "${task.name}" 已更新`);
         container.innerHTML = '';
     };
-    
-    // 取消按钮
+
+    // 取消编辑
     document.getElementById('cancelEdit').onclick = () => {
-        gantt.render();
         container.innerHTML = '';
-        addLog(`❌ 已取消对任务 "${task.name}" 的编辑`);
     };
 };
 
-// ==================== 按钮事件绑定 ====================
+// ==================== 控制按钮事件 ====================
 
 // 添加任务
 document.getElementById('addTask').onclick = () => {
     const newTask = {
         id: generateId(),
         name: '新任务',
-        start: formatDate(new Date()),
-        end: formatDate(addDays(new Date(), 3)),
+        start: formatDate(today),
+        end: formatDate(addDays(today, 3)),
         progress: 0,
         dependencies: []
     };
     gantt.addTask(newTask);
-    addLog(`✅ 已添加任务 "${newTask.name}"`);
+    gantt.selectTask(newTask.id);
+    addLog(`已添加新任务`);
 };
 
 // 删除任务
@@ -185,7 +162,7 @@ document.getElementById('deleteTask').onclick = () => {
     if (task) {
         if (confirm(`确定删除任务 "${task.name}"?`)) {
             gantt.deleteTask(task.id);
-            addLog(`🗑️ 已删除任务 "${task.name}"`);
+            addLog(`已删除任务 "${task.name}"`);
             document.getElementById('taskFormContainer').innerHTML = '';
         }
     } else {
@@ -197,7 +174,7 @@ document.getElementById('deleteTask').onclick = () => {
 document.getElementById('saveData').onclick = () => {
     const filename = `gantt-${formatDate(new Date())}.json`;
     downloadJSON(gantt.tasks, filename);
-    addLog('💾 数据已导出');
+    addLog('数据已导出');
 };
 
 // 加载数据
@@ -216,7 +193,7 @@ document.getElementById('loadData').onclick = () => {
                 gantt.tasks = loadedTasks;
                 gantt.calculateDateRange();
                 gantt.render();
-                addLog(`📂 已加载 ${loadedTasks.length} 个任务`);
+                addLog(`已加载 ${loadedTasks.length} 个任务`);
             } catch (err) {
                 alert('文件格式错误：' + err.message);
             }
@@ -228,56 +205,48 @@ document.getElementById('loadData').onclick = () => {
 
 // ==================== 冲突检测按钮 ====================
 
-// 检测时间冲突
 document.getElementById('checkConflicts').onclick = () => {
     gantt.checkConflicts();
 };
 
-// 自动修复冲突
 document.getElementById('autoFixConflicts').onclick = () => {
-    if (confirm('确定要自动修复所有时间冲突吗？\n\n这会调整冲突任务的开始和结束时间，\n使其在依赖任务完成后开始。')) {
+    if (confirm('确定要自动修复所有时间冲突吗？\n\n这会调整冲突任务的开始和结束时间。')) {
         gantt.autoFixConflicts();
     }
 };
 
-// 清除冲突高亮
 document.getElementById('clearHighlights').onclick = () => {
     gantt.clearConflictHighlights();
 };
 
 // ==================== 编辑设置 ====================
 
-// 启用/禁用拖拽编辑
 document.getElementById('enableEdit').onchange = (e) => {
     gantt.updateOptions({ enableEdit: e.target.checked });
-    addLog(`${e.target.checked ? '✅ 已启用' : '❌ 已禁用'}拖拽移动`);
+    addLog(`${e.target.checked ? '已启用' : '已禁用'}拖拽移动`);
 };
 
-// 启用/禁用大小调整
 document.getElementById('enableResize').onchange = (e) => {
     gantt.updateOptions({ enableResize: e.target.checked });
-    addLog(`${e.target.checked ? '✅ 已启用' : '❌ 已禁用'}大小调整`);
+    addLog(`${e.target.checked ? '已启用' : '已禁用'}大小调整`);
 };
 
-// 显示/隐藏周末
 document.getElementById('showWeekends').onchange = (e) => {
     gantt.updateOptions({ showWeekends: e.target.checked });
-    addLog(`${e.target.checked ? '✅ 已显示' : '❌ 已隐藏'}周末`);
+    addLog(`${e.target.checked ? '已显示' : '已隐藏'}周末`);
 };
 
-// 显示/隐藏依赖箭头
 document.getElementById('showDependencies').onchange = (e) => {
     gantt.updateOptions({ showDependencies: e.target.checked });
-    addLog(`${e.target.checked ? '✅ 已显示' : '❌ 已隐藏'}依赖箭头`);
+    addLog(`${e.target.checked ? '已显示' : '已隐藏'}依赖箭头`);
 };
 
-// 调整时间轴密度
 document.getElementById('cellWidth').oninput = (e) => {
     gantt.updateOptions({ cellWidth: parseInt(e.target.value) });
     document.getElementById('cellWidthValue').textContent = e.target.value;
 };
 
 // ==================== 初始化日志 ====================
-addLog('🎉 甘特图已就绪！拖动任务条可编辑日期，拖动两端可调整时长');
-addLog('💡 提示：双击任务名称或任务条可以快速编辑任务名称');
-addLog('🔍 新功能：点击"检测时间冲突"按钮可以检查依赖关系是否合理');
+addLog('甘特图已就绪！悬停任务条可选中，点击可拖拽');
+addLog('提示：编辑任务时，点击甘特图任务条可快速设置依赖');
+addLog('新功能：检测时间冲突 → 自动修复');
