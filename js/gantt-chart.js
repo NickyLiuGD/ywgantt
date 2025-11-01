@@ -144,7 +144,19 @@ class GanttChart {
 
                     const bend = 20;
                     const sign = x2 > x1 ? 1 : -1;
-                    let d = `M${x1},${y1} h${sign * bend} v${y2 - y1} h${(x2 - x1) - sign * bend}`;
+                    const midX = x1 + sign * bend;
+
+                    // 定义路径坐标点
+                    const coords = [
+                        {x: x1, y: y1},
+                        {x: midX, y: y1},
+                        {x: midX, y: y2},
+                        {x: x2, y: y2}
+                    ];
+
+                    // 使用圆角路径，半径为10
+                    const radius = 10;
+                    const d = createRoundedPath(coords, radius, false);
 
                     depSVG.innerHTML += `<path d="${d}" stroke="#dc3545" fill="none" stroke-width="2" marker-end="url(#arrow)" />`;
                 });

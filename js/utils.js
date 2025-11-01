@@ -118,3 +118,38 @@ function downloadJSON(data, filename) {
     a.click();
     URL.revokeObjectURL(url);
 }
+
+/**
+ * 创建带圆角的SVG路径字符串
+ * @param {Array<{x: number, y: number}>} coords - 路径坐标点数组
+ * @param {number} radius - 圆角半径
+ * @param {boolean} close - 是否闭合路径 (默认 false)
+ * @returns {string} SVG路径字符串
+ */
+function createRoundedPath(coords, radius, close = false) {
+    let path = "";
+    const length = coords.length + (close ? 1 : -1);
+    for (let i = 0; i < length; i++) {
+        const a = coords[i % coords.length];
+        const b = coords[(i + 1) % coords.length];
+        const t = Math.min(radius / Math.hypot(b.x - a.x, b.y - a.y), 0.5);
+
+        if (i > 0) {
+            path += `Q${a.x},${a.y} ${a.x * (1 - t) + b.x * t},${a.y * (1 - t) + b.y * t}`;
+        }
+
+        if (!close && i === 0) {
+            path += `M${a.x},${a.y}`;
+        } else if (i === 0) {
+            path += `M${a.x * (1 - t) + b.x * t},${a.y * (1 - t) + b.y * t}`;
+        }
+
+        if (!close && i === length - 1) {
+            path += `L${b.x},${b.y}`;
+        } else if (i < length - 1) {
+            path += `L${a.x * t + b.x * (1 - t)},${a.y * t + b.y * (1 - t)}`;
+        }
+    }
+    if (close) path += "Z";
+    return path;
+}
