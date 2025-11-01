@@ -129,6 +129,14 @@ class GanttChart {
         `;
 
         if (this.options.showDependencies) {
+            const rowHeight = 60;
+            const w = this.options.cellWidth;
+            const h = rowHeight;
+            const horizontal_offset = w / 4;
+            const vertical_bump = h / 8;
+            const horizontal_back = w;
+            const radius = 10;
+
             this.tasks.forEach((task, taskIndex) => {
                 if (!task.dependencies || task.dependencies.length === 0) return;
                 task.dependencies.forEach(depId => {
@@ -137,25 +145,44 @@ class GanttChart {
                     const depIndex = this.tasks.findIndex(t => t.id === depId);
                     const depEndOffset = daysBetween(this.startDate, depTask.end);
                     const taskStartOffset = daysBetween(this.startDate, task.start);
-                    const x1 = depEndOffset * this.options.cellWidth + this.options.cellWidth;
-                    const x2 = taskStartOffset * this.options.cellWidth;
-                    const y1 = 60 + depIndex * 60 + 30;
-                    const y2 = 60 + taskIndex * 60 + 30;
+                    const x1 = depEndOffset * w + w;
+                    const x2 = taskStartOffset * w;
+                    const y1 = rowHeight + depIndex * rowHeight + rowHeight / 2;
+                    const y2 = rowHeight + taskIndex * rowHeight + rowHeight / 2;
 
-                    const bend = 20;
-                    const sign = x2 > x1 ? 1 : -1;
-                    const midX = x1 + sign * bend;
+                    let coords;
+                    if (y1 < y2) {
+                        // 前置在上方
+                        coords = [
+                            {x: x1, y: y1},
+                            {x: x1 + horizontal_offset, y: y1},
+                            {x: x1 + horizontal_offset, y: y1 + vertical_bump},
+                            {x: x1 + horizontal_offset - horizontal_back, y: y1 + vertical_bump},
+                            {x: x1 + horizontal_offset - horizontal_back, y: y2},
+                            {x: x2, y: y2}
+                        ];
+                    } else if (y1 > y2) {
+                        // 前置在下方
+                        coords = [
+                            {x: x1, y: y1},
+                            {x: x1 + horizontal_offset, y: y1},
+                            {x: x1 + horizontal_offset, y: y1 - vertical_bump},
+                            {x: x1 + horizontal_offset - horizontal_back, y: y1 - vertical_bump},
+                            {x: x1 + horizontal_offset - horizontal_back, y: y2},
+                            {x: x2, y: y2}
+                        ];
+                    } else {
+                        // 同行，回退到简单路径
+                        const sign = x2 > x1 ? 1 : -1;
+                        const bend = 20;
+                        coords = [
+                            {x: x1, y: y1},
+                            {x: x1 + sign * bend, y: y1},
+                            {x: x1 + sign * bend, y: y2},
+                            {x: x2, y: y2}
+                        ];
+                    }
 
-                    // 定义路径坐标点
-                    const coords = [
-                        {x: x1, y: y1},
-                        {x: midX, y: y1},
-                        {x: midX, y: y2},
-                        {x: x2, y: y2}
-                    ];
-
-                    // 使用圆角路径，半径为10
-                    const radius = 10;
                     const d = createRoundedPath(coords, radius, false);
 
                     depSVG.innerHTML += `<path d="${d}" stroke="#dc3545" fill="none" stroke-width="2" marker-end="url(#arrow)" />`;
