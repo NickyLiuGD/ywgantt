@@ -109,11 +109,48 @@ class GanttChart {
                             ${this.tasks.map(task => this.renderRow(task, dates)).join('')}
                         </div>
                     </div>
+                    <svg class="gantt-dependencies" style="position: absolute; top: 0; left: 0; pointer-events: none;"></svg>
                 </div>
             </div>
         `;
 
         this.container.innerHTML = html;
+
+        const depSVG = this.container.querySelector('.gantt-dependencies');
+        depSVG.style.width = `${dates.length * this.options.cellWidth}px`;
+        depSVG.style.height = `${60 + this.tasks.length * 60}px`;
+
+        depSVG.innerHTML = `
+            <defs>
+                <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc3545" />
+                </marker>
+            </defs>
+        `;
+
+        if (this.options.showDependencies) {
+            this.tasks.forEach((task, taskIndex) => {
+                if (!task.dependencies || task.dependencies.length === 0) return;
+                task.dependencies.forEach(depId => {
+                    const depTask = this.tasks.find(t => t.id === depId);
+                    if (!depTask) return;
+                    const depIndex = this.tasks.findIndex(t => t.id === depId);
+                    const depEndOffset = daysBetween(this.startDate, depTask.end);
+                    const taskStartOffset = daysBetween(this.startDate, task.start);
+                    const x1 = depEndOffset * this.options.cellWidth + this.options.cellWidth;
+                    const x2 = taskStartOffset * this.options.cellWidth;
+                    const y1 = 60 + depIndex * 60 + 30;
+                    const y2 = 60 + taskIndex * 60 + 30;
+
+                    const bend = 20;
+                    const sign = x2 > x1 ? 1 : -1;
+                    let d = `M${x1},${y1} h${sign * bend} v${y2 - y1} h${(x2 - x1) - sign * bend}`;
+
+                    depSVG.innerHTML += `<path d="${d}" stroke="#dc3545" fill="none" stroke-width="2" marker-end="url(#arrow)" />`;
+                });
+            });
+        }
+
         this.attachEvents();
     }
 
@@ -133,41 +170,12 @@ class GanttChart {
         const width = Math.max(duration * this.options.cellWidth, 80);
         const progress = task.progress || 0;
 
-        let dependenciesHtml = '';
-        if (this.options.showDependencies && task.dependencies && task.dependencies.length > 0) {
-            task.dependencies.forEach(depId => {
-                const depTask = this.tasks.find(t => t.id === depId);
-                if (depTask) {
-                    const depEnd = new Date(depTask.end);
-                    const depEndOffset = daysBetween(this.startDate, depEnd);
-                    const from = depEndOffset * this.options.cellWidth + this.options.cellWidth;  // 依赖结束点右侧
-                    const to = startOffset * this.options.cellWidth;  // 本任务开始点左侧
-                    const arrowLeft = Math.min(from, to);
-                    const arrowWidth = Math.abs(from - to);
-                    let path;
-                    if (from < to) {
-                        // 右箭头
-                        path = `M0,12 H${arrowWidth - 10} L${arrowWidth - 10},0 L${arrowWidth},12 L${arrowWidth - 10},24`;
-                    } else {
-                        // 左箭头
-                        path = `M${arrowWidth},12 H10 L10,24 L0,12 L10,0`;
-                    }
-                    dependenciesHtml += `
-                        <svg class="gantt-dependency-arrow" style="position: absolute; left: ${arrowLeft}px; top: 18px; width: ${arrowWidth}px; height: 24px;">
-                            <path d="${path}" stroke="#dc3545" fill="none" stroke-width="2"/>
-                        </svg>
-                    `;
-                }
-            });
-        }
-
         return `
             <div class="gantt-row">
                 ${dates.map(date => `
                     <div class="gantt-cell ${isWeekend(date) && this.options.showWeekends ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}" 
                          style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;"></div>
                 `).join('')}
-                ${dependenciesHtml}
                 <div class="gantt-bar ${this.selectedTask === task.id ? 'selected' : ''}" 
                      data-task-id="${task.id}"
                      style="left: ${left}px; width: ${width}px;">
