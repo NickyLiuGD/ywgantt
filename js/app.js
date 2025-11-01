@@ -268,6 +268,23 @@ toggleButton.onclick = () => {
 
 // ==================== 新增：渲染PERT视图 ====================
 function renderPertView() {
+    const pertContainer = document.getElementById('pertContainer');
+    pertContainer.innerHTML = ''; // 清空
+
+    // 检查是否有依赖
+    const hasDependencies = gantt.tasks.some(task => task.dependencies && task.dependencies.length > 0);
+
+    if (!hasDependencies) {
+        pertContainer.innerHTML = `
+            <div class="alert alert-info text-center mt-5">
+                <h4>无依赖关系</h4>
+                <p>PERT视图需要至少一个任务依赖关系才能渲染网络图。请在任务编辑中添加依赖后重试。</p>
+            </div>
+        `;
+        addLog('PERT视图：无依赖，无法渲染。请添加任务依赖。');
+        return;
+    }
+
     const pertData = gantt.tasks.map(task => ({
         id: task.id,
         duration: daysBetween(task.start, task.end) + 1,
@@ -278,12 +295,11 @@ function renderPertView() {
     const chart = anychart.pert();
     chart.data(pertData, "asTable");
     chart.title("PERT 图");
-    chart.container("pertContainer");
+    chart.container(pertContainer);
     chart.draw();
 }
 
 // ==================== 初始化日志 ====================
 addLog('甘特图已就绪！悬停任务条可选中，点击可拖拽');
 addLog('提示：编辑任务时，点击甘特图任务条可快速设置依赖');
-addLog('新功能：检测时间冲突 → 自动修复冲突');
-addLog('新功能：切换到PERT视图查看任务网络图');
+addLog('新功能：检测时间冲突 → 自动修复');
