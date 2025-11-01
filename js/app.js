@@ -246,7 +246,44 @@ document.getElementById('cellWidth').oninput = (e) => {
     document.getElementById('cellWidthValue').textContent = e.target.value;
 };
 
+// ==================== 新增：切换视图 ====================
+let isPertView = false;
+const toggleButton = document.getElementById('toggleView');
+toggleButton.onclick = () => {
+    isPertView = !isPertView;
+    if (isPertView) {
+        document.getElementById('ganttContainer').style.display = 'none';
+        document.getElementById('pertContainer').style.display = 'block';
+        toggleButton.textContent = '切换到甘特视图';
+        renderPertView();
+        addLog('已切换到PERT视图');
+    } else {
+        document.getElementById('ganttContainer').style.display = 'block';
+        document.getElementById('pertContainer').style.display = 'none';
+        toggleButton.textContent = '切换到PERT视图';
+        gantt.render(); // 刷新甘特
+        addLog('已切换到甘特视图');
+    }
+};
+
+// ==================== 新增：渲染PERT视图 ====================
+function renderPertView() {
+    const pertData = gantt.tasks.map(task => ({
+        id: task.id,
+        duration: daysBetween(task.start, task.end) + 1,
+        name: task.name,
+        dependsOn: task.dependencies || []
+    }));
+
+    const chart = anychart.pert();
+    chart.data(pertData, "asTable");
+    chart.title("PERT 图");
+    chart.container("pertContainer");
+    chart.draw();
+}
+
 // ==================== 初始化日志 ====================
 addLog('甘特图已就绪！悬停任务条可选中，点击可拖拽');
 addLog('提示：编辑任务时，点击甘特图任务条可快速设置依赖');
-addLog('新功能：检测时间冲突 → 自动修复');
+addLog('新功能：检测时间冲突 → 自动修复冲突');
+addLog('新功能：切换到PERT视图查看任务网络图');

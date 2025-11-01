@@ -78,6 +78,18 @@ body {
 }
 
 /* ======================
+   新增：PERT容器样式
+   ====================== */
+#pertContainer {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    overflow: auto;
+}
+
+/* ======================
    侧边栏样式
    ====================== */
 .gantt-sidebar {
@@ -412,11 +424,4 @@ body {
 .gantt-task-name.dep-highlight {
     background: #d3f9d8;
     font-weight: 500;
-}
-
-/* ======================
-   新增：依赖箭头高亮样式（绿色）
-   ====================== */
-.gantt-dependencies path.dep-highlight-arrow {
-    stroke: #37b24d !important;
 }

@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>可编辑甘特图Epsilon4</title>
+    <title>可编辑甘特图Zeta</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" />
+    
+    <!-- AnyChart for PERT -->
+    <script src="https://cdn.anychart.com/releases/8.13.0/js/anychart-core.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.13.0/js/anychart-pert.min.js"></script>
     
     <!-- 可选，以下这段script代码用于开发模式，强制在每次刷新时重新加载所有的代码。动态加载自定义样式（带时间戳） -->
     <script>
@@ -16,7 +20,7 @@
 </head>
 <body>
     <div class="container-fluid">
-        <h1 class="text-center mb-4">📊 扬维甘特图演示Epsilon4</h1>
+        <h1 class="text-center mb-4">📊 扬维甘特图演示Zeta</h1>
         
         <!-- 新控制面板 -->
         <div class="controls">
@@ -82,6 +86,8 @@
                         <label class="form-label">📏 时间轴密度: <span id="cellWidthValue">60</span>px</label>
                         <input type="range" class="form-range" id="cellWidth" min="40" max="100" value="60" step="10">
                     </div>
+                    <!-- 新增切换视图按钮 -->
+                    <button class="btn btn-primary btn-sm mt-2" id="toggleView">切换到PERT视图</button>
                 </div>
             </div>
             
@@ -94,9 +100,12 @@
         </div>
         
         <!-- 甘特图显示区域 -->
-        <div class="gantt-container">
+        <div class="gantt-container" id="ganttContainer">
             <div id="gantt"></div>
         </div>
+        
+        <!-- 新增PERT视图容器 -->
+        <div id="pertContainer" style="display: none; height: 600px;"></div>
     </div>
     
     <!-- JavaScript 动态加载（带时间戳防止缓存） -->
