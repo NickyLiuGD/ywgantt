@@ -413,3 +413,10 @@ body {
     background: #d3f9d8;
     font-weight: 500;
 }
+
+/* ======================
+   新增：依赖箭头高亮样式（绿色）
+   ====================== */
+.gantt-dependencies path.dep-highlight-arrow {
+    stroke: #37b24d !important;
+}

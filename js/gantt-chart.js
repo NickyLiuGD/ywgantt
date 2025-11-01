@@ -181,7 +181,7 @@ class GanttChart {
 
                     const dPath = createRoundedPath(coords, radius, false);
 
-                    depSVG.innerHTML += `<path d="${dPath}" stroke="#dc3545" fill="none" stroke-width="2" marker-end="url(#arrow)" />`;
+                    depSVG.innerHTML += `<path data-from="${depId}" data-to="${task.id}" d="${dPath}" stroke="#dc3545" fill="none" stroke-width="2" marker-end="url(#arrow)" />`;
                 });
             });
         }

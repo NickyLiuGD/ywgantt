@@ -113,6 +113,9 @@ GanttChart.prototype.selectTask = function(taskId) {
     this.container.querySelectorAll('.gantt-bar, .gantt-task-name').forEach(el => {
         el.classList.remove('selected', 'dep-highlight');
     });
+    this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
+        path.classList.remove('dep-highlight-arrow');
+    });
     document.getElementById('taskFormContainer').innerHTML = '';
 
     if (!taskId) return;
@@ -137,6 +140,15 @@ GanttChart.prototype.selectTask = function(taskId) {
         if (name) name.classList.add('dep-highlight');
     });
 
+    // 高亮相关的箭头（从前置到后继的箭头，包括多级）
+    this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
+        const fromId = path.dataset.from;
+        const toId = path.dataset.to;
+        if (deps.has(fromId) && (toId === taskId || deps.has(toId))) {
+            path.classList.add('dep-highlight-arrow');
+        }
+    });
+
     if (window.showTaskForm) {
         window.showTaskForm(task);
     }
@@ -151,6 +163,9 @@ GanttChart.prototype.deselect = function() {
     this.selectedTask = null;
     this.container.querySelectorAll('.selected, .dep-highlight').forEach(el => {
         el.classList.remove('selected', 'dep-highlight');
+    });
+    this.container.querySelectorAll('.dep-highlight-arrow').forEach(path => {
+        path.classList.remove('dep-highlight-arrow');
     });
     document.getElementById('taskFormContainer').innerHTML = '';
     addLog('已取消选择');
