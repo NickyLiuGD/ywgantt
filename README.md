@@ -1,5 +1,9 @@
 # 扬维公司甘特图应用
 
+访问 https://{your-username}.github.io/ywgantt/   
+当前即：https://nickyliugd.github.io/ywgantt/
+**更新**: 2025-11-01  
+**版本**: Beta
 <details><summary>📁 项目文件结构</summary>
 
 ```
@@ -94,6 +98,3 @@ gantt-chart/
 <details><summary>👨‍💻 作者</summary>扬维团队</details>
 
 <details><summary>🙏 致谢</summary>Bootstrap, CDNJS, GitHub Pages。</details>
-
-**更新**: 2025-11-01  
-**版本**: Beta
