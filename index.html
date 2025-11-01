@@ -1,148 +1,112 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>可编辑甘特图Zeta</title>
-    
-    <!-- Bootstrap CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" />
-    
-    <!-- 可选，以下这段script代码用于开发模式，强制在每次刷新时重新加载所有的代码。动态加载自定义样式（带时间戳） -->
-    <script>
-        const timestamp = new Date().getTime();
-        document.write('<link rel="stylesheet" href="css/gantt.css?t=' + timestamp + '">');
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>甘特图项目管理工具Zeta1</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="css/gantt.css" />
+
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f5f7fa; }
+        .container-fluid { max-width: 1600px; }
+        #gantt { height: 70vh; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; }
+        .sidebar { background: #fff; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); height: 70vh; overflow-y: auto; }
+        .log-container { background: #f8f9fa; border-radius: 6px; padding: 1rem; height: 25vh; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.85rem; }
+        .log-entry { margin: 0.2rem 0; color: #2c3e50; }
+        .log-entry::before { content: "→ "; color: #007bff; }
+        #taskFormContainer { margin-top: 1rem; }
+        .task-form { background: white; padding: 1.2rem; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.1); }
+        .btn-sm { font-size: 0.8rem; }
+        .form-range { height: 6px; }
+        .form-check-inline { margin-right: 0.5rem; }
+    </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <h1 class="text-center mb-4">📊 扬维甘特图演示Zeta</h1>
-        
-        <!-- 新控制面板 -->
-        <div class="controls">
-            <div class="row">
-                <div class="col-md-6">
-                    <h5>🎯 任务管理</h5>
-                    <div class="btn-group mb-3" role="group">
-                        <button class="btn btn-primary btn-sm" id="addTask">
-                            ➕ 添加新任务
-                        </button>
-                        <button class="btn btn-danger btn-sm" id="deleteTask">
-                            🗑️ 删除选中任务
-                        </button>
-                        <button class="btn btn-success btn-sm" id="saveData">
-                            💾 导出Json文件
-                        </button>
-                        <button class="btn btn-info btn-sm" id="loadData">
-                            📂 加载Json文件
-                        </button>
+    <div class="container-fluid py-4">
+        <h1 class="h3 mb-4 text-primary">甘特图项目管理工具Zeta1</h1>
+
+        <div class="row g-4">
+            <!-- 左侧控制面板 -->
+            <div class="col-lg-3">
+                <div class="sidebar">
+                    <!-- 任务操作 -->
+                    <div class="mb-4">
+                        <h6 class="text-secondary">任务操作</h6>
+                        <div class="d-grid gap-2">
+                            <button id="addTask" class="btn btn-success btn-sm">添加任务</button>
+                            <button id="deleteTask" class="btn btn-danger btn-sm">删除选中任务</button>
+                        </div>
                     </div>
-                    
-                    <!-- 冲突检测按钮组 -->
-                    <div class="btn-group mb-3" role="group">
-                        <button class="btn btn-warning btn-sm" id="checkConflicts">
-                            🔍 检测时间冲突
-                        </button>
-                        <button class="btn btn-secondary btn-sm" id="autoFixConflicts">
-                            🔧 自动修复冲突
-                        </button>
-                        <button class="btn btn-outline-secondary btn-sm" id="clearHighlights">
-                            🔄 清除高亮
-                        </button>
+
+                    <!-- 数据管理 -->
+                    <div class="mb-4">
+                        <h6 class="text-secondary">数据管理</h6>
+                        <div class="d-grid gap-2">
+                            <button id="saveData" class="btn btn-primary btn-sm">导出 JSON</button>
+                            <button id="loadData" class="btn btn-outline-primary btn-sm">导入 JSON</button>
+                        </div>
                     </div>
-                    
-                    <div id="taskFormContainer"></div>
+
+                    <!-- 冲突检测 -->
+                    <div class="mb-4">
+                        <h6 class="text-secondary">冲突检测</h6>
+                        <div class="d-grid gap-2">
+                            <button id="checkConflicts" class="btn btn-warning btn-sm">检查冲突</button>
+                            <button id="autoFixConflicts" class="btn btn-outline-warning btn-sm">自动修复</button>
+                            <button id="clearHighlights" class="btn btn-outline-secondary btn-sm">清除高亮</button>
+                        </div>
+                    </div>
+
+                    <!-- 编辑设置 -->
+                    <div class="mb-4">
+                        <h6 class="text-secondary">编辑设置</h6>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="enableEdit" checked>
+                            <label class="form-check-label" for="enableEdit">允许拖拽移动</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="enableResize" checked>
+                            <label class="form-check-label" for="enableResize">允许调整大小</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="showWeekends">
+                            <label class="form-check-label" for="showWeekends">显示周末</label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="showDependencies" checked>
+                            <label class="form-check-label" for="showDependencies">显示依赖箭头</label>
+                        </div>
+                        <label class="form-label d-block">单元格宽度: <span id="cellWidthValue">30</span>px</label>
+                        <input type="range" class="form-range" id="cellWidth" min="20" max="80" value="30">
+                    </div>
                 </div>
-                
-                <div class="col-md-6">
-                    <h5>⚙️ 编辑设置</h5>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="enableEdit" checked>
-                        <label class="form-check-label" for="enableEdit">
-                            🖱️ 启用拖拽移动任务
-                        </label>
-                    </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="enableResize" checked>
-                        <label class="form-check-label" for="enableResize">
-                            ↔️ 启用拖拽调整时长
-                        </label>
-                    </div>
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" id="showWeekends" checked>
-                        <label class="form-check-label" for="showWeekends">
-                            📅 显示周末
-                        </label>
-                    </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="showDependencies" checked>
-                        <label class="form-check-label" for="showDependencies">🔗 显示依赖箭头</label>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">📏 时间轴密度: <span id="cellWidthValue">60</span>px</label>
-                        <input type="range" class="form-range" id="cellWidth" min="40" max="100" value="60" step="10">
-                    </div>
+
+                <!-- 日志区域 -->
+                <div class="mt-3">
+                    <h6 class="text-secondary">操作日志</h6>
+                    <div id="logContainer" class="log-container"></div>
                 </div>
             </div>
-            
-            <div class="row mt-3">
-                <div class="col-12">
-                    <h5>📋 操作日志</h5>
-                    <div class="log-area" id="logArea"></div>
-                </div>
+
+            <!-- 右侧甘特图 -->
+            <div class="col-lg-9">
+                <div id="gantt"></div>
+                <div id="taskFormContainer"></div>
             </div>
-        </div>
-        
-        <!-- 甘特图显示区域 -->
-        <div class="gantt-container">
-            <div id="gantt"></div>
         </div>
     </div>
-    
-    <!-- JavaScript 动态加载（带时间戳防止缓存） -->
-    <script>
-        (function() {
-            const timestamp = new Date().getTime();
-            const scripts = [
-                'js/utils.js',              // 1. 工具函数
-                'js/gantt-chart.js',        // 2. 核心类
-                'js/gantt-events.js',       // 3. 事件扩展
-                'js/gantt-conflicts.js',    // 4. 冲突检测模块
-                'js/app.js'                 // 5. 应用初始化
-            ];
-            
-            // 同步加载脚本（保证顺序）
-            scripts.forEach(function(src) {
-                document.write('<script src="' + src + '?t=' + timestamp + '"><\/script>');
-            });
-        })();
+
+    <!-- 核心脚本（模块化入口） -->
+    <script type="module">
+        import './js/app.js';
     </script>
-    
-    <!-- 加载检测和错误提示 -->
-    <script>
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                // 检测关键对象
-                const checks = {
-                    'GanttChart类': typeof GanttChart !== 'undefined',
-                    'gantt实例': typeof gantt !== 'undefined',
-                    '工具函数': typeof formatDate !== 'undefined',
-                    '冲突检测': typeof detectAllConflicts !== 'undefined'
-                };
-                
-                const failed = Object.keys(checks).filter(key => !checks[key]);
-                
-                if (failed.length > 0) {
-                    console.error('❌ 加载失败的模块：', failed);
-                    alert('⚠️ 部分模块加载失败：' + failed.join(', '));
-                } else {
-                    console.log('✅ 所有模块加载成功！');
-                }
-            }, 500);
-        });
-    </script>
-    
+
     <!-- Bootstrap JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
