@@ -140,14 +140,21 @@ class GanttChart {
                 if (depTask) {
                     const depEnd = new Date(depTask.end);
                     const depEndOffset = daysBetween(this.startDate, depEnd);
-                    const depLeft = depEndOffset * this.options.cellWidth + this.options.cellWidth;  // 依赖结束点右侧
-                    const startOffset = daysBetween(this.startDate, start);
-                    const arrowLeft = Math.min(depLeft, startOffset * this.options.cellWidth);
-                    const arrowWidth = Math.abs(startOffset * this.options.cellWidth - depLeft);
-                    
+                    const from = depEndOffset * this.options.cellWidth + this.options.cellWidth;  // 依赖结束点右侧
+                    const to = startOffset * this.options.cellWidth;  // 本任务开始点左侧
+                    const arrowLeft = Math.min(from, to);
+                    const arrowWidth = Math.abs(from - to);
+                    let path;
+                    if (from < to) {
+                        // 右箭头
+                        path = `M0,12 H${arrowWidth - 10} L${arrowWidth - 10},0 L${arrowWidth},12 L${arrowWidth - 10},24`;
+                    } else {
+                        // 左箭头
+                        path = `M${arrowWidth},12 H10 L10,24 L0,12 L10,0`;
+                    }
                     dependenciesHtml += `
                         <svg class="gantt-dependency-arrow" style="position: absolute; left: ${arrowLeft}px; top: 18px; width: ${arrowWidth}px; height: 24px;">
-                            <path d="M0,12 H${arrowWidth - 10} L${arrowWidth - 10},0 L${arrowWidth},12 L${arrowWidth - 10},24" stroke="#dc3545" fill="none" stroke-width="2"/>
+                            <path d="${path}" stroke="#dc3545" fill="none" stroke-width="2"/>
                         </svg>
                     `;
                 }
