@@ -390,3 +390,26 @@ body {
     background: #e9ecef;
     border-color: #007bff;
 }
+
+/* ======================
+   新增：依赖高亮样式（绿色渐变）
+   ====================== */
+.gantt-bar.dep-highlight {
+    background: linear-gradient(135deg, #37b24d 0%, #099268 100%);
+    box-shadow: 0 2px 8px rgba(55, 178, 77, 0.4);
+}
+
+.gantt-bar.dep-highlight:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(55, 178, 77, 0.6);
+    z-index: 10;
+}
+
+.gantt-bar.dep-highlight .gantt-bar-progress {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.gantt-task-name.dep-highlight {
+    background: #d3f9d8;
+    font-weight: 500;
+}

@@ -211,6 +211,36 @@ class GanttChart {
     }
 
     /**
+     * 获取任务的所有前置依赖ID（递归）
+     * @param {string} taskId - 任务ID
+     * @returns {Set<string>} 所有前置依赖ID集合
+     */
+    getAllDependencies(taskId) {
+        const deps = new Set();
+        const visited = new Set();
+        const stack = [taskId];
+
+        while (stack.length) {
+            const current = stack.pop();
+            if (visited.has(current)) continue;
+            visited.add(current);
+
+            const task = this.tasks.find(t => t.id === current);
+            if (task && task.dependencies) {
+                task.dependencies.forEach(dep => {
+                    if (!deps.has(dep)) {
+                        deps.add(dep);
+                        stack.push(dep);
+                    }
+                });
+            }
+        }
+
+        deps.delete(taskId); // 移除自身（如果有循环）
+        return deps;
+    }
+
+    /**
      * 添加任务
      * @param {Object} task - 任务对象
      */

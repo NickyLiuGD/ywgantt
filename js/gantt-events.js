@@ -88,6 +88,16 @@ GanttChart.prototype.attachEvents = function() {
         };
     });
 
+    // ------------------- 添加取消选择事件（点击时间轴空白处） -------------------
+    const timelineWrapper = this.container.querySelector('.gantt-timeline-wrapper');
+    if (timelineWrapper) {
+        timelineWrapper.addEventListener('click', (e) => {
+            if (!e.target.closest('.gantt-bar, .gantt-bar-handle')) {
+                this.deselect();
+            }
+        });
+    }
+
     // ------------------- 全局鼠标事件 -------------------
     document.onmousemove = (e) => this.onMouseMove(e);
     document.onmouseup = (e) => {
@@ -95,25 +105,55 @@ GanttChart.prototype.attachEvents = function() {
     };
 };
 
-// ------------------- 选择任务 -------------------
+// ------------------- 选择任务（修改：添加依赖高亮） -------------------
 GanttChart.prototype.selectTask = function(taskId) {
     if (this.selectedTask === taskId) return;
+
+    // 清除所有现有高亮
+    this.container.querySelectorAll('.gantt-bar, .gantt-task-name').forEach(el => {
+        el.classList.remove('selected', 'dep-highlight');
+    });
+    document.getElementById('taskFormContainer').innerHTML = '';
+
+    if (!taskId) return;
+
     this.selectedTask = taskId;
     const task = this.tasks.find(t => t.id === taskId);
 
-    this.container.querySelectorAll('.gantt-bar').forEach(bar => {
-        bar.classList.toggle('selected', bar.dataset.taskId === taskId);
-    });
+    // 添加选中高亮
+    const selectedBar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
+    if (selectedBar) selectedBar.classList.add('selected');
 
-    this.container.querySelectorAll('.gantt-task-name').forEach(el => {
-        el.classList.toggle('selected', el.dataset.taskId === taskId);
+    const selectedName = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
+    if (selectedName) selectedName.classList.add('selected');
+
+    // 添加依赖高亮（递归前置）
+    const deps = this.getAllDependencies(taskId);
+    deps.forEach(depId => {
+        const bar = this.container.querySelector(`.gantt-bar[data-task-id="${depId}"]`);
+        if (bar) bar.classList.add('dep-highlight');
+
+        const name = this.container.querySelector(`.gantt-task-name[data-task-id="${depId}"]`);
+        if (name) name.classList.add('dep-highlight');
     });
 
     if (window.showTaskForm) {
         window.showTaskForm(task);
     }
 
-    addLog(`已悬停选中任务 "${task.name}"`);
+    addLog(`📌 已选择任务 "${task.name}"`);
+};
+
+// ------------------- 取消选择 -------------------
+GanttChart.prototype.deselect = function() {
+    if (!this.selectedTask) return;
+
+    this.selectedTask = null;
+    this.container.querySelectorAll('.selected, .dep-highlight').forEach(el => {
+        el.classList.remove('selected', 'dep-highlight');
+    });
+    document.getElementById('taskFormContainer').innerHTML = '';
+    addLog('已取消选择');
 };
 
 // ------------------- 其余函数保持不变 -------------------
