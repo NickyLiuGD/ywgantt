@@ -154,8 +154,8 @@ class GanttChart {
                             {x: x1, y: y1}, // start
                             {x: x1 + w / 2, y: y1}, // 右 w/2
                             {x: x1 + w / 2, y: y1 + h / 8}, // 下 h/8
-                            {x: x1 + w / 2 - w / d, y: y1 + h / 8}, // 左 w/d
-                            {x: x1 + w / 2 - w / d, y: y2}, // 下 to y2
+                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y1 + h / 8}, // 左 w/(2d) + w/2
+                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y2}, // 下 to y2
                             {x: x2, y: y2} // 水平 to x2
                         ];
                     } else if (depIndex > taskIndex) { // 前置在下方 (y1 > y2)
@@ -163,8 +163,8 @@ class GanttChart {
                             {x: x1, y: y1}, // start
                             {x: x1 + w / 2, y: y1}, // 右 w/2
                             {x: x1 + w / 2, y: y1 - h / 8}, // 上 h/8 (负方向)
-                            {x: x1 + w / 2 - w / d, y: y1 - h / 8}, // 左 w/d
-                            {x: x1 + w / 2 - w / d, y: y2}, // 上 to y2 (负方向)
+                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y1 - h / 8}, // 左 w/(2d) + w/2
+                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y2}, // 上 to y2 (负方向)
                             {x: x2, y: y2} // 水平 to x2
                         ];
                     } else {
