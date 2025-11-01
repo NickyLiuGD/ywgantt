@@ -8,12 +8,21 @@
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" />
     
-    <!-- 自定义样式 -->
-    <link rel="stylesheet" href="css/gantt.css">
+    <!-- 动态加载自定义样式（带时间戳），即每次都忽略缓存，全部重新加载，适用于代码开发阶段，发布时要删去以下这段script代码 -->
+    <script>
+        const timestamp = new Date().getTime();
+        document.write('<link rel="stylesheet" href="css/gantt.css?t=' + timestamp + '">');
+    </script>
 </head>
 <body>
     <div class="container-fluid">
         <h1 class="text-center mb-4">📊 扬维甘特图演示Alpha3</h1>
+        
+        <!-- 开发提示横幅（可选，生产环境可删除） -->
+        <div class="alert alert-info alert-dismissible fade show text-center" role="alert">
+            <strong>🔧 开发模式：</strong>页面已禁用缓存，每次刷新都会加载最新代码
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
         
         <!-- 新控制面板 -->
         <div class="controls">
@@ -82,10 +91,49 @@
         </div>
     </div>
     
-    <!-- JavaScript 模块 -->
-    <script src="js/gantt-events.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/gantt-chart.js"></script>
-    <script src="js/app.js"></script>
+    <!-- JavaScript 动态加载（带时间戳防止缓存） -->
+    <script>
+        (function() {
+            const timestamp = new Date().getTime();
+            const scripts = [
+                'js/utils.js',           // 1. 工具函数
+                'js/gantt-chart.js',     // 2. 核心类
+                'js/gantt-events.js',    // 3. 事件扩展
+                'js/app.js'              // 4. 初始化
+            ];
+            
+            // 同步加载脚本（保证顺序）
+            scripts.forEach(function(src) {
+                document.write('<script src="' + src + '?t=' + timestamp + '"><\/script>');
+            });
+        })();
+    </script>
+    
+    <!-- 加载检测和错误提示 -->
+    <script>
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                // 检测关键对象
+                const checks = {
+                    'GanttChart类': typeof GanttChart !== 'undefined',
+                    'gantt实例': typeof gantt !== 'undefined',
+                    '工具函数': typeof formatDate !== 'undefined'
+                };
+                
+                const failed = Object.keys(checks).filter(key => !checks[key]);
+                
+                if (failed.length > 0) {
+                    console.error('❌ 加载失败的模块：', failed);
+                    alert('⚠️ 部分模块加载失败：' + failed.join(', ') + '\n\n请检查：\n1. 文件路径是否正确\n2. 浏览器控制台的错误信息');
+                } else {
+                    console.log('✅ 所有模块加载成功！当前时间戳：' + new Date().getTime());
+                    console.log('📊 甘特图实例：', gantt);
+                }
+            }, 500);
+        });
+    </script>
+    
+    <!-- Bootstrap JS（用于关闭提示横幅） -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
