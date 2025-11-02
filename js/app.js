@@ -51,12 +51,9 @@ const initialTasks = [
 // ==================== 创建甘特图实例 ====================
 const gantt = new GanttChart('#gantt', initialTasks);
 
-// ==================== 任务表单函数（图形化依赖）===================
+// ==================== 任务表单函数 ====================
 window.showTaskForm = function(task) {
     const container = document.getElementById('taskFormContainer');
-    const duration = daysBetween(task.start, task.end) + 1;
-    
-    // 可用任务（排除自身）
     const availableTasks = gantt.tasks.filter(t => t.id !== task.id);
 
     container.innerHTML = `
@@ -80,8 +77,6 @@ window.showTaskForm = function(task) {
                 <label class="form-label">完成进度: <strong id="progressVal">${task.progress}%</strong></label>
                 <input type="range" class="form-range" id="editProgress" value="${task.progress}" min="0" max="100" step="5">
             </div>
-
-            <!-- 图形化依赖选择器 -->
             <div class="mb-3">
                 <label class="form-label">依赖任务（点击甘特图任务条选择）</label>
                 <div id="depList" class="dep-list border rounded p-2" style="max-height:120px;overflow-y:auto;">
@@ -95,7 +90,6 @@ window.showTaskForm = function(task) {
                 </div>
                 <small class="text-muted">提示：点击甘特图任务条可快速切换依赖</small>
             </div>
-
             <div class="d-flex gap-2">
                 <button class="btn btn-primary btn-sm" id="saveTask">保存</button>
                 <button class="btn btn-secondary btn-sm" id="cancelEdit">取消</button>
@@ -103,85 +97,55 @@ window.showTaskForm = function(task) {
         </div>
     `;
 
-    // 进度滑块实时显示
     const progressInput = document.getElementById('editProgress');
     const progressVal = document.getElementById('progressVal');
-    progressInput.oninput = () => {
-        progressVal.textContent = progressInput.value + '%';
-    };
+    progressInput.oninput = () => progressVal.textContent = progressInput.value + '%';
 
-    // 保存任务
     document.getElementById('saveTask').onclick = () => {
         const newName = document.getElementById('editName').value.trim();
-        if (!newName) {
-            alert('任务名称不能为空');
-            return;
-        }
-
+        if (!newName) { alert('任务名称不能为空'); return; }
         task.name = newName;
         task.start = document.getElementById('editStart').value;
         task.end = document.getElementById('editEnd').value;
         task.progress = parseInt(progressInput.value);
-
-        // 收集选中的依赖ID
-        task.dependencies = Array.from(document.querySelectorAll('#depList input[type="checkbox"]:checked'))
-            .map(cb => cb.value);
-
+        task.dependencies = Array.from(document.querySelectorAll('#depList input[type="checkbox"]:checked')).map(cb => cb.value);
         gantt.calculateDateRange();
         gantt.render();
         addLog(`任务 "${task.name}" 已更新`);
         container.innerHTML = '';
     };
 
-    // 取消编辑
-    document.getElementById('cancelEdit').onclick = () => {
-        container.innerHTML = '';
-    };
+    document.getElementById('cancelEdit').onclick = () => container.innerHTML = '';
 };
 
 // ==================== 控制按钮事件 ====================
-
-// 添加任务
 document.getElementById('addTask').onclick = () => {
-    const newTask = {
-        id: generateId(),
-        name: '新任务',
-        start: formatDate(today),
-        end: formatDate(addDays(today, 3)),
-        progress: 0,
-        dependencies: []
-    };
+    const newTask = { id: generateId(), name: '新任务', start: formatDate(today), end: formatDate(addDays(today, 3)), progress: 0, dependencies: [] };
     gantt.addTask(newTask);
     gantt.selectTask(newTask.id);
     addLog(`已添加新任务`);
 };
 
-// 删除任务
 document.getElementById('deleteTask').onclick = () => {
     const task = gantt.getSelectedTask();
-    if (task) {
-        if (confirm(`确定删除任务 "${task.name}"?`)) {
-            gantt.deleteTask(task.id);
-            addLog(`已删除任务 "${task.name}"`);
-            document.getElementById('taskFormContainer').innerHTML = '';
-        }
-    } else {
+    if (task && confirm(`确定删除任务 "${task.name}"?`)) {
+        gantt.deleteTask(task.id);
+        addLog(`已删除任务 "${task.name}"`);
+        document.getElementById('taskFormContainer').innerHTML = '';
+    } else if (!task) {
         alert('请先选择一个任务');
     }
 };
 
-// 保存数据
 document.getElementById('saveData').onclick = () => {
     const filename = `gantt-${formatDate(new Date()).replace(/-/g, '')}.json`;
     downloadJSON(gantt.tasks, filename);
     addLog(`已导出文件：${filename}`);
 };
 
-// 加载数据
 document.getElementById('loadData').onclick = () => {
     const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
+    input.type = 'file'; input.accept = '.json';
     input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -195,32 +159,17 @@ document.getElementById('loadData').onclick = () => {
                     gantt.calculateDateRange();
                     gantt.render();
                     addLog(`已从 ${file.name} 加载数据`);
-                } else {
-                    alert('文件格式错误');
-                }
-            } catch (err) {
-                alert('加载失败：' + err.message);
-            }
+                } else alert('文件格式错误');
+            } catch (err) { alert('加载失败：' + err.message); }
         };
         reader.readAsText(file);
     };
     input.click();
 };
 
-// 检测冲突
-document.getElementById('checkConflicts').onclick = () => {
-    gantt.checkConflicts();
-};
-
-// 自动修复
-document.getElementById('autoFixConflicts').onclick = () => {
-    gantt.autoFixConflicts();
-};
-
-// 清除高亮
-document.getElementById('clearHighlights').onclick = () => {
-    gantt.clearConflictHighlights();
-};
+document.getElementById('checkConflicts').onclick = () => gantt.checkConflicts();
+document.getElementById('autoFixConflicts').onclick = () => gantt.autoFixConflicts();
+document.getElementById('clearHighlights').onclick = () => gantt.clearConflictHighlights();
 
 // 切换视图
 let isPertView = false;
@@ -241,18 +190,14 @@ toggleButton.onclick = () => {
         addLog('已切换到 甘特图 视图');
     }
     const btnText = toggleButton.querySelector('.btn-text');
-    if (btnText) {
-        btnText.textContent = isPertView ? '甘特视图' : 'PERT视图';
-    }
+    if (btnText) btnText.textContent = isPertView ? '甘特视图' : 'PERT视图';
 };
 
-// ==================== PERT 图表渲染函数（完整补全）===================
+// ==================== PERT 图表渲染函数（完整保留）===================
 function renderPertChart(tasks) {
-    // 清空容器
     pertContainer.innerHTML = '<svg id="pertSvg" width="100%" height="600"></svg>';
     const svg = document.getElementById('pertSvg');
 
-    // 计算层级
     const levels = new Map();
     const visited = new Set();
     const stack = [...tasks];
@@ -261,21 +206,17 @@ function renderPertChart(tasks) {
         const task = stack.pop();
         if (visited.has(task.id)) continue;
         visited.add(task.id);
-
         let maxLevel = 0;
         if (task.dependencies && task.dependencies.length > 0) {
             task.dependencies.forEach(depId => {
                 const depTask = tasks.find(t => t.id === depId);
-                if (depTask && levels.has(depId)) {
-                    maxLevel = Math.max(maxLevel, levels.get(depId) + 1);
-                }
+                if (depTask && levels.has(depId)) maxLevel = Math.max(maxLevel, levels.get(depId) + 1);
             });
         }
         levels.set(task.id, maxLevel);
         stack.push(...tasks.filter(t => t.dependencies?.includes(task.id)));
     }
 
-    // 分组
     const levelGroups = new Map();
     tasks.forEach(task => {
         const level = levels.get(task.id) || 0;
@@ -283,7 +224,6 @@ function renderPertChart(tasks) {
         levelGroups.get(level).push(task);
     });
     
-    // 计算位置
     const svgWidth = pertContainer.clientWidth;
     const svgHeight = 600;
     const nodeWidth = 120;
@@ -309,28 +249,20 @@ function renderPertChart(tasks) {
         });
     });
     
-    // 绘制节点
     nodes.forEach(node => drawPertNode(svg, node));
-    
-    // 绘制箭头
     tasks.forEach(task => {
         if (!task.dependencies || task.dependencies.length === 0) return;
         const fromNode = nodes.find(n => n.id === task.id);
         if (!fromNode) return;
         task.dependencies.forEach(depId => {
             const toNode = nodes.find(n => n.id === depId);
-            if (toNode) {
-                drawArrow(svg, toNode.x + toNode.width / 2, toNode.y, fromNode.x - fromNode.width / 2, fromNode.y);
-            }
+            if (toNode) drawArrow(svg, toNode.x + toNode.width / 2, toNode.y, fromNode.x - fromNode.width / 2, fromNode.y);
         });
     });
 }
 
-// 绘制PERT节点
 function drawPertNode(svg, node) {
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    
-    // 节点矩形
     const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     rect.setAttribute('x', node.x - node.width / 2);
     rect.setAttribute('y', node.y - node.height / 2);
@@ -341,8 +273,7 @@ function drawPertNode(svg, node) {
     rect.setAttribute('stroke-width', '2');
     rect.setAttribute('rx', '5');
     g.appendChild(rect);
-    
-    // 任务名称
+
     const text1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     text1.setAttribute('x', node.x);
     text1.setAttribute('y', node.y - 15);
@@ -352,8 +283,7 @@ function drawPertNode(svg, node) {
     text1.setAttribute('fill', '#212529');
     text1.textContent = node.name.length > 12 ? node.name.substring(0, 12) + '...' : node.name;
     g.appendChild(text1);
-    
-    // 工期
+
     const text2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     text2.setAttribute('x', node.x);
     text2.setAttribute('y', node.y + 5);
@@ -362,8 +292,7 @@ function drawPertNode(svg, node) {
     text2.setAttribute('fill', '#6c757d');
     text2.textContent = `工期: ${node.duration}天`;
     g.appendChild(text2);
-    
-    // 进度
+
     const text3 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     text3.setAttribute('x', node.x);
     text3.setAttribute('y', node.y + 20);
@@ -372,38 +301,26 @@ function drawPertNode(svg, node) {
     text3.setAttribute('fill', '#198754');
     text3.textContent = `完成: ${node.progress}%`;
     g.appendChild(text3);
-    
+
     svg.appendChild(g);
 }
 
-// 绘制箭头
 function drawArrow(svg, x1, y1, x2, y2) {
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', x1);
-    line.setAttribute('y1', y1);
-    line.setAttribute('x2', x2);
-    line.setAttribute('y2', y2);
-    line.setAttribute('stroke', '#6c757d');
-    line.setAttribute('stroke-width', '2');
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+    line.setAttribute('stroke', '#6c757d'); line.setAttribute('stroke-width', '2');
     line.setAttribute('marker-end', 'url(#arrowhead)');
     svg.appendChild(line);
-    
-    // 确保箭头标记存在
+
     if (!svg.querySelector('#arrowhead')) {
         const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
         const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-        marker.setAttribute('id', 'arrowhead');
-        marker.setAttribute('markerWidth', '10');
-        marker.setAttribute('markerHeight', '10');
-        marker.setAttribute('refX', '9');
-        marker.setAttribute('refY', '3');
-        marker.setAttribute('orient', 'auto');
+        marker.setAttribute('id', 'arrowhead'); marker.setAttribute('markerWidth', '10'); marker.setAttribute('markerHeight', '10');
+        marker.setAttribute('refX', '9'); marker.setAttribute('refY', '3'); marker.setAttribute('orient', 'auto');
         const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        polygon.setAttribute('points', '0 0, 10 3, 0 6');
-        polygon.setAttribute('fill', '#6c757d');
-        marker.appendChild(polygon);
-        defs.appendChild(marker);
-        svg.appendChild(defs);
+        polygon.setAttribute('points', '0 0, 10 3, 0 6'); polygon.setAttribute('fill', '#6c757d');
+        marker.appendChild(polygon); defs.appendChild(marker); svg.appendChild(defs);
     }
 }
 
@@ -414,28 +331,15 @@ const settingsClose = document.getElementById('settingsClose');
 const showLogPanelSwitch = document.getElementById('showLogPanel');
 const logPanel = document.getElementById('logPanel');
 
-// 打开设置面板
-settingsTrigger.onclick = () => {
-    settingsPanel.classList.add('active');
-    addLog('已打开设置面板');
-};
+settingsTrigger.onclick = () => { settingsPanel.classList.add('active'); addLog('已打开设置面板'); };
+settingsClose.onclick = () => { settingsPanel.classList.remove('active'); addLog('已关闭设置面板'); };
 
-// 关闭设置面板
-settingsClose.onclick = () => {
-    settingsPanel.classList.remove('active');
-    addLog('已关闭设置面板');
-};
-
-// 点击外部关闭
 document.addEventListener('click', (e) => {
-    if (settingsPanel.classList.contains('active') && 
-        !settingsPanel.contains(e.target) && 
-        !settingsTrigger.contains(e.target)) {
+    if (settingsPanel.classList.contains('active') && !settingsPanel.contains(e.target) && !settingsTrigger.contains(e.target)) {
         settingsPanel.classList.remove('active');
     }
 });
 
-// 日志面板显示开关
 showLogPanelSwitch.onchange = () => {
     if (showLogPanelSwitch.checked) {
         logPanel.classList.remove('hidden');
@@ -446,36 +350,13 @@ showLogPanelSwitch.onchange = () => {
     }
 };
 
-// 初始化日志面板状态
-if (!showLogPanelSwitch.checked) {
-    logPanel.classList.add('hidden');
-}
+if (!showLogPanelSwitch.checked) logPanel.classList.add('hidden');
 
-// ==================== 其他设置项同步 ====================
-document.getElementById('enableEdit').onchange = (e) => {
-    gantt.options.enableEdit = e.target.checked;
-    gantt.render();
-    addLog(e.target.checked ? '启用拖拽移动' : '禁用拖拽移动');
-};
-
-document.getElementById('enableResize').onchange = (e) => {
-    gantt.options.enableResize = e.target.checked;
-    gantt.render();
-    addLog(e.target.checked ? '启用调整时长' : '禁用调整时长');
-};
-
-document.getElementById('showWeekends').onchange = (e) => {
-    gantt.options.showWeekends = e.target.checked;
-    gantt.render();
-    addLog(e.target.checked ? '显示周末' : '隐藏周末');
-};
-
-document.getElementById('showDependencies').onchange = (e) => {
-    gantt.options.showDependencies = e.target.checked;
-    gantt.render();
-    addLog(e.target.checked ? '显示依赖箭头' : '隐藏依赖箭头');
-};
-
+// 其他设置项
+document.getElementById('enableEdit').onchange = (e) => { gantt.options.enableEdit = e.target.checked; gantt.render(); addLog(e.target.checked ? '启用拖拽移动' : '禁用拖拽移动'); };
+document.getElementById('enableResize').onchange = (e) => { gantt.options.enableResize = e.target.checked; gantt.render(); addLog(e.target.checked ? '启用调整时长' : '禁用调整时长'); };
+document.getElementById('showWeekends').onchange = (e) => { gantt.options.showWeekends = e.target.checked; gantt.render(); addLog(e.target.checked ? '显示周末' : '隐藏周末'); };
+document.getElementById('showDependencies').onchange = (e) => { gantt.options.showDependencies = e.target.checked; gantt.render(); addLog(e.target.checked ? '显示依赖箭头' : '隐藏依赖箭头'); };
 document.getElementById('cellWidth').oninput = (e) => {
     const value = parseInt(e.target.value);
     gantt.options.cellWidth = value;
@@ -483,16 +364,50 @@ document.getElementById('cellWidth').oninput = (e) => {
     gantt.render();
 };
 
-// ==================== 日志面板折叠 ====================
+// 日志面板折叠
 const logHeader = document.getElementById('logHeader');
 const logToggle = document.getElementById('logToggle');
-
 logHeader.onclick = () => {
     logPanel.classList.toggle('collapsed');
     const isCollapsed = logPanel.classList.contains('collapsed');
     logToggle.textContent = isCollapsed ? '+' : '−';
     addLog(isCollapsed ? '日志面板已折叠' : '日志面板已展开');
 };
+
+// ==================== 二级工具栏悬停展开 ====================
+const toolbarCollapsed = document.getElementById('toolbarCollapsed');
+const toolbarExpanded = document.getElementById('floatingToolbarExpanded');
+let toolbarHoverTimer = null;
+
+toolbarCollapsed.addEventListener('mouseenter', () => {
+    clearTimeout(toolbarHoverTimer);
+    toolbarExpanded.style.opacity = '1';
+    toolbarExpanded.style.visibility = 'visible';
+    toolbarExpanded.style.transform = 'translateX(0)';
+    toolbarExpanded.style.pointerEvents = 'auto';
+    addLog('工具栏已展开');
+});
+
+toolbarCollapsed.addEventListener('mouseleave', () => {
+    toolbarHoverTimer = setTimeout(() => {
+        toolbarExpanded.style.opacity = '0';
+        toolbarExpanded.style.visibility = 'hidden';
+        toolbarExpanded.style.transform = 'translateX(-20px)';
+        toolbarExpanded.style.pointerEvents = 'none';
+        addLog('工具栏已收起');
+    }, 300);
+});
+
+toolbarExpanded.addEventListener('mouseenter', () => clearTimeout(toolbarHoverTimer));
+toolbarExpanded.addEventListener('mouseleave', () => {
+    toolbarHoverTimer = setTimeout(() => {
+        toolbarExpanded.style.opacity = '0';
+        toolbarExpanded.style.visibility = 'hidden';
+        toolbarExpanded.style.transform = 'translateX(-20px)';
+        toolbarExpanded.style.pointerEvents = 'none';
+        addLog('工具栏已收起');
+    }, 300);
+});
 
 // ==================== 初始化日志 ====================
 addLog('甘特图已就绪！悬停任务条可选中，点击可拖拽');

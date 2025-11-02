@@ -21,33 +21,33 @@
 <body>
     <div class="container-fluid">
         <!-- 标题 + 折叠工具按钮 -->
-        <div class="d-flex align-items-center mb-4">
-            <!-- 折叠工具按钮（悬停展开） -->
+        <div class="d-flex align-items-center mb-4 position-relative">
+            <!-- 折叠工具按钮 -->
             <div class="toolbar-collapsed" id="toolbarCollapsed" title="工具">
-                <span class="toolbar-icon">🛠️</span>
+                <span class="toolbar-icon">工具</span>
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;color:#495057;">📊 扬维甘特图演示Alpha2</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;color:#495057;">扬维甘特图演示Alpha2</h1>
         </div>
         
         <!-- 展开的浮动工具栏 -->
         <div class="floating-toolbar-expanded" id="floatingToolbarExpanded">
             <div class="toolbar-section">
                 <button class="toolbar-btn" id="addTask" title="添加新任务">
-                    <span class="btn-icon">➕</span>
+                    <span class="btn-icon">添加</span>
                     <span class="btn-text">添加任务</span>
                 </button>
                 <button class="toolbar-btn" id="deleteTask" title="删除选中任务">
-                    <span class="btn-icon">🗑️</span>
+                    <span class="btn-icon">删除</span>
                     <span class="btn-text">删除任务</span>
                 </button>
                 <button class="toolbar-btn" id="saveData" title="导出Json文件">
-                    <span class="btn-icon">💾</span>
+                    <span class="btn-icon">导出</span>
                     <span class="btn-text">导出文件</span>
                 </button>
                 <button class="toolbar-btn" id="loadData" title="加载Json文件">
-                    <span class="btn-icon">📂</span>
+                    <span class="btn-icon">加载</span>
                     <span class="btn-text">加载文件</span>
                 </button>
             </div>
@@ -56,15 +56,15 @@
             
             <div class="toolbar-section">
                 <button class="toolbar-btn" id="checkConflicts" title="检测时间冲突">
-                    <span class="btn-icon">🔍</span>
+                    <span class="btn-icon">检测</span>
                     <span class="btn-text">检测冲突</span>
                 </button>
                 <button class="toolbar-btn" id="autoFixConflicts" title="自动修复冲突">
-                    <span class="btn-icon">🔧</span>
+                    <span class="btn-icon">修复</span>
                     <span class="btn-text">自动修复</span>
                 </button>
                 <button class="toolbar-btn" id="clearHighlights" title="清除高亮">
-                    <span class="btn-icon">🔄</span>
+                    <span class="btn-icon">清除</span>
                     <span class="btn-text">清除高亮</span>
                 </button>
             </div>
@@ -73,14 +73,14 @@
             
             <div class="toolbar-section">
                 <button class="toolbar-btn" id="toggleView" title="切换视图">
-                    <span class="btn-icon">🔀</span>
+                    <span class="btn-icon">切换</span>
                     <span class="btn-text">PERT视图</span>
                 </button>
             </div>
             
             <!-- 设置按钮 -->
             <button class="toolbar-btn settings-trigger" id="settingsTrigger" title="设置">
-                <span class="btn-icon">⚙️</span>
+                <span class="btn-icon">设置</span>
                 <span class="btn-text">设置</span>
             </button>
         </div>
@@ -143,7 +143,7 @@
         <!-- 日志区域（可折叠） -->
         <div class="log-panel" id="logPanel">
             <div class="log-header" id="logHeader">
-                <span>📋 操作日志</span>
+                <span>操作日志</span>
                 <button class="log-toggle" id="logToggle">−</button>
             </div>
             <div class="log-body" id="logArea"></div>
