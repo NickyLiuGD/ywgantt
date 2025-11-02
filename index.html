@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>可编辑甘特图Alpha</title>
+    <title>可编辑甘特图Alpha1</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" />
@@ -12,7 +12,7 @@
     <script src="https://cdn.anychart.com/releases/8.13.0/js/anychart-core.min.js"></script>
     <script src="https://cdn.anychart.com/releases/8.13.0/js/anychart-pert.min.js"></script>
     
-    <!-- 可选，以下这段script代码用于开发模式，强制在每次刷新时重新加载所有的代码。动态加载自定义样式（带时间戳） -->
+    <!-- 动态加载自定义样式 -->
     <script>
         const timestamp = new Date().getTime();
         document.write('<link rel="stylesheet" href="css/gantt.css?t=' + timestamp + '">');
@@ -20,82 +20,119 @@
 </head>
 <body>
     <div class="container-fluid">
-        <h1 class="text-center mb-4">📊 扬维甘特图演示Alpha</h1>
+        <h1 class="text-center mb-4" style="font-weight:300;color:#495057;">📊 扬维甘特图演示Alpha1</h1>
         
-        <!-- 新控制面板 -->
-        <div class="controls">
-            <div class="row">
-                <div class="col-md-6">
-                    <h5>🎯 任务管理</h5>
-                    <div class="btn-group mb-3" role="group">
-                        <button class="btn btn-primary btn-sm" id="addTask">
-                            ➕ 添加新任务
-                        </button>
-                        <button class="btn btn-danger btn-sm" id="deleteTask">
-                            🗑️ 删除选中任务
-                        </button>
-                        <button class="btn btn-success btn-sm" id="saveData">
-                            💾 导出Json文件
-                        </button>
-                        <button class="btn btn-info btn-sm" id="loadData">
-                            📂 加载Json文件
-                        </button>
-                    </div>
-                    
-                    <!-- 冲突检测按钮组 -->
-                    <div class="btn-group mb-3" role="group">
-                        <button class="btn btn-warning btn-sm" id="checkConflicts">
-                            🔍 检测时间冲突
-                        </button>
-                        <button class="btn btn-secondary btn-sm" id="autoFixConflicts">
-                            🔧 自动修复冲突
-                        </button>
-                        <button class="btn btn-outline-secondary btn-sm" id="clearHighlights">
-                            🔄 清除高亮
-                        </button>
-                    </div>
-                    
-                    <div id="taskFormContainer"></div>
+        <!-- 新的极简控制面板 -->
+        <div class="minimal-controls">
+            <!-- 浮动工具栏 -->
+            <div class="floating-toolbar" id="floatingToolbar">
+                <div class="toolbar-section">
+                    <button class="toolbar-btn" id="addTask" title="添加新任务">
+                        <span class="btn-icon">➕</span>
+                        <span class="btn-text">添加任务</span>
+                    </button>
+                    <button class="toolbar-btn" id="deleteTask" title="删除选中任务">
+                        <span class="btn-icon">🗑️</span>
+                        <span class="btn-text">删除任务</span>
+                    </button>
+                    <button class="toolbar-btn" id="saveData" title="导出Json文件">
+                        <span class="btn-icon">💾</span>
+                        <span class="btn-text">导出文件</span>
+                    </button>
+                    <button class="toolbar-btn" id="loadData" title="加载Json文件">
+                        <span class="btn-icon">📂</span>
+                        <span class="btn-text">加载文件</span>
+                    </button>
                 </div>
                 
-                <div class="col-md-6">
-                    <h5>⚙️ 编辑设置</h5>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="enableEdit" checked>
-                        <label class="form-check-label" for="enableEdit">
-                            🖱️ 启用拖拽移动任务
+                <div class="toolbar-divider"></div>
+                
+                <div class="toolbar-section">
+                    <button class="toolbar-btn" id="checkConflicts" title="检测时间冲突">
+                        <span class="btn-icon">🔍</span>
+                        <span class="btn-text">检测冲突</span>
+                    </button>
+                    <button class="toolbar-btn" id="autoFixConflicts" title="自动修复冲突">
+                        <span class="btn-icon">🔧</span>
+                        <span class="btn-text">自动修复</span>
+                    </button>
+                    <button class="toolbar-btn" id="clearHighlights" title="清除高亮">
+                        <span class="btn-icon">🔄</span>
+                        <span class="btn-text">清除高亮</span>
+                    </button>
+                </div>
+                
+                <div class="toolbar-divider"></div>
+                
+                <div class="toolbar-section">
+                    <button class="toolbar-btn" id="toggleView" title="切换视图">
+                        <span class="btn-icon">🔀</span>
+                        <span class="btn-text">PERT视图</span>
+                    </button>
+                </div>
+                
+                <!-- 设置按钮（触发侧边栏） -->
+                <button class="toolbar-btn settings-trigger" id="settingsTrigger" title="设置">
+                    <span class="btn-icon">⚙️</span>
+                    <span class="btn-text">设置</span>
+                </button>
+            </div>
+            
+            <!-- 侧边设置面板 -->
+            <div class="settings-panel" id="settingsPanel">
+                <div class="settings-header">
+                    <h6>编辑设置</h6>
+                    <button class="settings-close" id="settingsClose">×</button>
+                </div>
+                <div class="settings-body">
+                    <div class="setting-item">
+                        <label class="switch-label">
+                            <input type="checkbox" id="enableEdit" checked>
+                            <span class="switch-slider"></span>
                         </label>
+                        <span class="setting-text">拖拽移动任务</span>
                     </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="enableResize" checked>
-                        <label class="form-check-label" for="enableResize">
-                            ↔️ 启用拖拽调整时长
+                    <div class="setting-item">
+                        <label class="switch-label">
+                            <input type="checkbox" id="enableResize" checked>
+                            <span class="switch-slider"></span>
                         </label>
+                        <span class="setting-text">拖拽调整时长</span>
                     </div>
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" id="showWeekends" checked>
-                        <label class="form-check-label" for="showWeekends">
-                            📅 显示周末
+                    <div class="setting-item">
+                        <label class="switch-label">
+                            <input type="checkbox" id="showWeekends" checked>
+                            <span class="switch-slider"></span>
                         </label>
+                        <span class="setting-text">显示周末</span>
                     </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="showDependencies" checked>
-                        <label class="form-check-label" for="showDependencies">🔗 显示依赖箭头</label>
+                    <div class="setting-item">
+                        <label class="switch-label">
+                            <input type="checkbox" id="showDependencies" checked>
+                            <span class="switch-slider"></span>
+                        </label>
+                        <span class="setting-text">显示依赖箭头</span>
                     </div>
-                    <div class="mb-2">
-                        <label class="form-label">📏 时间轴密度: <span id="cellWidthValue">60</span>px</label>
-                        <input type="range" class="form-range" id="cellWidth" min="40" max="100" value="60" step="10">
+                    <div class="setting-item slider-item">
+                        <span class="setting-text">时间轴密度</span>
+                        <div class="slider-container">
+                            <input type="range" class="custom-slider" id="cellWidth" min="40" max="100" value="60" step="10">
+                            <span class="slider-value" id="cellWidthValue">60px</span>
+                        </div>
                     </div>
-                    <!-- 新增切换视图按钮 -->
-                    <button class="btn btn-primary btn-sm mt-2" id="toggleView">切换到PERT视图</button>
                 </div>
             </div>
             
-            <div class="row mt-3">
-                <div class="col-12">
-                    <h5>📋 操作日志</h5>
-                    <div class="log-area" id="logArea"></div>
+            <!-- 任务编辑表单容器 -->
+            <div class="task-form-minimal" id="taskFormContainer"></div>
+            
+            <!-- 日志区域（可折叠） -->
+            <div class="log-panel" id="logPanel">
+                <div class="log-header" id="logHeader">
+                    <span>📋 操作日志</span>
+                    <button class="log-toggle" id="logToggle">−</button>
                 </div>
+                <div class="log-body" id="logArea"></div>
             </div>
         </div>
         
@@ -104,34 +141,32 @@
             <div id="gantt"></div>
         </div>
         
-        <!-- 新增PERT视图容器 -->
+        <!-- PERT视图容器 -->
         <div id="pertContainer" style="display: none; height: 600px;"></div>
     </div>
     
-    <!-- JavaScript 动态加载（带时间戳防止缓存） -->
+    <!-- JavaScript 动态加载 -->
     <script>
         (function() {
             const timestamp = new Date().getTime();
             const scripts = [
-                'js/utils.js',              // 1. 工具函数
-                'js/gantt-chart.js',        // 2. 核心类
-                'js/gantt-events.js',       // 3. 事件扩展
-                'js/gantt-conflicts.js',    // 4. 冲突检测模块
-                'js/app.js'                 // 5. 应用初始化
+                'js/utils.js',
+                'js/gantt-chart.js',
+                'js/gantt-events.js',
+                'js/gantt-conflicts.js',
+                'js/app.js'
             ];
             
-            // 同步加载脚本（保证顺序）
             scripts.forEach(function(src) {
                 document.write('<script src="' + src + '?t=' + timestamp + '"><\/script>');
             });
         })();
     </script>
     
-    <!-- 加载检测和错误提示 -->
+    <!-- 加载检测 -->
     <script>
         window.addEventListener('load', function() {
             setTimeout(function() {
-                // 检测关键对象
                 const checks = {
                     'GanttChart类': typeof GanttChart !== 'undefined',
                     'gantt实例': typeof gantt !== 'undefined',

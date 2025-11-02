@@ -464,6 +464,54 @@ function drawArrow(svg, x1, y1, x2, y2) {
     }
 }
 
+// ==================== 设置面板交互 ====================
+const settingsPanel = document.getElementById('settingsPanel');
+const settingsTrigger = document.getElementById('settingsTrigger');
+const settingsClose = document.getElementById('settingsClose');
+
+// 打开设置面板
+settingsTrigger.onclick = () => {
+    settingsPanel.classList.add('active');
+    addLog('已打开设置面板');
+};
+
+// 关闭设置面板
+settingsClose.onclick = () => {
+    settingsPanel.classList.remove('active');
+    addLog('已关闭设置面板');
+};
+
+// 点击面板外部关闭
+document.addEventListener('click', (e) => {
+    if (settingsPanel.classList.contains('active') && 
+        !settingsPanel.contains(e.target) && 
+        !settingsTrigger.contains(e.target)) {
+        settingsPanel.classList.remove('active');
+    }
+});
+
+// ==================== 日志面板折叠 ====================
+const logPanel = document.getElementById('logPanel');
+const logHeader = document.getElementById('logHeader');
+const logToggle = document.getElementById('logToggle');
+
+logHeader.onclick = () => {
+    logPanel.classList.toggle('collapsed');
+    const isCollapsed = logPanel.classList.contains('collapsed');
+    logToggle.textContent = isCollapsed ? '+' : '−';
+    addLog(isCollapsed ? '日志面板已折叠' : '日志面板已展开');
+};
+
+// ==================== 更新切换按钮文本 ====================
+const originalToggleClick = toggleButton.onclick;
+toggleButton.onclick = () => {
+    originalToggleClick();
+    const btnText = toggleButton.querySelector('.btn-text');
+    if (btnText) {
+        btnText.textContent = isPertView ? '甘特视图' : 'PERT视图';
+    }
+};
+
 // ==================== 初始化日志 ====================
 addLog('甘特图已就绪！悬停任务条可选中，点击可拖拽');
 addLog('提示：编辑任务时，点击甘特图任务条可快速设置依赖');
