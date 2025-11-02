@@ -172,30 +172,34 @@ document.getElementById('deleteTask').onclick = () => {
 
 // 保存数据
 document.getElementById('saveData').onclick = () => {
-    const filename = `gantt-${formatDate(new Date())}.json`;
+    const filename = `gantt-${formatDate(new Date()).replace(/-/g, '')}.json`;
     downloadJSON(gantt.tasks, filename);
-    addLog('数据已导出');
+    addLog(`已导出文件：${filename}`);
 };
 
 // 加载数据
 document.getElementById('loadData').onclick = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'application/json';
+    input.accept = '.json';
     input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = (ev) => {
             try {
-                const loadedTasks = JSON.parse(event.target.result);
-                gantt.tasks = loadedTasks;
-                gantt.calculateDateRange();
-                gantt.render();
-                addLog(`已加载 ${loadedTasks.length} 个任务`);
+                const tasks = JSON.parse(ev.target.result);
+                if (Array.isArray(tasks)) {
+                    tasks.forEach(t => t.id = t.id || generateId());
+                    gantt.tasks = tasks;
+                    gantt.calculateDateRange();
+                    gantt.render();
+                    addLog(`已从 ${file.name} 加载数据`);
+                } else {
+                    alert('文件格式错误');
+                }
             } catch (err) {
-                alert('文件格式错误：' + err.message);
+                alert('加载失败：' + err.message);
             }
         };
         reader.readAsText(file);
@@ -203,151 +207,75 @@ document.getElementById('loadData').onclick = () => {
     input.click();
 };
 
-// ==================== 冲突检测按钮 ====================
-
+// 检测冲突
 document.getElementById('checkConflicts').onclick = () => {
     gantt.checkConflicts();
 };
 
+// 自动修复
 document.getElementById('autoFixConflicts').onclick = () => {
-    if (confirm('确定要自动修复所有时间冲突吗？\n\n这会调整冲突任务的开始和结束时间。')) {
-        gantt.autoFixConflicts();
-    }
+    gantt.autoFixConflicts();
 };
 
+// 清除高亮
 document.getElementById('clearHighlights').onclick = () => {
     gantt.clearConflictHighlights();
 };
 
-// ==================== 编辑设置 ====================
-
-document.getElementById('enableEdit').onchange = (e) => {
-    gantt.updateOptions({ enableEdit: e.target.checked });
-    addLog(`${e.target.checked ? '已启用' : '已禁用'}拖拽移动`);
-};
-
-document.getElementById('enableResize').onchange = (e) => {
-    gantt.updateOptions({ enableResize: e.target.checked });
-    addLog(`${e.target.checked ? '已启用' : '已禁用'}大小调整`);
-};
-
-document.getElementById('showWeekends').onchange = (e) => {
-    gantt.updateOptions({ showWeekends: e.target.checked });
-    addLog(`${e.target.checked ? '已显示' : '已隐藏'}周末`);
-};
-
-document.getElementById('showDependencies').onchange = (e) => {
-    gantt.updateOptions({ showDependencies: e.target.checked });
-    addLog(`${e.target.checked ? '已显示' : '已隐藏'}依赖箭头`);
-};
-
-document.getElementById('cellWidth').oninput = (e) => {
-    gantt.updateOptions({ cellWidth: parseInt(e.target.value) });
-    document.getElementById('cellWidthValue').textContent = e.target.value;
-};
-
-// ==================== 新增：切换视图 ====================
+// 切换视图
 let isPertView = false;
 const toggleButton = document.getElementById('toggleView');
+const ganttContainer = document.getElementById('ganttContainer');
+const pertContainer = document.getElementById('pertContainer');
+
 toggleButton.onclick = () => {
     isPertView = !isPertView;
     if (isPertView) {
-        document.getElementById('ganttContainer').style.display = 'none';
-        document.getElementById('pertContainer').style.display = 'block';
-        toggleButton.textContent = '切换到甘特视图';
-        renderPertView();
-        addLog('已切换到PERT视图');
+        ganttContainer.style.display = 'none';
+        pertContainer.style.display = 'block';
+        renderPertChart(gantt.tasks);
+        addLog('已切换到 PERT 视图');
     } else {
-        document.getElementById('ganttContainer').style.display = 'block';
-        document.getElementById('pertContainer').style.display = 'none';
-        toggleButton.textContent = '切换到PERT视图';
-        gantt.render(); // 刷新甘特
-        addLog('已切换到甘特视图');
+        ganttContainer.style.display = 'block';
+        pertContainer.style.display = 'none';
+        addLog('已切换到 甘特图 视图');
+    }
+    const btnText = toggleButton.querySelector('.btn-text');
+    if (btnText) {
+        btnText.textContent = isPertView ? '甘特视图' : 'PERT视图';
     }
 };
 
-// ==================== 新增:渲染PERT视图 ====================
-function renderPertView() {
-    const pertContainer = document.getElementById('pertContainer');
-    pertContainer.innerHTML = ''; // 清空
+// ==================== PERT 图表渲染函数（完整补全）===================
+function renderPertChart(tasks) {
+    // 清空容器
+    pertContainer.innerHTML = '<svg id="pertSvg" width="100%" height="600"></svg>';
+    const svg = document.getElementById('pertSvg');
 
-    // 检查是否有依赖
-    const hasDependencies = gantt.tasks.some(task => task.dependencies && task.dependencies.length > 0);
+    // 计算层级
+    const levels = new Map();
+    const visited = new Set();
+    const stack = [...tasks];
 
-    if (!hasDependencies) {
-        pertContainer.innerHTML = `
-            <div class="alert alert-info text-center mt-5">
-                <h4>无依赖关系</h4>
-                <p>PERT视图需要至少一个任务依赖关系才能渲染网络图。请在任务编辑中添加依赖后重试。</p>
-            </div>
-        `;
-        addLog('PERT视图:无依赖,无法渲染。请添加任务依赖。');
-        return;
-    }
+    while (stack.length) {
+        const task = stack.pop();
+        if (visited.has(task.id)) continue;
+        visited.add(task.id);
 
-    // 创建SVG画布
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.style.width = '100%';
-    svg.style.height = '600px';
-    svg.style.border = '1px solid #dee2e6';
-    svg.style.backgroundColor = '#f8f9fa';
-    pertContainer.appendChild(svg);
-
-    // 计算节点位置 (使用层级布局)
-    const nodes = calculatePertLayout(gantt.tasks);
-    const svgWidth = pertContainer.clientWidth;
-    const svgHeight = 600;
-
-    // 绘制连接线
-    gantt.tasks.forEach(task => {
+        let maxLevel = 0;
         if (task.dependencies && task.dependencies.length > 0) {
             task.dependencies.forEach(depId => {
-                const fromNode = nodes.find(n => n.id === depId);
-                const toNode = nodes.find(n => n.id === task.id);
-                if (fromNode && toNode) {
-                    drawArrow(svg, fromNode.x, fromNode.y, toNode.x, toNode.y);
+                const depTask = tasks.find(t => t.id === depId);
+                if (depTask && levels.has(depId)) {
+                    maxLevel = Math.max(maxLevel, levels.get(depId) + 1);
                 }
             });
         }
-    });
-
-    // 绘制节点
-    nodes.forEach(node => {
-        drawPertNode(svg, node);
-    });
-
-    addLog('PERT视图已渲染');
-}
-
-// 计算PERT节点布局
-function calculatePertLayout(tasks) {
-    const nodes = [];
-    const taskMap = new Map(tasks.map(t => [t.id, t]));
-    
-    // 计算每个任务的层级
-    const levels = new Map();
-    const visited = new Set();
-    
-    function getLevel(taskId) {
-        if (levels.has(taskId)) return levels.get(taskId);
-        if (visited.has(taskId)) return 0; // 避免循环依赖
-        
-        visited.add(taskId);
-        const task = taskMap.get(taskId);
-        if (!task || !task.dependencies || task.dependencies.length === 0) {
-            levels.set(taskId, 0);
-            return 0;
-        }
-        
-        const maxDepLevel = Math.max(...task.dependencies.map(depId => getLevel(depId)));
-        const level = maxDepLevel + 1;
-        levels.set(taskId, level);
-        return level;
+        levels.set(task.id, maxLevel);
+        stack.push(...tasks.filter(t => t.dependencies?.includes(task.id)));
     }
-    
-    tasks.forEach(task => getLevel(task.id));
-    
-    // 按层级分组
+
+    // 分组
     const levelGroups = new Map();
     tasks.forEach(task => {
         const level = levels.get(task.id) || 0;
@@ -356,13 +284,14 @@ function calculatePertLayout(tasks) {
     });
     
     // 计算位置
-    const svgWidth = document.getElementById('pertContainer').clientWidth;
+    const svgWidth = pertContainer.clientWidth;
     const svgHeight = 600;
     const nodeWidth = 120;
     const nodeHeight = 80;
     const maxLevel = Math.max(...levels.values(), 0);
     const levelWidth = svgWidth / (maxLevel + 2);
     
+    const nodes = [];
     levelGroups.forEach((tasksInLevel, level) => {
         const levelHeight = svgHeight / (tasksInLevel.length + 1);
         tasksInLevel.forEach((task, index) => {
@@ -380,7 +309,21 @@ function calculatePertLayout(tasks) {
         });
     });
     
-    return nodes;
+    // 绘制节点
+    nodes.forEach(node => drawPertNode(svg, node));
+    
+    // 绘制箭头
+    tasks.forEach(task => {
+        if (!task.dependencies || task.dependencies.length === 0) return;
+        const fromNode = nodes.find(n => n.id === task.id);
+        if (!fromNode) return;
+        task.dependencies.forEach(depId => {
+            const toNode = nodes.find(n => n.id === depId);
+            if (toNode) {
+                drawArrow(svg, toNode.x + toNode.width / 2, toNode.y, fromNode.x - fromNode.width / 2, fromNode.y);
+            }
+        });
+    });
 }
 
 // 绘制PERT节点
@@ -468,6 +411,8 @@ function drawArrow(svg, x1, y1, x2, y2) {
 const settingsPanel = document.getElementById('settingsPanel');
 const settingsTrigger = document.getElementById('settingsTrigger');
 const settingsClose = document.getElementById('settingsClose');
+const showLogPanelSwitch = document.getElementById('showLogPanel');
+const logPanel = document.getElementById('logPanel');
 
 // 打开设置面板
 settingsTrigger.onclick = () => {
@@ -481,7 +426,7 @@ settingsClose.onclick = () => {
     addLog('已关闭设置面板');
 };
 
-// 点击面板外部关闭
+// 点击外部关闭
 document.addEventListener('click', (e) => {
     if (settingsPanel.classList.contains('active') && 
         !settingsPanel.contains(e.target) && 
@@ -490,8 +435,55 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// 日志面板显示开关
+showLogPanelSwitch.onchange = () => {
+    if (showLogPanelSwitch.checked) {
+        logPanel.classList.remove('hidden');
+        addLog('日志面板已启用');
+    } else {
+        logPanel.classList.add('hidden');
+        addLog('日志面板已隐藏');
+    }
+};
+
+// 初始化日志面板状态
+if (!showLogPanelSwitch.checked) {
+    logPanel.classList.add('hidden');
+}
+
+// ==================== 其他设置项同步 ====================
+document.getElementById('enableEdit').onchange = (e) => {
+    gantt.options.enableEdit = e.target.checked;
+    gantt.render();
+    addLog(e.target.checked ? '启用拖拽移动' : '禁用拖拽移动');
+};
+
+document.getElementById('enableResize').onchange = (e) => {
+    gantt.options.enableResize = e.target.checked;
+    gantt.render();
+    addLog(e.target.checked ? '启用调整时长' : '禁用调整时长');
+};
+
+document.getElementById('showWeekends').onchange = (e) => {
+    gantt.options.showWeekends = e.target.checked;
+    gantt.render();
+    addLog(e.target.checked ? '显示周末' : '隐藏周末');
+};
+
+document.getElementById('showDependencies').onchange = (e) => {
+    gantt.options.showDependencies = e.target.checked;
+    gantt.render();
+    addLog(e.target.checked ? '显示依赖箭头' : '隐藏依赖箭头');
+};
+
+document.getElementById('cellWidth').oninput = (e) => {
+    const value = parseInt(e.target.value);
+    gantt.options.cellWidth = value;
+    document.getElementById('cellWidthValue').textContent = `${value}px`;
+    gantt.render();
+};
+
 // ==================== 日志面板折叠 ====================
-const logPanel = document.getElementById('logPanel');
 const logHeader = document.getElementById('logHeader');
 const logToggle = document.getElementById('logToggle');
 
@@ -500,16 +492,6 @@ logHeader.onclick = () => {
     const isCollapsed = logPanel.classList.contains('collapsed');
     logToggle.textContent = isCollapsed ? '+' : '−';
     addLog(isCollapsed ? '日志面板已折叠' : '日志面板已展开');
-};
-
-// ==================== 更新切换按钮文本 ====================
-const originalToggleClick = toggleButton.onclick;
-toggleButton.onclick = () => {
-    originalToggleClick();
-    const btnText = toggleButton.querySelector('.btn-text');
-    if (btnText) {
-        btnText.textContent = isPertView ? '甘特视图' : 'PERT视图';
-    }
 };
 
 // ==================== 初始化日志 ====================
