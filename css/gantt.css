@@ -114,7 +114,7 @@ body {
 }
 
 /* ======================
-   展开工具栏 - 毛玻璃 + 圆角卡片
+   展开工具栏 - 毛玻璃 + 圆角卡片 + 滑出动画
    ====================== */
 .floating-toolbar-expanded {
     position: absolute;
@@ -132,12 +132,12 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    max-width: 0;
     opacity: 0;
     visibility: hidden;
-    overflow: hidden;
-    transition: max-width 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.4s ease 0.1s,
+    transform: translateX(-30px) scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.5s ease,
                 visibility 0s linear 0.6s;
     z-index: 999;
     pointer-events: none;
@@ -145,12 +145,12 @@ body {
 }
 
 .floating-toolbar-expanded.active {
-    max-width: 1000px;
     opacity: 1;
     visibility: visible;
+    transform: translateX(0) scaleX(1);
     pointer-events: auto;
-    transition: max-width 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.4s ease 0.2s,
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.5s ease 0.1s,
                 visibility 0s linear 0s;
 }
 
