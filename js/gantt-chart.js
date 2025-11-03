@@ -77,7 +77,7 @@ class GanttChart {
     }
 
     /**
-     * 渲染甘特图
+     * 渲染甘特图（分离头部与内容）
      */
     render() {
         const dates = this.generateDates();
@@ -85,42 +85,81 @@ class GanttChart {
         
         const html = `
             <div class="gantt-wrapper">
+                <!-- 左侧任务列表 -->
                 <div class="gantt-sidebar">
                     <div class="gantt-sidebar-header">任务名称</div>
-                    ${this.tasks.map(task => `
-                        <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''}" 
-                             data-task-id="${task.id}">
-                            ${task.name}
-                        </div>
-                    `).join('')}
+                    <div class="gantt-sidebar-content" id="sidebarScroll">
+                        ${this.tasks.map(task => `
+                            <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''}" 
+                                 data-task-id="${task.id}">
+                                ${task.name}
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
+
+                <!-- 右侧甘特图 -->
                 <div class="gantt-timeline-wrapper">
-                    <div class="gantt-timeline">
-                        <div class="gantt-timeline-header">
-                            ${dates.map(date => `
-                                <div class="gantt-date-cell ${isWeekend(date) && this.options.showWeekends ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}" 
-                                     style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;">
-                                    <div class="gantt-date-day">${date.getDate()}</div>
-                                    <div class="gantt-date-weekday">${weekdays[date.getDay()]}</div>
-                                </div>
-                            `).join('')}
-                        </div>
+                    <!-- 固定头部 -->
+                    <div class="gantt-timeline-header">
+                        ${dates.map(date => `
+                            <div class="gantt-date-cell ${isWeekend(date) && this.options.showWeekends ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}" 
+                                 style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;">
+                                <div class="gantt-date-day">${date.getDate()}</div>
+                                <div class="gantt-date-weekday">${weekdays[date.getDay()]}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- 可滚动内容 -->
+                    <div class="gantt-timeline-content" id="timelineScroll">
                         <div class="gantt-rows">
                             ${this.tasks.map(task => this.renderRow(task, dates)).join('')}
                         </div>
+                        <svg class="gantt-dependencies"></svg>
                     </div>
-                    <svg class="gantt-dependencies" style="position: absolute; top: 0; left: 0; pointer-events: none;"></svg>
                 </div>
             </div>
         `;
 
         this.container.innerHTML = html;
 
+        // 设置 SVG 尺寸
         const depSVG = this.container.querySelector('.gantt-dependencies');
-        depSVG.style.width = `${dates.length * this.options.cellWidth}px`;
-        depSVG.style.height = `${60 + this.tasks.length * 60}px`;
+        const contentWidth = dates.length * this.options.cellWidth;
+        const contentHeight = this.tasks.length * 60 + 60; // 行高 + 头部
+        depSVG.style.width = `${contentWidth}px`;
+        depSVG.style.height = `${contentHeight}px`;
 
-        depSVG.innerHTML = `
+        // 渲染依赖箭头
+        if (this.options.showDependencies) {
+            this.renderDependencies(depSVG, dates);
+        }
+
+        // 同步左右滚动
+        const sidebarScroll = this.container.querySelector('#sidebarScroll');
+        const timelineScroll = this.container.querySelector('#timelineScroll');
+        if (sidebarScroll && timelineScroll) {
+            sidebarScroll.onscroll = () => {
+                timelineScroll.scrollTop = sidebarScroll.scrollTop;
+            };
+            timelineScroll.onscroll = () => {
+                sidebarScroll.scrollTop = timelineScroll.scrollTop;
+            };
+        }
+
+        this.attachEvents();
+    }
+
+    /**
+     * 渲染依赖箭头
+     */
+    renderDependencies(svg, dates) {
+        const rowHeight = 60;
+        const w = this.options.cellWidth;
+        const radius = 10;
+
+        svg.innerHTML = `
             <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
                     <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc3545" />
@@ -128,72 +167,58 @@ class GanttChart {
             </defs>
         `;
 
-        if (this.options.showDependencies) {
-            const rowHeight = 60; // h
-            const w = this.options.cellWidth;
-            const h = rowHeight;
-            const radius = 10;
+        this.tasks.forEach((task, taskIndex) => {
+            if (!task.dependencies || task.dependencies.length === 0) return;
+            task.dependencies.forEach(depId => {
+                const depTask = this.tasks.find(t => t.id === depId);
+                if (!depTask) return;
+                const depIndex = this.tasks.findIndex(t => t.id === depId);
+                const depEndOffset = daysBetween(this.startDate, depTask.end);
+                const taskStartOffset = daysBetween(this.startDate, task.start);
+                const x1 = depEndOffset * w + w;
+                const x2 = taskStartOffset * w;
+                const y1 = depIndex * rowHeight + rowHeight / 2;
+                const y2 = taskIndex * rowHeight + rowHeight / 2;
+                const d = Math.abs(taskIndex - depIndex);
 
-            this.tasks.forEach((task, taskIndex) => {
-                if (!task.dependencies || task.dependencies.length === 0) return;
-                task.dependencies.forEach(depId => {
-                    const depTask = this.tasks.find(t => t.id === depId);
-                    if (!depTask) return;
-                    const depIndex = this.tasks.findIndex(t => t.id === depId);
-                    const depEndOffset = daysBetween(this.startDate, depTask.end);
-                    const taskStartOffset = daysBetween(this.startDate, task.start);
-                    const x1 = depEndOffset * w + w; // 前置最右侧
-                    const x2 = taskStartOffset * w; // 后继左侧
-                    const y1 = rowHeight + depIndex * rowHeight + rowHeight / 2; // 前置中心
-                    const y2 = rowHeight + taskIndex * rowHeight + rowHeight / 2; // 后继中心
-                    const d = Math.abs(taskIndex - depIndex); // 距离d，相邻1，隔一2等
+                let coords;
+                if (depIndex < taskIndex) {
+                    coords = [
+                        {x: x1, y: y1},
+                        {x: x1 + w / 2, y: y1},
+                        {x: x1 + w / 2, y: y1 + rowHeight / 8},
+                        {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y1 + rowHeight / 8},
+                        {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y2},
+                        {x: x2, y: y2}
+                    ];
+                } else if (depIndex > taskIndex) {
+                    coords = [
+                        {x: x1, y: y1},
+                        {x: x1 + w / 2, y: y1},
+                        {x: x1 + w / 2, y: y1 - rowHeight / 8},
+                        {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y1 - rowHeight / 8},
+                        {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y2},
+                        {x: x2, y: y2}
+                    ];
+                } else {
+                    const sign = x2 > x1 ? 1 : -1;
+                    const bend = 20;
+                    coords = [
+                        {x: x1, y: y1},
+                        {x: x1 + sign * bend, y: y1},
+                        {x: x1 + sign * bend, y: y2},
+                        {x: x2, y: y2}
+                    ];
+                }
 
-                    let coords;
-                    if (depIndex < taskIndex) { // 前置在上方 (y1 < y2)
-                        coords = [
-                            {x: x1, y: y1}, // start
-                            {x: x1 + w / 2, y: y1}, // 右 w/2
-                            {x: x1 + w / 2, y: y1 + h / 8}, // 下 h/8
-                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y1 + h / 8}, // 左 w/(2d) + w/2
-                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y2}, // 下 to y2
-                            {x: x2, y: y2} // 水平 to x2
-                        ];
-                    } else if (depIndex > taskIndex) { // 前置在下方 (y1 > y2)
-                        coords = [
-                            {x: x1, y: y1}, // start
-                            {x: x1 + w / 2, y: y1}, // 右 w/2
-                            {x: x1 + w / 2, y: y1 - h / 8}, // 上 h/8 (负方向)
-                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y1 - h / 8}, // 左 w/(2d) + w/2
-                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y2}, // 上 to y2 (负方向)
-                            {x: x2, y: y2} // 水平 to x2
-                        ];
-                    } else {
-                        // 同行，使用简单弯曲路径
-                        const sign = x2 > x1 ? 1 : -1;
-                        const bend = 20;
-                        coords = [
-                            {x: x1, y: y1},
-                            {x: x1 + sign * bend, y: y1},
-                            {x: x1 + sign * bend, y: y2},
-                            {x: x2, y: y2}
-                        ];
-                    }
-
-                    const dPath = createRoundedPath(coords, radius, false);
-
-                    depSVG.innerHTML += `<path data-from="${depId}" data-to="${task.id}" d="${dPath}" stroke="#dc3545" fill="none" stroke-width="2" marker-end="url(#arrow)" />`;
-                });
+                const dPath = createRoundedPath(coords, radius, false);
+                svg.innerHTML += `<path data-from="${depId}" data-to="${task.id}" d="${dPath}" stroke="#dc3545" fill="none" stroke-width="2" marker-end="url(#arrow)" />`;
             });
-        }
-
-        this.attachEvents();
+        });
     }
 
     /**
      * 渲染单个任务行
-     * @param {Object} task - 任务对象
-     * @param {Array<Date>} dates - 日期数组
-     * @returns {string} HTML字符串
      */
     renderRow(task, dates) {
         const start = new Date(task.start);
@@ -225,30 +250,69 @@ class GanttChart {
 
     /**
      * 选择任务
-     * @param {string} taskId - 任务ID
      */
     selectTask(taskId) {
+        if (this.selectedTask === taskId) return;
+
+        this.container.querySelectorAll('.gantt-bar, .gantt-task-name').forEach(el => {
+            el.classList.remove('selected', 'dep-highlight');
+        });
+        this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
+            path.classList.remove('dep-highlight-arrow');
+        });
+        const oldForm = this.container.querySelector('.inline-task-form');
+        if (oldForm) oldForm.remove();
+
+        if (!taskId) return;
+
         this.selectedTask = taskId;
         const task = this.tasks.find(t => t.id === taskId);
-        
-        this.container.querySelectorAll('.gantt-bar').forEach(bar => {
-            bar.classList.toggle('selected', bar.dataset.taskId === taskId);
+
+        const selectedBar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
+        if (selectedBar) selectedBar.classList.add('selected');
+
+        const selectedName = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
+        if (selectedName) selectedName.classList.add('selected');
+
+        const deps = this.getAllDependencies(taskId);
+        deps.forEach(depId => {
+            const bar = this.container.querySelector(`.gantt-bar[data-task-id="${depId}"]`);
+            if (bar) bar.classList.add('dep-highlight');
+            const name = this.container.querySelector(`.gantt-task-name[data-task-id="${depId}"]`);
+            if (name) name.classList.add('dep-highlight');
         });
-        
-        this.container.querySelectorAll('.gantt-task-name').forEach(el => {
-            el.classList.toggle('selected', el.dataset.taskId === taskId);
+
+        this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
+            const fromId = path.dataset.from;
+            const toId = path.dataset.to;
+            if (deps.has(fromId) && (toId === taskId || deps.has(toId))) {
+                path.classList.add('dep-highlight-arrow');
+            }
         });
-        
-        if (window.showTaskForm) {
-            window.showTaskForm(task);
-        }
-        addLog(`📌 已选择任务 "${task.name}"`);
+
+        addLog(`已选择任务 "${task.name}"`);
     }
 
     /**
-     * 获取任务的所有前置依赖ID（递归）
-     * @param {string} taskId - 任务ID
-     * @returns {Set<string>} 所有前置依赖ID集合
+     * 取消选择
+     */
+    deselect() {
+        if (!this.selectedTask) return;
+
+        this.selectedTask = null;
+        this.container.querySelectorAll('.selected, .dep-highlight').forEach(el => {
+            el.classList.remove('selected', 'dep-highlight');
+        });
+        this.container.querySelectorAll('.dep-highlight-arrow').forEach(path => {
+            path.classList.remove('dep-highlight-arrow');
+        });
+        const form = this.container.querySelector('.inline-task-form');
+        if (form) form.remove();
+        addLog('已取消选择');
+    }
+
+    /**
+     * 获取所有前置依赖
      */
     getAllDependencies(taskId) {
         const deps = new Set();
@@ -271,13 +335,12 @@ class GanttChart {
             }
         }
 
-        deps.delete(taskId); // 移除自身（如果有循环）
+        deps.delete(taskId);
         return deps;
     }
 
     /**
      * 添加任务
-     * @param {Object} task - 任务对象
      */
     addTask(task) {
         this.tasks.push(task);
@@ -287,10 +350,9 @@ class GanttChart {
 
     /**
      * 删除任务
-     * @param {string} taskId - 任务ID
      */
     deleteTask(taskId) {
-        this.tasks = this.tasks.filter(t => t.id !== taskId);
+        this.tasks =  = this.tasks.filter(t => t.id !== taskId);
         if (this.selectedTask === taskId) {
             this.selectedTask = null;
         }
@@ -300,7 +362,6 @@ class GanttChart {
 
     /**
      * 更新选项
-     * @param {Object} options - 新选项
      */
     updateOptions(options) {
         Object.assign(this.options, options);
@@ -308,8 +369,7 @@ class GanttChart {
     }
 
     /**
-     * 获取选中的任务
-     * @returns {Object|undefined} 任务对象
+     * 获取选中任务
      */
     getSelectedTask() {
         return this.tasks.find(t => t.id === this.selectedTask);
