@@ -85,17 +85,9 @@ class GanttChart {
         
         const html = `
             <div class="gantt-wrapper">
-                <div class="gantt-sidebar">
+                <div class="gantt-header">
                     <div class="gantt-sidebar-header">任务名称</div>
-                    ${this.tasks.map(task => `
-                        <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''}" 
-                             data-task-id="${task.id}">
-                            ${task.name}
-                        </div>
-                    `).join('')}
-                </div>
-                <div class="gantt-timeline-wrapper">
-                    <div class="gantt-timeline">
+                    <div class="gantt-timeline-header-wrapper">
                         <div class="gantt-timeline-header">
                             ${dates.map(date => `
                                 <div class="gantt-date-cell ${isWeekend(date) && this.options.showWeekends ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}" 
@@ -105,11 +97,25 @@ class GanttChart {
                                 </div>
                             `).join('')}
                         </div>
-                        <div class="gantt-rows">
-                            ${this.tasks.map(task => this.renderRow(task, dates)).join('')}
-                        </div>
                     </div>
-                    <svg class="gantt-dependencies" style="position: absolute; top: 0; left: 0; pointer-events: none;"></svg>
+                </div>
+                <div class="gantt-body">
+                    <div class="gantt-sidebar-body">
+                        ${this.tasks.map(task => `
+                            <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''}" 
+                                 data-task-id="${task.id}">
+                                ${task.name}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="gantt-timeline-body">
+                        <div class="gantt-timeline">
+                            <div class="gantt-rows">
+                                ${this.tasks.map(task => this.renderRow(task, dates)).join('')}
+                            </div>
+                        </div>
+                        <svg class="gantt-dependencies" style="position: absolute; top: 0; left: 0; pointer-events: none;"></svg>
+                    </div>
                 </div>
             </div>
         `;
@@ -118,7 +124,7 @@ class GanttChart {
 
         const depSVG = this.container.querySelector('.gantt-dependencies');
         depSVG.style.width = `${dates.length * this.options.cellWidth}px`;
-        depSVG.style.height = `${60 + this.tasks.length * 60}px`;
+        depSVG.style.height = `${this.tasks.length * 60}px`;
 
         depSVG.innerHTML = `
             <defs>
@@ -144,8 +150,8 @@ class GanttChart {
                     const taskStartOffset = daysBetween(this.startDate, task.start);
                     const x1 = depEndOffset * w + w; // 前置最右侧
                     const x2 = taskStartOffset * w; // 后继左侧
-                    const y1 = rowHeight + depIndex * rowHeight + rowHeight / 2; // 前置中心
-                    const y2 = rowHeight + taskIndex * rowHeight + rowHeight / 2; // 后继中心
+                    const y1 = depIndex * rowHeight + rowHeight / 2; // 前置中心 (去除header的60)
+                    const y2 = taskIndex * rowHeight + rowHeight / 2; // 后继中心
                     const d = Math.abs(taskIndex - depIndex); // 距离d，相邻1，隔一2等
 
                     let coords;
@@ -187,6 +193,22 @@ class GanttChart {
         }
 
         this.attachEvents();
+
+        // 添加滚动同步
+        const timelineBody = this.container.querySelector('.gantt-timeline-body');
+        const sidebarBody = this.container.querySelector('.gantt-sidebar-body');
+        const headerWrapper = this.container.querySelector('.gantt-timeline-header-wrapper');
+
+        if (timelineBody && sidebarBody && headerWrapper) {
+            timelineBody.addEventListener('scroll', () => {
+                sidebarBody.scrollTop = timelineBody.scrollTop;
+                headerWrapper.scrollLeft = timelineBody.scrollLeft;
+            });
+
+            sidebarBody.addEventListener('scroll', () => {
+                timelineBody.scrollTop = sidebarBody.scrollTop;
+            });
+        }
     }
 
     /**
