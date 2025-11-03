@@ -114,17 +114,17 @@ body {
 }
 
 /* ======================
-   展开工具栏 - 毛玻璃 + 圆角卡片 + 滑出动画
+   展开工具栏 - 毛玻璃 + 圆角卡片 + 自然滑出动画
    ====================== */
 .floating-toolbar-expanded {
     position: absolute;
-    left: 88px;
+    left: 20px; /* 与折叠按钮左对齐 */
     top: 20px;
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-radius: 20px;
-    padding: 12px 16px;
+    padding: 12px 16px 12px 68px; /* 左侧预留折叠按钮空间 */
     box-shadow: 0 8px 32px rgba(0,0,0,0.12), 
                 0 2px 8px rgba(0,0,0,0.08),
                 inset 0 1px 0 rgba(255,255,255,0.8);
@@ -132,24 +132,23 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
+    clip-path: inset(0 100% 0 0 round 20px);
     opacity: 0;
     visibility: hidden;
-    transform: translateX(-30px) scaleX(0);
-    transform-origin: left center;
-    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    transition: clip-path 0.6s cubic-bezier(0.4, 0, 0.2, 1),
                 opacity 0.5s ease,
                 visibility 0s linear 0.6s;
-    z-index: 999;
+    z-index: 998; /* 比折叠按钮低 */
     pointer-events: none;
     white-space: nowrap;
 }
 
 .floating-toolbar-expanded.active {
+    clip-path: inset(0 0 0 0 round 20px);
     opacity: 1;
     visibility: visible;
-    transform: translateX(0) scaleX(1);
     pointer-events: auto;
-    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    transition: clip-path 0.6s cubic-bezier(0.4, 0, 0.2, 1),
                 opacity 0.5s ease 0.1s,
                 visibility 0s linear 0s;
 }
