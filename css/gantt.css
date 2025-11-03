@@ -132,25 +132,20 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    clip-path: inset(0 100% 0 0 round 20px);
+    max-width: 68px; /* 初始只显示按钮部分 */
     opacity: 0;
-    visibility: hidden;
-    transition: clip-path 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.5s ease,
-                visibility 0s linear 0.6s;
+    overflow: hidden;
+    transition: max-width 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.5s ease;
     z-index: 998; /* 比折叠按钮低 */
     pointer-events: none;
     white-space: nowrap;
 }
 
 .floating-toolbar-expanded.active {
-    clip-path: inset(0 0 0 0 round 20px);
+    max-width: 1200px; /* 展开到足够宽 */
     opacity: 1;
-    visibility: visible;
     pointer-events: auto;
-    transition: clip-path 0.6s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.5s ease 0.1s,
-                visibility 0s linear 0s;
 }
 
 /* ======================
@@ -160,6 +155,28 @@ body {
     display: flex;
     gap: 8px;
     align-items: center;
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.floating-toolbar-expanded.active .toolbar-section {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* 分组延迟动画 */
+.floating-toolbar-expanded.active .toolbar-section:nth-child(1) {
+    transition-delay: 0.2s;
+}
+.floating-toolbar-expanded.active .toolbar-section:nth-child(3) {
+    transition-delay: 0.3s;
+}
+.floating-toolbar-expanded.active .toolbar-section:nth-child(5) {
+    transition-delay: 0.4s;
+}
+.floating-toolbar-expanded.active .settings-trigger {
+    transition-delay: 0.5s;
 }
 
 .toolbar-btn {
