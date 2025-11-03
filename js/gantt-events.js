@@ -1,6 +1,6 @@
 /**
  * 甘特图事件处理模块
- * 悬停 = 选中，点击 = 拖拽 + 切换依赖
+ * 仅保留：左侧任务名称单击 → 选中 + 打开编辑界面
  */
 
 GanttChart.prototype.attachEvents = function() {
@@ -8,7 +8,15 @@ GanttChart.prototype.attachEvents = function() {
     this.container.querySelectorAll('.gantt-task-name').forEach(el => {
         el.onclick = (e) => {
             if (el.classList.contains('editing')) return;
-            this.selectTask(el.dataset.taskId);
+            const taskId = el.dataset.taskId;
+            const task = this.tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            // 选中任务并打开编辑表单
+            this.selectTask(taskId);
+            if (window.showTaskForm) {
+                window.showTaskForm(task);
+            }
         };
 
         el.ondblclick = (e) => {
@@ -16,41 +24,13 @@ GanttChart.prototype.attachEvents = function() {
             e.stopPropagation();
             this.editTaskName(el);
         };
-
-        // 新增：右键展开编辑任务界面
-        el.oncontextmenu = (e) => {
-            e.preventDefault();
-            const taskId = el.dataset.taskId;
-            this.selectTask(taskId);
-            const task = this.tasks.find(t => t.id === taskId);
-            window.showTaskForm(task);
-        };
     });
 
     // ------------------- 甘特图任务条 -------------------
     this.container.querySelectorAll('.gantt-bar').forEach(bar => {
-        let hoverTimer = null;
         const taskId = bar.dataset.taskId;
 
-        // 悬停：延迟选中
-        bar.onmouseenter = () => {
-            hoverTimer = setTimeout(() => {
-                this.selectTask(taskId);
-                // 同步左侧高亮
-                const nameEl = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
-                if (nameEl) {
-                    this.container.querySelectorAll('.gantt-task-name').forEach(el => {
-                        el.classList.toggle('selected', el === nameEl);
-                    });
-                }
-            }, 200);
-        };
-
-        bar.onmouseleave = () => {
-            if (hoverTimer) clearTimeout(hoverTimer);
-        };
-
-        // 点击：切换依赖（仅表单打开时）或拖拽
+        // 点击：切换依赖（仅表单打开时）
         bar.onclick = (e) => {
             if (e.target.classList.contains('gantt-bar-handle')) return;
 
@@ -87,7 +67,7 @@ GanttChart.prototype.attachEvents = function() {
             e.stopPropagation();
         };
 
-        // 双击编辑
+        // 双击编辑名称
         bar.ondblclick = (e) => {
             if (e.target.classList.contains('gantt-bar-handle')) return;
             e.preventDefault();
@@ -95,17 +75,9 @@ GanttChart.prototype.attachEvents = function() {
             const taskNameEl = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
             if (taskNameEl) this.editTaskName(taskNameEl);
         };
-
-        // 新增：右键展开编辑任务界面
-        bar.oncontextmenu = (e) => {
-            e.preventDefault();
-            this.selectTask(taskId);
-            const task = this.tasks.find(t => t.id === taskId);
-            window.showTaskForm(task);
-        };
     });
 
-    // ------------------- 添加取消选择事件（点击时间轴空白处） -------------------
+    // ------------------- 点击时间轴空白处取消选择 -------------------
     const timelineWrapper = this.container.querySelector('.gantt-timeline-wrapper');
     if (timelineWrapper) {
         timelineWrapper.addEventListener('click', (e) => {
@@ -122,42 +94,40 @@ GanttChart.prototype.attachEvents = function() {
     };
 };
 
-// ------------------- 选择任务（修改：添加依赖高亮） -------------------
+// ------------------- 选择任务（仅高亮，不自动打开表单） -------------------
 GanttChart.prototype.selectTask = function(taskId) {
     if (this.selectedTask === taskId) return;
 
-    // 清除所有现有高亮
+    // 清除所有高亮
     this.container.querySelectorAll('.gantt-bar, .gantt-task-name').forEach(el => {
         el.classList.remove('selected', 'dep-highlight');
     });
     this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
         path.classList.remove('dep-highlight-arrow');
     });
-    document.getElementById('taskFormContainer').innerHTML = '';
 
     if (!taskId) return;
 
     this.selectedTask = taskId;
     const task = this.tasks.find(t => t.id === taskId);
 
-    // 添加选中高亮
+    // 高亮选中任务
     const selectedBar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
     if (selectedBar) selectedBar.classList.add('selected');
 
     const selectedName = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
     if (selectedName) selectedName.classList.add('selected');
 
-    // 添加依赖高亮（递归前置）
+    // 高亮依赖任务
     const deps = this.getAllDependencies(taskId);
     deps.forEach(depId => {
         const bar = this.container.querySelector(`.gantt-bar[data-task-id="${depId}"]`);
         if (bar) bar.classList.add('dep-highlight');
-
         const name = this.container.querySelector(`.gantt-task-name[data-task-id="${depId}"]`);
         if (name) name.classList.add('dep-highlight');
     });
 
-    // 高亮相关的箭头（从前置到后继的箭头，包括多级）
+    // 高亮依赖箭头
     this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
         const fromId = path.dataset.from;
         const toId = path.dataset.to;
@@ -166,7 +136,7 @@ GanttChart.prototype.selectTask = function(taskId) {
         }
     });
 
-    addLog(`📌 已选择任务 "${task.name}"`);
+    addLog(`已选择任务 "${task.name}"`);
 };
 
 // ------------------- 取消选择 -------------------
