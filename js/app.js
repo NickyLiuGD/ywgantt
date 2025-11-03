@@ -374,37 +374,41 @@ logHeader.onclick = () => {
     addLog(isCollapsed ? '日志面板已折叠' : '日志面板已展开');
 };
 
-// ==================== 二级工具栏悬停展开 ====================
+// ==================== 工具栏悬停展开（优化的滑出动画）====================
 const toolbarCollapsed = document.getElementById('toolbarCollapsed');
 const toolbarExpanded = document.getElementById('floatingToolbarExpanded');
 let toolbarHoverTimer = null;
+let toolbarLeaveTimer = null;
 
+// 鼠标进入折叠按钮
 toolbarCollapsed.addEventListener('mouseenter', () => {
-    clearTimeout(toolbarHoverTimer);
-    toolbarExpanded.style.opacity = '1';
-    toolbarExpanded.style.visibility = 'visible';
-    toolbarExpanded.style.transform = 'translateX(0)';
-    toolbarExpanded.style.pointerEvents = 'auto';
-    addLog('工具栏已展开');
+    clearTimeout(toolbarLeaveTimer);
+    toolbarHoverTimer = setTimeout(() => {
+        toolbarExpanded.classList.add('active');
+        addLog('工具栏已展开');
+    }, 150); // 150ms延迟，避免误触
 });
 
+// 鼠标离开折叠按钮
 toolbarCollapsed.addEventListener('mouseleave', () => {
-    toolbarHoverTimer = setTimeout(() => {
-        toolbarExpanded.style.opacity = '0';
-        toolbarExpanded.style.visibility = 'hidden';
-        toolbarExpanded.style.transform = 'translateX(-20px)';
-        toolbarExpanded.style.pointerEvents = 'none';
-        addLog('工具栏已收起');
-    }, 300);
+    clearTimeout(toolbarHoverTimer);
+    toolbarLeaveTimer = setTimeout(() => {
+        if (!toolbarExpanded.matches(':hover')) {
+            toolbarExpanded.classList.remove('active');
+            addLog('工具栏已收起');
+        }
+    }, 200);
 });
 
-toolbarExpanded.addEventListener('mouseenter', () => clearTimeout(toolbarHoverTimer));
+// 鼠标进入展开的工具栏
+toolbarExpanded.addEventListener('mouseenter', () => {
+    clearTimeout(toolbarLeaveTimer);
+});
+
+// 鼠标离开展开的工具栏
 toolbarExpanded.addEventListener('mouseleave', () => {
-    toolbarHoverTimer = setTimeout(() => {
-        toolbarExpanded.style.opacity = '0';
-        toolbarExpanded.style.visibility = 'hidden';
-        toolbarExpanded.style.transform = 'translateX(-20px)';
-        toolbarExpanded.style.pointerEvents = 'none';
+    toolbarLeaveTimer = setTimeout(() => {
+        toolbarExpanded.classList.remove('active');
         addLog('工具栏已收起');
     }, 300);
 });
