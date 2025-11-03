@@ -152,6 +152,13 @@ GanttChart.prototype.deselect = function() {
     });
     const form = this.container.querySelector('.inline-task-form');
     if (form) form.remove();
+    
+    // 移除滚动监听
+    if (this.scrollUpdateInterval) {
+        clearInterval(this.scrollUpdateInterval);
+        this.scrollUpdateInterval = null;
+    }
+    
     addLog('已取消选择');
 };
 
@@ -164,23 +171,9 @@ GanttChart.prototype.showInlineTaskForm = function(task) {
     const bar = this.container.querySelector(`.gantt-bar[data-task-id="${task.id}"]`);
     if (!bar) return;
 
-    const rect = bar.getBoundingClientRect();
-    const containerRect = this.container.getBoundingClientRect();
-    const timelineRect = this.container.querySelector('.gantt-timeline-wrapper').getBoundingClientRect();
-
     const form = document.createElement('div');
     form.className = 'inline-task-form';
-    form.style.position = 'absolute';
-    form.style.left = `${rect.left - timelineRect.left + 20}px`;
-    form.style.top = `${rect.bottom - timelineRect.top + 8}px`;
-    form.style.zIndex = '1000';
-    form.style.width = '320px';
-    form.style.background = 'white';
-    form.style.borderRadius = '12px';
-    form.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
-    form.style.padding = '16px';
-    form.style.border = '1px solid #dee2e6';
-    form.style.fontSize = '0.9rem';
+    form.dataset.taskId = task.id; // 保存任务ID用于更新位置
 
     const availableTasks = this.tasks.filter(t => t.id !== task.id);
 
@@ -229,8 +222,27 @@ GanttChart.prototype.showInlineTaskForm = function(task) {
     `;
 
     // 插入到时间轴容器
-    const timelineWrapper = this.container.querySelector('.gantt-timeline-wrapper');
-    timelineWrapper.appendChild(form);
+    const rowsContainer = this.container.querySelector('.gantt-rows-container');
+    if (!rowsContainer) return;
+    
+    rowsContainer.appendChild(form);
+
+    // 初始位置计算和设置
+    this.updateFormPosition(form, bar, rowsContainer);
+
+    // 监听滚动事件，实时更新表单位置
+    const updatePosition = () => {
+        const currentBar = this.container.querySelector(`.gantt-bar[data-task-id="${task.id}"]`);
+        if (currentBar && form.parentElement) {
+            this.updateFormPosition(form, currentBar, rowsContainer);
+        }
+    };
+
+    rowsContainer.addEventListener('scroll', updatePosition);
+    
+    // 保存滚动监听器引用，用于清理
+    form._scrollListener = updatePosition;
+    form._scrollContainer = rowsContainer;
 
     // 进度条同步
     const progressInput = form.querySelector('#editProgress');
@@ -246,6 +258,12 @@ GanttChart.prototype.showInlineTaskForm = function(task) {
         task.end = form.querySelector('#editEnd').value;
         task.progress = parseInt(progressInput.value);
         task.dependencies = Array.from(form.querySelectorAll('#depList input[type="checkbox"]:checked')).map(cb => cb.value);
+        
+        // 清理滚动监听
+        if (form._scrollListener && form._scrollContainer) {
+            form._scrollContainer.removeEventListener('scroll', form._scrollListener);
+        }
+        
         this.calculateDateRange();
         this.render();
         addLog(`任务 "${task.name}" 已更新`);
@@ -253,17 +271,84 @@ GanttChart.prototype.showInlineTaskForm = function(task) {
     };
 
     // 取消
-    form.querySelector('#cancelEdit').onclick = () => form.remove();
-    form.querySelector('#closeForm').onclick = () => form.remove();
+    const cancelForm = () => {
+        if (form._scrollListener && form._scrollContainer) {
+            form._scrollContainer.removeEventListener('scroll', form._scrollListener);
+        }
+        form.remove();
+    };
+    
+    form.querySelector('#cancelEdit').onclick = cancelForm;
+    form.querySelector('#closeForm').onclick = cancelForm;
 
     // 点击外部关闭
     const clickOutside = (e) => {
         if (!form.contains(e.target) && !bar.contains(e.target)) {
+            if (form._scrollListener && form._scrollContainer) {
+                form._scrollContainer.removeEventListener('scroll', form._scrollListener);
+            }
             form.remove();
             document.removeEventListener('click', clickOutside);
         }
     };
     setTimeout(() => document.addEventListener('click', clickOutside), 0);
+};
+
+// ------------------- 更新表单位置（新增方法） -------------------
+GanttChart.prototype.updateFormPosition = function(form, bar, container) {
+    const barRect = bar.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+
+    // 计算相对于滚动容器的位置
+    const scrollTop = container.scrollTop;
+    const scrollLeft = container.scrollLeft;
+    
+    // 任务条在容器内的位置（考虑滚动）
+    const barTopInContainer = barRect.top - containerRect.top + scrollTop;
+    const barLeftInContainer = barRect.left - containerRect.left + scrollLeft;
+    
+    // 表单位置：任务条下方偏右一点
+    let formTop = barTopInContainer + barRect.height + 8;
+    let formLeft = barLeftInContainer + 20;
+    
+    // 防止表单超出右边界
+    const formWidth = 320;
+    const maxLeft = container.scrollWidth - formWidth - 20;
+    if (formLeft > maxLeft) {
+        formLeft = maxLeft;
+    }
+    
+    // 防止表单超出左边界
+    if (formLeft < 10) {
+        formLeft = 10;
+    }
+    
+    // 如果任务条在视口底部，表单显示在上方
+    const viewportHeight = containerRect.height;
+    const barBottomInViewport = barRect.bottom - containerRect.top;
+    const formHeight = 450; // 表单大约高度
+    
+    if (barBottomInViewport + formHeight > viewportHeight) {
+        // 放在任务条上方
+        formTop = barTopInContainer - formHeight - 8;
+        if (formTop < scrollTop) {
+            // 如果上方也放不下，就放在任务条右侧
+            formLeft = barLeftInContainer + barRect.width + 20;
+            formTop = barTopInContainer;
+        }
+    }
+
+    form.style.position = 'absolute';
+    form.style.left = `${formLeft}px`;
+    form.style.top = `${formTop}px`;
+    form.style.zIndex = '1000';
+    form.style.width = '320px';
+    form.style.background = 'white';
+    form.style.borderRadius = '12px';
+    form.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
+    form.style.padding = '16px';
+    form.style.border = '1px solid #dee2e6';
+    form.style.fontSize = '0.9rem';
 };
 
 // ------------------- 其余函数保持不变 -------------------
@@ -331,6 +416,13 @@ GanttChart.prototype.onMouseMove = function(e) {
         this.dragState.task.end = formatDate(newEnd);
         const offset = daysBetween(this.startDate, newStart);
         this.dragState.bar.style.left = offset * this.options.cellWidth + 'px';
+        
+        // 拖动时更新表单位置
+        const form = this.container.querySelector('.inline-task-form');
+        const rowsContainer = this.container.querySelector('.gantt-rows-container');
+        if (form && form.dataset.taskId === this.dragState.task.id && rowsContainer) {
+            this.updateFormPosition(form, this.dragState.bar, rowsContainer);
+        }
     } else if (this.dragState.type === 'resize') {
         if (this.dragState.isRight) {
             const newEnd = addDays(new Date(this.dragState.originalEnd), deltaDays);
@@ -352,6 +444,13 @@ GanttChart.prototype.onMouseMove = function(e) {
                 this.dragState.bar.style.left = offset * this.options.cellWidth + 'px';
                 this.dragState.bar.style.width = w + 'px';
             }
+        }
+        
+        // 调整大小时更新表单位置
+        const form = this.container.querySelector('.inline-task-form');
+        const rowsContainer = this.container.querySelector('.gantt-rows-container');
+        if (form && form.dataset.taskId === this.dragState.task.id && rowsContainer) {
+            this.updateFormPosition(form, this.dragState.bar, rowsContainer);
         }
     }
 };
