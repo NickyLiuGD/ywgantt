@@ -340,6 +340,10 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// ==================== 默认隐藏日志面板 ====================
+showLogPanelSwitch.checked = false; // 默认不勾选
+logPanel.classList.add('hidden'); // 默认隐藏
+
 showLogPanelSwitch.onchange = () => {
     if (showLogPanelSwitch.checked) {
         logPanel.classList.remove('hidden');
@@ -349,8 +353,6 @@ showLogPanelSwitch.onchange = () => {
         addLog('日志面板已隐藏');
     }
 };
-
-if (!showLogPanelSwitch.checked) logPanel.classList.add('hidden');
 
 // 其他设置项
 document.getElementById('enableEdit').onchange = (e) => { gantt.options.enableEdit = e.target.checked; gantt.render(); addLog(e.target.checked ? '启用拖拽移动' : '禁用拖拽移动'); };
@@ -386,7 +388,7 @@ toolbarCollapsed.addEventListener('mouseenter', () => {
     toolbarHoverTimer = setTimeout(() => {
         toolbarExpanded.classList.add('active');
         addLog('工具栏已展开');
-    }, 150); // 150ms延迟，避免误触
+    }, 150);
 });
 
 // 鼠标离开折叠按钮
