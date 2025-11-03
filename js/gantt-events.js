@@ -1,6 +1,6 @@
 /**
  * 甘特图事件处理模块
- * 仅保留：左侧任务名称单击 → 选中 + 打开编辑界面
+ * 选中任务时，在甘特图内部弹出编辑界面（浮动卡片）
  */
 
 GanttChart.prototype.attachEvents = function() {
@@ -12,11 +12,9 @@ GanttChart.prototype.attachEvents = function() {
             const task = this.tasks.find(t => t.id === taskId);
             if (!task) return;
 
-            // 选中任务并打开编辑表单
+            // 选中任务并在甘特图内部弹出编辑界面
             this.selectTask(taskId);
-            if (window.showTaskForm) {
-                window.showTaskForm(task);
-            }
+            this.showInlineTaskForm(task);
         };
 
         el.ondblclick = (e) => {
@@ -34,7 +32,7 @@ GanttChart.prototype.attachEvents = function() {
         bar.onclick = (e) => {
             if (e.target.classList.contains('gantt-bar-handle')) return;
 
-            const formOpen = !!document.getElementById('taskFormContainer').innerHTML;
+            const formOpen = !!this.container.querySelector('.inline-task-form');
             if (formOpen) {
                 const selectedTask = gantt.getSelectedTask();
                 if (selectedTask && selectedTask.id !== taskId) {
@@ -81,7 +79,7 @@ GanttChart.prototype.attachEvents = function() {
     const timelineWrapper = this.container.querySelector('.gantt-timeline-wrapper');
     if (timelineWrapper) {
         timelineWrapper.addEventListener('click', (e) => {
-            if (!e.target.closest('.gantt-bar, .gantt-bar-handle')) {
+            if (!e.target.closest('.gantt-bar, .gantt-bar-handle, .inline-task-form')) {
                 this.deselect();
             }
         });
@@ -98,13 +96,15 @@ GanttChart.prototype.attachEvents = function() {
 GanttChart.prototype.selectTask = function(taskId) {
     if (this.selectedTask === taskId) return;
 
-    // 清除所有高亮
+    // 清除所有高亮和旧表单
     this.container.querySelectorAll('.gantt-bar, .gantt-task-name').forEach(el => {
         el.classList.remove('selected', 'dep-highlight');
     });
     this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
         path.classList.remove('dep-highlight-arrow');
     });
+    const oldForm = this.container.querySelector('.inline-task-form');
+    if (oldForm) oldForm.remove();
 
     if (!taskId) return;
 
@@ -150,8 +150,120 @@ GanttChart.prototype.deselect = function() {
     this.container.querySelectorAll('.dep-highlight-arrow').forEach(path => {
         path.classList.remove('dep-highlight-arrow');
     });
-    document.getElementById('taskFormContainer').innerHTML = '';
+    const form = this.container.querySelector('.inline-task-form');
+    if (form) form.remove();
     addLog('已取消选择');
+};
+
+// ------------------- 在甘特图内部显示编辑表单 -------------------
+GanttChart.prototype.showInlineTaskForm = function(task) {
+    // 移除旧表单
+    const oldForm = this.container.querySelector('.inline-task-form');
+    if (oldForm) oldForm.remove();
+
+    const bar = this.container.querySelector(`.gantt-bar[data-task-id="${task.id}"]`);
+    if (!bar) return;
+
+    const rect = bar.getBoundingClientRect();
+    const containerRect = this.container.getBoundingClientRect();
+    const timelineRect = this.container.querySelector('.gantt-timeline-wrapper').getBoundingClientRect();
+
+    const form = document.createElement('div');
+    form.className = 'inline-task-form';
+    form.style.position = 'absolute';
+    form.style.left = `${rect.left - timelineRect.left + 20}px`;
+    form.style.top = `${rect.bottom - timelineRect.top + 8}px`;
+    form.style.zIndex = '1000';
+    form.style.width = '320px';
+    form.style.background = 'white';
+    form.style.borderRadius = '12px';
+    form.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
+    form.style.padding = '16px';
+    form.style.border = '1px solid #dee2e6';
+    form.style.fontSize = '0.9rem';
+
+    const availableTasks = this.tasks.filter(t => t.id !== task.id);
+
+    form.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0 fw-bold">编辑任务</h6>
+            <button type="button" class="btn-close btn-close-sm" id="closeForm"></button>
+        </div>
+        <div class="mb-2">
+            <label class="form-label fw-semibold">任务名称</label>
+            <input type="text" class="form-control form-control-sm" id="editName" value="${task.name}">
+        </div>
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label fw-semibold">开始日期</label>
+                <input type="date" class="form-control form-control-sm" id="editStart" value="${task.start}">
+            </div>
+            <div class="col-6">
+                <label class="form-label fw-semibold">结束日期</label>
+                <input type="date" class="form-control form-control-sm" id="editEnd" value="${task.end}">
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
+                完成进度: <span id="progressVal">${task.progress}%</span>
+            </label>
+            <input type="range" class="form-range" id="editProgress" value="${task.progress}" min="0" max="100" step="5">
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold">依赖任务</label>
+            <div id="depList" class="border rounded p-2" style="max-height:100px;overflow-y:auto;background:#f8f9fa;">
+                ${availableTasks.length > 0 ? availableTasks.map(t => `
+                    <div class="form-check form-check-inline mb-1">
+                        <input class="form-check-input" type="checkbox" value="${t.id}" id="dep_${t.id}"
+                            ${task.dependencies?.includes(t.id) ? 'checked' : ''}>
+                        <label class="form-check-label small" for="dep_${t.id}">${t.name}</label>
+                    </div>
+                `).join('') : '<small class="text-muted">无其他任务</small>'}
+            </div>
+            <small class="text-muted">提示：点击其他任务条可快速切换依赖</small>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm flex-fill" id="saveTask">保存</button>
+            <button class="btn btn-secondary btn-sm flex-fill" id="cancelEdit">取消</button>
+        </div>
+    `;
+
+    // 插入到时间轴容器
+    const timelineWrapper = this.container.querySelector('.gantt-timeline-wrapper');
+    timelineWrapper.appendChild(form);
+
+    // 进度条同步
+    const progressInput = form.querySelector('#editProgress');
+    const progressVal = form.querySelector('#progressVal');
+    progressInput.oninput = () => progressVal.textContent = progressInput.value + '%';
+
+    // 保存
+    form.querySelector('#saveTask').onclick = () => {
+        const newName = form.querySelector('#editName').value.trim();
+        if (!newName) { alert('任务名称不能为空'); return; }
+        task.name = newName;
+        task.start = form.querySelector('#editStart').value;
+        task.end = form.querySelector('#editEnd').value;
+        task.progress = parseInt(progressInput.value);
+        task.dependencies = Array.from(form.querySelectorAll('#depList input[type="checkbox"]:checked')).map(cb => cb.value);
+        this.calculateDateRange();
+        this.render();
+        addLog(`任务 "${task.name}" 已更新`);
+        form.remove();
+    };
+
+    // 取消
+    form.querySelector('#cancelEdit').onclick = () => form.remove();
+    form.querySelector('#closeForm').onclick = () => form.remove();
+
+    // 点击外部关闭
+    const clickOutside = (e) => {
+        if (!form.contains(e.target) && !bar.contains(e.target)) {
+            form.remove();
+            document.removeEventListener('click', clickOutside);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', clickOutside), 0);
 };
 
 // ------------------- 其余函数保持不变 -------------------

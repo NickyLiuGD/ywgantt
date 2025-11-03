@@ -868,3 +868,26 @@ input:checked + .switch-slider:before {
         right: -100%;
     }
 }
+
+/* 内部编辑表单样式 */
+.inline-task-form {
+    animation: fadeInUp 0.2s ease-out;
+    pointer-events: auto;
+}
+
+.inline-task-form .form-control-sm,
+.inline-task-form .form-range,
+.inline-task-form .form-check-input {
+    font-size: 0.85rem;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
