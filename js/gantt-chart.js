@@ -238,8 +238,12 @@ class GanttChart {
                      style="left: ${left}px; width: ${width}px;">
                     <div class="gantt-bar-progress" style="width: ${progress}%"></div>
                     ${this.options.enableResize ? '<div class="gantt-bar-handle left"></div>' : ''}
-                    <div class="gantt-bar-label">${task.name} (${progress}%)</div>
                     ${this.options.enableResize ? '<div class="gantt-bar-handle right"></div>' : ''}
+                </div>
+                <div class="gantt-bar-label-external ${this.selectedTask === task.id ? 'selected' : ''}" 
+                     data-task-id="${task.id}"
+                     style="left: ${left + width + 8}px;">
+                    ${task.name} (${progress}%)
                 </div>
             </div>
         `;
@@ -255,6 +259,10 @@ class GanttChart {
         
         this.container.querySelectorAll('.gantt-bar').forEach(bar => {
             bar.classList.toggle('selected', bar.dataset.taskId === taskId);
+        });
+        
+        this.container.querySelectorAll('.gantt-bar-label-external').forEach(label => {
+            label.classList.toggle('selected', label.dataset.taskId === taskId);
         });
         
         this.container.querySelectorAll('.gantt-task-name').forEach(el => {
