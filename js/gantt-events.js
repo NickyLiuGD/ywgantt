@@ -26,6 +26,32 @@ GanttChart.prototype.attachEvents = function() {
         };
     });
 
+    // ------------------- 右侧任务名称标签（新增点击事件） -------------------
+    this.container.querySelectorAll('.gantt-bar-label-external').forEach(label => {
+        // 单击：选中任务并打开编辑表单（与左侧任务名称行为一致）
+        label.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const taskId = label.dataset.taskId;
+            const task = this.tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            // 选中任务并在甘特图内部弹出编辑界面
+            this.selectTask(taskId);
+            this.showInlineTaskForm(task);
+        };
+
+        // 双击：编辑任务名称
+        label.ondblclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const taskId = label.dataset.taskId;
+            const taskNameEl = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
+            if (taskNameEl) this.editTaskName(taskNameEl);
+        };
+    });
+
     // ------------------- 甘特图任务条 -------------------
     this.container.querySelectorAll('.gantt-bar').forEach(bar => {
         const taskId = bar.dataset.taskId;
@@ -72,17 +98,6 @@ GanttChart.prototype.attachEvents = function() {
             if (e.target.classList.contains('gantt-bar-handle')) return;
             e.preventDefault();
             e.stopPropagation();
-            const taskNameEl = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
-            if (taskNameEl) this.editTaskName(taskNameEl);
-        };
-    });
-
-    // ------------------- 外部标签也支持双击编辑 -------------------
-    this.container.querySelectorAll('.gantt-bar-label-external').forEach(label => {
-        label.ondblclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const taskId = label.dataset.taskId;
             const taskNameEl = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
             if (taskNameEl) this.editTaskName(taskNameEl);
         };
