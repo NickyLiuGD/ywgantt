@@ -41,8 +41,8 @@ GanttChart.prototype.attachEvents = function() {
                     const depInput = document.getElementById(`dep_${taskId}`);
                     if (depInput) {
                         depInput.checked = !depInput.checked;
-                        const taskName = bar.querySelector('.gantt-bar-label').textContent.split(' (')[0];
-                        addLog(`${depInput.checked ? '添加' : '移除'}依赖：${taskName}`);
+                        const task = this.tasks.find(t => t.id === taskId);
+                        addLog(`${depInput.checked ? '添加' : '移除'}依赖：${task.name}`);
                     }
                 }
                 e.stopPropagation();
@@ -77,11 +77,22 @@ GanttChart.prototype.attachEvents = function() {
         };
     });
 
+    // ------------------- 外部标签也支持双击编辑 -------------------
+    this.container.querySelectorAll('.gantt-bar-label-external').forEach(label => {
+        label.ondblclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const taskId = label.dataset.taskId;
+            const taskNameEl = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
+            if (taskNameEl) this.editTaskName(taskNameEl);
+        };
+    });
+
     // ------------------- 点击时间轴空白处取消选择 -------------------
     const timelineWrapper = this.container.querySelector('.gantt-timeline-wrapper');
     if (timelineWrapper) {
         timelineWrapper.addEventListener('click', (e) => {
-            if (!e.target.closest('.gantt-bar, .gantt-bar-handle, .inline-task-form')) {
+            if (!e.target.closest('.gantt-bar, .gantt-bar-handle, .inline-task-form, .gantt-bar-label-external')) {
                 this.deselect();
             }
         });
@@ -106,7 +117,7 @@ GanttChart.prototype.selectTask = function(taskId) {
     if (this.selectedTask === taskId) return;
 
     // 清除所有高亮和旧表单
-    this.container.querySelectorAll('.gantt-bar, .gantt-task-name').forEach(el => {
+    this.container.querySelectorAll('.gantt-bar, .gantt-task-name, .gantt-bar-label-external').forEach(el => {
         el.classList.remove('selected', 'dep-highlight');
     });
     this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
@@ -124,6 +135,9 @@ GanttChart.prototype.selectTask = function(taskId) {
     const selectedBar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
     if (selectedBar) selectedBar.classList.add('selected');
 
+    const selectedLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${taskId}"]`);
+    if (selectedLabel) selectedLabel.classList.add('selected');
+
     const selectedName = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
     if (selectedName) selectedName.classList.add('selected');
 
@@ -132,6 +146,8 @@ GanttChart.prototype.selectTask = function(taskId) {
     deps.forEach(depId => {
         const bar = this.container.querySelector(`.gantt-bar[data-task-id="${depId}"]`);
         if (bar) bar.classList.add('dep-highlight');
+        const label = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${depId}"]`);
+        if (label) label.classList.add('dep-highlight');
         const name = this.container.querySelector(`.gantt-task-name[data-task-id="${depId}"]`);
         if (name) name.classList.add('dep-highlight');
     });
@@ -397,10 +413,11 @@ GanttChart.prototype.editTaskName = function(element) {
         }
         element.textContent = task.name;
         element.classList.remove('editing');
-        const bar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
-        if (bar) {
-            const label = bar.querySelector('.gantt-bar-label');
-            if (label) label.textContent = `${task.name} (${task.progress || 0}%)`;
+        
+        // 更新外部标签
+        const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${taskId}"]`);
+        if (externalLabel) {
+            externalLabel.textContent = `${task.name} (${task.progress || 0}%)`;
         }
     };
 
@@ -439,6 +456,13 @@ GanttChart.prototype.onMouseMove = function(e) {
         const offset = daysBetween(this.startDate, newStart);
         this.dragState.bar.style.left = offset * this.options.cellWidth + 'px';
         
+        // 同步更新外部标签位置
+        const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${this.dragState.task.id}"]`);
+        if (externalLabel) {
+            const barWidth = parseFloat(this.dragState.bar.style.width) || this.dragState.bar.offsetWidth;
+            externalLabel.style.left = (offset * this.options.cellWidth + barWidth + 8) + 'px';
+        }
+        
         // 拖动时更新表单位置
         const form = this.container.querySelector('.inline-task-form');
         const rowsContainer = this.container.querySelector('.gantt-rows-container');
@@ -454,6 +478,13 @@ GanttChart.prototype.onMouseMove = function(e) {
                 const dur = daysBetween(start, newEnd) + 1;
                 const w = Math.max(dur * this.options.cellWidth, 80);
                 this.dragState.bar.style.width = w + 'px';
+                
+                // 更新外部标签位置
+                const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${this.dragState.task.id}"]`);
+                if (externalLabel) {
+                    const offset = daysBetween(this.startDate, start);
+                    externalLabel.style.left = (offset * this.options.cellWidth + w + 8) + 'px';
+                }
             }
         } else {
             const newStart = addDays(new Date(this.dragState.originalStart), deltaDays);
@@ -465,6 +496,12 @@ GanttChart.prototype.onMouseMove = function(e) {
                 const w = Math.max(dur * this.options.cellWidth, 80);
                 this.dragState.bar.style.left = offset * this.options.cellWidth + 'px';
                 this.dragState.bar.style.width = w + 'px';
+                
+                // 更新外部标签位置
+                const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${this.dragState.task.id}"]`);
+                if (externalLabel) {
+                    externalLabel.style.left = (offset * this.options.cellWidth + w + 8) + 'px';
+                }
             }
         }
         
