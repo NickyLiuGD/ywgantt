@@ -1,21 +1,32 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>在线甘特图Gamma4</title>
+    <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测">
+    <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图">
+    <title>在线甘特图Gamma5</title>
+    
+    <!-- Preconnect to CDN for faster loading -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.anychart.com" crossorigin>
     
     <!-- Bootstrap CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" integrity="sha512-b2QcS5SsA8tZodcDtGRELiGv5SaKSk1vDHDaQRda0htPYWZ6046lr3kJ5bAAQdpV2mmA/4v0wQF9MyU6/pDIAg==" crossorigin="anonymous">
     
-    <!-- AnyChart for PERT -->
-    <script src="https://cdn.anychart.com/releases/8.13.0/js/anychart-core.min.js"></script>
-    <script src="https://cdn.anychart.com/releases/8.13.0/js/anychart-pert.min.js"></script>
+    <!-- AnyChart for PERT (defer loading) -->
+    <script defer src="https://cdn.anychart.com/releases/8.13.0/js/anychart-core.min.js"></script>
+    <script defer src="https://cdn.anychart.com/releases/8.13.0/js/anychart-pert.min.js"></script>
     
-    <!-- 动态加载自定义样式 -->
+    <!-- 动态加载自定义样式 (优化：使用立即执行函数避免全局污染) -->
     <script>
-        const timestamp = new Date().getTime();
-        document.write('<link rel="stylesheet" href="css/gantt.css?t=' + timestamp + '">');
+        (function() {
+            const timestamp = Date.now();
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'css/gantt.css?t=' + timestamp;
+            document.head.appendChild(link);
+        })();
     </script>
     
     <style>
@@ -24,6 +35,29 @@
             font-style: normal;
             font-size: inherit;
         }
+        
+        /* 页面加载时的优化 */
+        body {
+            opacity: 0;
+            transition: opacity 0.3s ease-in;
+        }
+        
+        body.loaded {
+            opacity: 1;
+        }
+        
+        /* 防止未加载完成时的闪烁 */
+        .gantt-container,
+        .floating-toolbar-expanded,
+        .settings-panel {
+            visibility: hidden;
+        }
+        
+        body.loaded .gantt-container,
+        body.loaded .floating-toolbar-expanded,
+        body.loaded .settings-panel {
+            visibility: visible;
+        }
     </style>
 </head>
 <body>
@@ -31,145 +65,147 @@
         <!-- 标题 + 折叠工具按钮 -->
         <div class="d-flex align-items-center mb-4 position-relative">
             <!-- 折叠工具按钮 - 圆形渐变 -->
-            <div class="toolbar-collapsed" id="toolbarCollapsed" title="工具">
-                <span class="toolbar-icon">⚙️</span>
+            <div class="toolbar-collapsed" id="toolbarCollapsed" title="工具" role="button" aria-label="打开工具栏" tabindex="0">
+                <span class="toolbar-icon" aria-hidden="true">⚙️</span>
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Gamma4</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图NewBeta7</h1>
         </div>
         
         <!-- 展开的浮动工具栏 - 毛玻璃效果 -->
-        <div class="floating-toolbar-expanded" id="floatingToolbarExpanded">
+        <div class="floating-toolbar-expanded" id="floatingToolbarExpanded" role="toolbar" aria-label="主工具栏">
             <div class="toolbar-section">
-                <button class="toolbar-btn" id="addTask" title="添加新任务">
-                    <span class="btn-icon icon">➕</span>
+                <button class="toolbar-btn" id="addTask" title="添加新任务" aria-label="添加任务">
+                    <span class="btn-icon icon" aria-hidden="true">➕</span>
                     <span class="btn-text">添加任务</span>
                 </button>
-                <button class="toolbar-btn" id="deleteTask" title="删除选中任务">
-                    <span class="btn-icon icon">🗑️</span>
+                <button class="toolbar-btn" id="deleteTask" title="删除选中任务" aria-label="删除任务">
+                    <span class="btn-icon icon" aria-hidden="true">🗑️</span>
                     <span class="btn-text">删除任务</span>
                 </button>
-                <button class="toolbar-btn" id="saveData" title="导出Json文件">
-                    <span class="btn-icon icon">💾</span>
+                <button class="toolbar-btn" id="saveData" title="导出Json文件" aria-label="导出文件">
+                    <span class="btn-icon icon" aria-hidden="true">💾</span>
                     <span class="btn-text">导出文件</span>
                 </button>
-                <button class="toolbar-btn" id="loadData" title="加载Json文件">
-                    <span class="btn-icon icon">📂</span>
+                <button class="toolbar-btn" id="loadData" title="加载Json文件" aria-label="加载文件">
+                    <span class="btn-icon icon" aria-hidden="true">📂</span>
                     <span class="btn-text">加载文件</span>
                 </button>
             </div>
             
-            <div class="toolbar-divider"></div>
+            <div class="toolbar-divider" role="separator" aria-hidden="true"></div>
             
             <div class="toolbar-section">
-                <button class="toolbar-btn" id="checkConflicts" title="检测时间冲突">
-                    <span class="btn-icon icon">🔍</span>
+                <button class="toolbar-btn" id="checkConflicts" title="检测时间冲突" aria-label="检测冲突">
+                    <span class="btn-icon icon" aria-hidden="true">🔍</span>
                     <span class="btn-text">检测冲突</span>
                 </button>
-                <button class="toolbar-btn" id="autoFixConflicts" title="自动修复冲突">
-                    <span class="btn-icon icon">🔧</span>
+                <button class="toolbar-btn" id="autoFixConflicts" title="自动修复冲突" aria-label="自动修复">
+                    <span class="btn-icon icon" aria-hidden="true">🔧</span>
                     <span class="btn-text">自动修复</span>
                 </button>
-                <button class="toolbar-btn" id="clearHighlights" title="清除高亮">
-                    <span class="btn-icon icon">🧹</span>
+                <button class="toolbar-btn" id="clearHighlights" title="清除高亮" aria-label="清除高亮">
+                    <span class="btn-icon icon" aria-hidden="true">🧹</span>
                     <span class="btn-text">清除高亮</span>
                 </button>
             </div>
             
-            <div class="toolbar-divider"></div>
+            <div class="toolbar-divider" role="separator" aria-hidden="true"></div>
             
             <div class="toolbar-section">
-                <button class="toolbar-btn" id="toggleView" title="切换视图">
-                    <span class="btn-icon icon">🔄</span>
+                <button class="toolbar-btn" id="toggleView" title="切换视图" aria-label="切换PERT视图">
+                    <span class="btn-icon icon" aria-hidden="true">🔄</span>
                     <span class="btn-text">PERT视图</span>
                 </button>
             </div>
             
             <!-- 设置按钮 - 独立齿轮图标 -->
-            <button class="toolbar-btn settings-trigger" id="settingsTrigger" title="设置">
-                <span class="btn-icon icon">⚙️</span>
+            <button class="toolbar-btn settings-trigger" id="settingsTrigger" title="设置" aria-label="打开设置">
+                <span class="btn-icon icon" aria-hidden="true">⚙️</span>
                 <span class="btn-text">设置</span>
             </button>
         </div>
         
         <!-- 侧边设置面板 -->
-        <div class="settings-panel" id="settingsPanel">
+        <aside class="settings-panel" id="settingsPanel" role="complementary" aria-label="设置面板">
             <div class="settings-header">
                 <h6>编辑设置</h6>
-                <button class="settings-close" id="settingsClose">×</button>
+                <button class="settings-close" id="settingsClose" aria-label="关闭设置面板">×</button>
             </div>
             <div class="settings-body">
                 <div class="setting-item">
                     <span class="setting-text">拖拽移动任务</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="enableEdit" checked>
+                        <input type="checkbox" id="enableEdit" checked aria-label="启用拖拽移动">
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">拖拽调整时长</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="enableResize" checked>
+                        <input type="checkbox" id="enableResize" checked aria-label="启用调整时长">
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">显示周末</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="showWeekends" checked>
+                        <input type="checkbox" id="showWeekends" checked aria-label="显示周末">
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">显示依赖箭头</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="showDependencies" checked>
+                        <input type="checkbox" id="showDependencies" checked aria-label="显示依赖箭头">
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">显示操作日志</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="showLogPanel" checked>
+                        <input type="checkbox" id="showLogPanel" aria-label="显示操作日志">
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item slider-item">
-                    <span class="setting-text">时间轴密度</span>
+                    <label for="cellWidth" class="setting-text">时间轴密度</label>
                     <div class="slider-container">
-                        <input type="range" class="custom-slider" id="cellWidth" min="40" max="100" value="60" step="10">
-                        <span class="slider-value" id="cellWidthValue">60px</span>
+                        <input type="range" class="custom-slider" id="cellWidth" min="40" max="100" value="60" step="10" aria-label="时间轴密度" aria-valuemin="40" aria-valuemax="100" aria-valuenow="60">
+                        <span class="slider-value" id="cellWidthValue" aria-live="polite">60px</span>
                     </div>
                 </div>
             </div>
-        </div>
+        </aside>
         
         <!-- 任务编辑表单容器 -->
-        <div class="task-form-minimal" id="taskFormContainer"></div>
+        <div class="task-form-minimal" id="taskFormContainer" role="form" aria-label="任务编辑表单"></div>
         
         <!-- 日志区域(可折叠) -->
-        <div class="log-panel" id="logPanel">
-            <div class="log-header" id="logHeader">
+        <section class="log-panel hidden" id="logPanel" aria-label="操作日志">
+            <div class="log-header" id="logHeader" role="button" tabindex="0" aria-expanded="true" aria-controls="logArea">
                 <span>操作日志</span>
-                <button class="log-toggle" id="logToggle">−</button>
+                <button class="log-toggle" id="logToggle" aria-label="折叠日志">−</button>
             </div>
-            <div class="log-body" id="logArea"></div>
-        </div>
+            <div class="log-body" id="logArea" role="log" aria-live="polite" aria-atomic="false"></div>
+        </section>
         
         <!-- 甘特图显示区域 -->
-        <div class="gantt-container" id="ganttContainer">
+        <main class="gantt-container" id="ganttContainer" role="main" aria-label="甘特图">
             <div id="gantt"></div>
-        </div>
+        </main>
         
         <!-- PERT视图容器 -->
-        <div id="pertContainer" style="display: none; height: 600px;"></div>
+        <div id="pertContainer" style="display: none; height: 600px;" role="region" aria-label="PERT网络图"></div>
     </div>
     
-    <!-- JavaScript 动态加载 -->
+    <!-- JavaScript 动态加载 (优化：使用模块化加载) -->
     <script>
         (function() {
-            const timestamp = new Date().getTime();
+            'use strict';
+            
+            const timestamp = Date.now();
             const scripts = [
                 'js/utils.js',
                 'js/gantt-chart.js',
@@ -178,16 +214,42 @@
                 'js/app.js'
             ];
             
-            scripts.forEach(function(src) {
-                document.write('<script src="' + src + '?t=' + timestamp + '"><\/script>');
-            });
-        })();
-    </script>
-    
-    <!-- 加载检测 -->
-    <script>
-        window.addEventListener('load', function() {
-            setTimeout(function() {
+            // 顺序加载脚本，确保依赖关系
+            let loadedCount = 0;
+            
+            function loadScript(index) {
+                if (index >= scripts.length) {
+                    onAllScriptsLoaded();
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = scripts[index] + '?t=' + timestamp;
+                script.async = false; // 保持顺序执行
+                
+                script.onload = function() {
+                    loadedCount++;
+                    loadScript(index + 1);
+                };
+                
+                script.onerror = function() {
+                    console.error('Failed to load script:', scripts[index]);
+                    // 继续加载下一个脚本
+                    loadScript(index + 1);
+                };
+                
+                document.body.appendChild(script);
+            }
+            
+            function onAllScriptsLoaded() {
+                // 标记页面加载完成
+                document.body.classList.add('loaded');
+                
+                // 延迟检测，确保所有代码执行完毕
+                setTimeout(checkModulesLoaded, 500);
+            }
+            
+            function checkModulesLoaded() {
                 const checks = {
                     'GanttChart类': typeof GanttChart !== 'undefined',
                     'gantt实例': typeof gantt !== 'undefined',
@@ -199,15 +261,30 @@
                 
                 if (failed.length > 0) {
                     console.error('加载失败的模块:', failed);
-                    alert('部分模块加载失败:' + failed.join(', '));
+                    alert('部分模块加载失败: ' + failed.join(', ') + '\n请刷新页面重试');
                 } else {
-                    console.log('所有模块加载成功!');
+                    console.log('✅ 所有模块加载成功!');
+                    console.log('📊 甘特图就绪 - 版本: NewBeta7');
                 }
-            }, 500);
-        });
+            }
+            
+            // 开始加载脚本
+            loadScript(0);
+        })();
     </script>
     
-    <!-- Bootstrap JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <!-- Bootstrap JS (defer loading for better performance) -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js" integrity="sha512-X/YkDZyjTf4wyc2Vy16YGCPHwAY8rZJY+POgokZjQB2mhIRFJCckEGc6YyX9eNsPfn0PzThEuNs+uaomE5CO6A==" crossorigin="anonymous"></script>
+    
+    <!-- 错误处理 -->
+    <script>
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.message, e.filename, e.lineno, e.colno);
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('Unhandled promise rejection:', e.reason);
+        });
+    </script>
 </body>
 </html>
