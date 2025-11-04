@@ -695,7 +695,7 @@ input:checked + .switch-slider:before {
     border-radius: 6px;
     overflow: hidden;
     min-height: 400px;
-    max-height: 600px; /* 设置最大高度，超出部分滚动 */
+    max-height: 600px;
 }
 
 #pertContainer {
@@ -727,12 +727,12 @@ input:checked + .switch-slider:before {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0; /* 固定不滚动 */
+    flex-shrink: 0;
 }
 
 .gantt-sidebar-body {
     flex: 1;
-    overflow-y: auto; /* 任务名称列表可滚动 */
+    overflow-y: auto;
     overflow-x: hidden;
 }
 
@@ -771,15 +771,15 @@ input:checked + .switch-slider:before {
     background: #e9ecef; 
     border-bottom: 2px solid #dee2e6; 
     height: 60px;
-    flex-shrink: 0; /* 固定不滚动 */
+    flex-shrink: 0;
     overflow: hidden;
 }
 
 /* 任务行容器 - 可滚动 */
 .gantt-rows-container {
     flex: 1;
-    overflow-y: auto; /* 垂直滚动 */
-    overflow-x: auto; /* 水平滚动 */
+    overflow-y: auto;
+    overflow-x: auto;
     position: relative;
 }
 
@@ -844,20 +844,24 @@ input:checked + .switch-slider:before {
     background: #fffbeb; 
 }
 
+/* ======================
+   任务条样式 - 移除紫色背景
+   ====================== */
 .gantt-bar {
     position: absolute;
     height: 36px;
     top: 12px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: transparent;
+    border: 2px solid #dee2e6;
     border-radius: 8px;
     cursor: move;
     display: flex;
     align-items: center;
     padding: 0 12px;
-    color: white;
+    color: #495057;
     font-size: 0.85rem;
     font-weight: 500;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.2s;
     user-select: none;
     overflow: hidden;
@@ -866,54 +870,66 @@ input:checked + .switch-slider:before {
 
 .gantt-bar:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    border-color: #adb5bd;
 }
 
 .gantt-bar.selected { 
-    box-shadow: 0 0 0 3px #ffc107; 
+    border-color: #ffc107;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3);
     z-index: 10;
 }
 
 .gantt-bar.conflict { 
-    outline: 3px solid #dc3545; 
-    outline-offset: -3px;
+    border-color: #dc3545;
+    background: rgba(220, 53, 69, 0.05);
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2);
 }
 
 .gantt-bar.dep-highlight {
-    outline: 2px solid #10b981;
-    outline-offset: -2px;
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.05);
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
 }
 
 .gantt-bar-progress { 
+    position: absolute;
+    left: 0;
+    top: 0;
     height: 100%; 
-    background: rgba(255,255,255,0.3); 
-    border-radius: 8px; 
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    opacity: 0.3;
+    border-radius: 6px;
+    pointer-events: none;
 }
 
 .gantt-bar-handle { 
     width: 8px; 
     height: 100%; 
-    background: rgba(255,255,255,0.5); 
+    background: #adb5bd;
     cursor: ew-resize; 
     position: absolute; 
-    top: 0; 
+    top: 0;
+    transition: background 0.2s;
+}
+
+.gantt-bar-handle:hover {
+    background: #6c757d;
 }
 
 .gantt-bar-handle.left { 
     left: 0; 
-    border-radius: 8px 0 0 8px; 
+    border-radius: 6px 0 0 6px; 
 }
 
 .gantt-bar-handle.right { 
     right: 0; 
-    border-radius: 0 8px 8px 0; 
+    border-radius: 0 6px 6px 0; 
 }
 
+/* 隐藏任务条内部的标签 */
 .gantt-bar-label { 
-    white-space: nowrap; 
-    overflow: hidden; 
-    text-overflow: ellipsis; 
-    flex: 1;
+    display: none !important;
 }
 
 .gantt-dependencies { 
@@ -1009,13 +1025,6 @@ input:checked + .switch-slider:before {
 /* ======================
    任务条外部标签样式（右侧显示）
    ====================== */
-
-/* 隐藏任务条内部的标签 */
-.gantt-bar-label { 
-    display: none !important;
-}
-
-/* 任务条外部标签 - 显示在右侧 */
 .gantt-bar-label-external {
     position: absolute;
     top: 12px;
