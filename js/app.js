@@ -51,10 +51,13 @@ const initialTasks = [
 // ==================== 创建甘特图实例 ====================
 const gantt = new GanttChart('#gantt', initialTasks);
 
-// ==================== 任务表单函数 ====================
+// ==================== 任务表单函数（工期版本） ====================
 window.showTaskForm = function(task) {
     const container = document.getElementById('taskFormContainer');
     const availableTasks = gantt.tasks.filter(t => t.id !== task.id);
+    
+    // 计算当前工期（天数）
+    const currentDuration = daysBetween(task.start, task.end) + 1;
 
     container.innerHTML = `
         <div class="task-form">
@@ -69,9 +72,13 @@ window.showTaskForm = function(task) {
                     <input type="date" class="form-control form-control-sm" id="editStart" value="${task.start}">
                 </div>
                 <div class="col-6 mb-2">
-                    <label class="form-label">结束日期</label>
-                    <input type="date" class="form-control form-control-sm" id="editEnd" value="${task.end}">
+                    <label class="form-label">工期（天）</label>
+                    <input type="number" class="form-control form-control-sm" id="editDuration" 
+                           value="${currentDuration}" min="1" max="365" step="1">
                 </div>
+            </div>
+            <div class="mb-2">
+                <small class="text-muted">结束日期：<span id="calculatedEndDate" style="color:#10b981;font-weight:600;">${task.end}</span></small>
             </div>
             <div class="mb-3">
                 <label class="form-label">完成进度: <strong id="progressVal">${task.progress}%</strong></label>
@@ -101,17 +108,63 @@ window.showTaskForm = function(task) {
     const progressVal = document.getElementById('progressVal');
     progressInput.oninput = () => progressVal.textContent = progressInput.value + '%';
 
+    // 开始日期或工期改变时，自动计算结束日期
+    const startInput = document.getElementById('editStart');
+    const durationInput = document.getElementById('editDuration');
+    const endDateDisplay = document.getElementById('calculatedEndDate');
+    
+    const updateEndDate = () => {
+        const start = startInput.value;
+        const duration = parseInt(durationInput.value) || 1;
+        
+        if (start && duration > 0) {
+            const startDate = new Date(start);
+            const endDate = addDays(startDate, duration - 1);
+            endDateDisplay.textContent = formatDate(endDate);
+        }
+    };
+    
+    startInput.addEventListener('change', updateEndDate);
+    durationInput.addEventListener('input', updateEndDate);
+
     document.getElementById('saveTask').onclick = () => {
         const newName = document.getElementById('editName').value.trim();
-        if (!newName) { alert('任务名称不能为空'); return; }
+        if (!newName) { 
+            alert('任务名称不能为空'); 
+            return; 
+        }
+        
+        const start = startInput.value;
+        const duration = parseInt(durationInput.value);
+        
+        if (!start) {
+            alert('请选择开始日期');
+            return;
+        }
+        
+        if (!duration || duration < 1) {
+            alert('工期必须大于0天');
+            return;
+        }
+        
+        if (duration > 365) {
+            alert('工期不能超过365天');
+            return;
+        }
+        
+        // 计算结束日期
+        const startDate = new Date(start);
+        const endDate = addDays(startDate, duration - 1);
+        
         task.name = newName;
-        task.start = document.getElementById('editStart').value;
-        task.end = document.getElementById('editEnd').value;
+        task.start = start;
+        task.end = formatDate(endDate);
         task.progress = parseInt(progressInput.value);
         task.dependencies = Array.from(document.querySelectorAll('#depList input[type="checkbox"]:checked')).map(cb => cb.value);
+        
         gantt.calculateDateRange();
         gantt.render();
-        addLog(`任务 "${task.name}" 已更新`);
+        addLog(`任务 "${task.name}" 已更新，工期 ${duration} 天 (${start} ~ ${task.end})`);
         container.innerHTML = '';
     };
 
