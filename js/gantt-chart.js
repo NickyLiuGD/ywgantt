@@ -1,8 +1,8 @@
-/**
- * 甘特图核心类
- * 负责甘特图的渲染和数据管理
- * 版本: NewBeta7 - 优化版
- */
+// ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+// ▓▓ 甘特图核心类 - 渲染、数据管理、交互控制                          ▓▓
+// ▓▓ 路径: js/gantt-chart.js                                          ▓▓
+// ▓▓ 版本: Gamma8 - 界面优化版                                        ▓▓
+// ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
     'use strict';
@@ -14,7 +14,6 @@
      * @param {Object} options - 配置选项
      */
     function GanttChart(selector, tasks, options) {
-        // 参数验证
         if (!selector) {
             throw new Error('GanttChart: selector is required');
         }
@@ -26,16 +25,14 @@
             showWeekends: true,
             enableEdit: true,
             enableResize: true,
-            showDependencies: true
+            showDependencies: true,
+            showTaskNames: true
         }, options || {});
 
         this.selectedTask = null;
         this.dragState = null;
-        
-        // 缓存常用的 DOM 查询
         this._cachedElements = {};
         
-        // 初始化
         this.init();
     }
 
@@ -56,7 +53,6 @@
 
     /**
      * 计算日期范围
-     * 优化：添加边界检查和性能优化
      */
     GanttChart.prototype.calculateDateRange = function() {
         if (this.tasks.length === 0) {
@@ -65,12 +61,10 @@
             return;
         }
 
-        // 使用 reduce 优化日期计算
         const dateRange = this.tasks.reduce((acc, task) => {
             const start = new Date(task.start);
             const end = new Date(task.end || task.start);
             
-            // 验证日期有效性
             if (isNaN(start.getTime()) || isNaN(end.getTime())) {
                 console.warn(`Invalid date for task: ${task.name}`);
                 return acc;
@@ -87,8 +81,7 @@
     };
 
     /**
-     * 生成日期数组
-     * 优化：添加缓存机制，避免重复计算
+     * 生成日期数组（带缓存）
      * @returns {Array<Date>} 日期数组
      */
     GanttChart.prototype.generateDates = function() {
@@ -106,15 +99,13 @@
             current = addDays(current, 1);
         }
 
-        // 缓存结果
         this._dateCache = { key: cacheKey, dates: dates };
         
         return dates;
     };
 
     /**
-     * 渲染甘特图
-     * 优化：使用 DocumentFragment 和模板字符串优化
+     * 渲染甘特图（完整版 - 包含折叠按钮）
      */
     GanttChart.prototype.render = function() {
         if (!this.container) {
@@ -124,15 +115,20 @@
 
         const dates = this.generateDates();
         const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+        const isCollapsed = !this.options.showTaskNames;
         
-        // 使用模板字符串构建 HTML（保持原有结构）
         const html = `
             <div class="gantt-wrapper">
-                <div class="gantt-sidebar">
+                <div class="gantt-sidebar ${isCollapsed ? 'collapsed' : ''}">
                     <div class="gantt-sidebar-header">任务名称</div>
                     <div class="gantt-sidebar-body" id="ganttSidebarBody">
                         ${this.renderTaskNames()}
                     </div>
+                    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" 
+                            title="${isCollapsed ? '展开任务名称栏' : '折叠任务名称栏'}"
+                            aria-label="${isCollapsed ? '展开' : '折叠'}任务名称栏">
+                        <span class="sidebar-toggle-icon">${isCollapsed ? '▶' : '◀'}</span>
+                    </button>
                 </div>
                 <div class="gantt-timeline-wrapper">
                     <div class="gantt-timeline">
@@ -152,19 +148,23 @@
 
         this.container.innerHTML = html;
 
-        // 设置滚动同步
+        const toggleBtn = document.getElementById('sidebarToggleBtn');
+        if (toggleBtn) {
+            toggleBtn.onclick = () => {
+                this.toggleSidebar(isCollapsed);
+                this.render();
+            };
+        }
+
         this.setupScrollSync();
-
-        // 渲染依赖关系
         this.renderDependencies(dates);
-
-        // 绑定事件
         this.attachEvents();
+        
+        this.updateHeight();
     };
 
     /**
      * 渲染任务名称列表
-     * 优化：提取为独立方法
      * @returns {string} HTML字符串
      */
     GanttChart.prototype.renderTaskNames = function() {
@@ -181,7 +181,6 @@
 
     /**
      * 渲染日期表头
-     * 优化：提取为独立方法
      * @param {Array<Date>} dates - 日期数组
      * @param {Array<string>} weekdays - 星期名称数组
      * @returns {string} HTML字符串
@@ -209,7 +208,6 @@
 
     /**
      * 渲染所有任务行
-     * 优化：提取为独立方法
      * @param {Array<Date>} dates - 日期数组
      * @returns {string} HTML字符串
      */
@@ -219,7 +217,6 @@
 
     /**
      * 渲染单个任务行
-     * 优化：添加边界检查和 ARIA 属性
      * @param {Object} task - 任务对象
      * @param {Array<Date>} dates - 日期数组
      * @returns {string} HTML字符串
@@ -228,7 +225,6 @@
         const start = new Date(task.start);
         const end = new Date(task.end || task.start);
         
-        // 验证日期有效性
         if (isNaN(start.getTime()) || isNaN(end.getTime())) {
             console.warn(`Invalid date for task: ${task.name}`);
             return '';
@@ -239,7 +235,7 @@
         
         const left = startOffset * this.options.cellWidth;
         const width = Math.max(duration * this.options.cellWidth, 80);
-        const progress = Math.min(Math.max(task.progress || 0, 0), 100); // 确保进度在 0-100 之间
+        const progress = Math.min(Math.max(task.progress || 0, 0), 100);
 
         const isSelected = this.selectedTask === task.id;
 
@@ -270,7 +266,6 @@
 
     /**
      * 渲染单元格
-     * 优化：提取为独立方法
      * @param {Array<Date>} dates - 日期数组
      * @returns {string} HTML字符串
      */
@@ -293,7 +288,6 @@
 
     /**
      * 设置滚动同步
-     * 优化：使用被动监听器和节流
      */
     GanttChart.prototype.setupScrollSync = function() {
         const sidebarBody = document.getElementById('ganttSidebarBody');
@@ -305,10 +299,8 @@
             return;
         }
 
-        // 使用标志防止循环触发
         let isSyncingScroll = false;
 
-        // 右侧滚动时，同步左侧垂直滚动和头部水平滚动
         rowsContainer.addEventListener('scroll', () => {
             if (isSyncingScroll) return;
             isSyncingScroll = true;
@@ -321,7 +313,6 @@
             });
         }, { passive: true });
 
-        // 左侧滚动时，同步右侧垂直滚动
         sidebarBody.addEventListener('scroll', () => {
             if (isSyncingScroll) return;
             isSyncingScroll = true;
@@ -336,7 +327,6 @@
 
     /**
      * 渲染依赖关系
-     * 优化：提取为独立方法，添加错误处理
      * @param {Array<Date>} dates - 日期数组
      */
     GanttChart.prototype.renderDependencies = function(dates) {
@@ -350,7 +340,6 @@
         depSVG.style.width = `${dates.length * this.options.cellWidth}px`;
         depSVG.style.height = `${this.tasks.length * 60}px`;
 
-        // 添加箭头标记定义
         depSVG.innerHTML = `
             <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" 
@@ -364,14 +353,12 @@
             return;
         }
 
-        // 渲染依赖箭头
         const paths = this.generateDependencyPaths();
         depSVG.innerHTML += paths;
     };
 
     /**
      * 生成依赖路径
-     * 优化：提取为独立方法
      * @returns {string} SVG路径HTML字符串
      */
     GanttChart.prototype.generateDependencyPaths = function() {
@@ -442,8 +429,7 @@
     };
 
     /**
-     * 选择任务
-     * 优化：添加状态检查
+     * 选择任务（修改 - 添加居中滚动）
      * @param {string} taskId - 任务ID
      */
     GanttChart.prototype.selectTask = function(taskId) {
@@ -456,30 +442,24 @@
         }
 
         this.selectedTask = taskId;
-        
-        // 更新所有相关元素的选中状态
         this.updateSelectionState(taskId);
         
-        // 调用外部表单显示函数（如果存在）
-        if (typeof window.showTaskForm === 'function') {
-            window.showTaskForm(task);
-        }
+        setTimeout(() => {
+            this.scrollTaskToCenter(taskId);
+        }, 100);
         
         addLog(`📌 已选择任务 "${task.name}"`);
     };
 
     /**
      * 更新选择状态
-     * 优化：提取为独立方法，批量更新DOM
      * @param {string} taskId - 任务ID
      */
     GanttChart.prototype.updateSelectionState = function(taskId) {
-        // 批量查询所有需要更新的元素
         const bars = this.container.querySelectorAll('.gantt-bar');
         const labels = this.container.querySelectorAll('.gantt-bar-label-external');
         const names = this.container.querySelectorAll('.gantt-task-name');
         
-        // 批量更新
         bars.forEach(bar => {
             bar.classList.toggle('selected', bar.dataset.taskId === taskId);
         });
@@ -495,7 +475,6 @@
 
     /**
      * 获取任务的所有前置依赖ID（递归）
-     * 优化：添加循环依赖检测
      * @param {string} taskId - 任务ID
      * @returns {Set<string>} 所有前置依赖ID集合
      */
@@ -504,7 +483,7 @@
         const visited = new Set();
         const stack = [taskId];
         let iterations = 0;
-        const maxIterations = this.tasks.length * 10; // 防止无限循环
+        const maxIterations = this.tasks.length * 10;
 
         while (stack.length && iterations < maxIterations) {
             iterations++;
@@ -534,7 +513,6 @@
 
     /**
      * 添加任务
-     * 优化：添加参数验证
      * @param {Object} task - 任务对象
      */
     GanttChart.prototype.addTask = function(task) {
@@ -543,7 +521,6 @@
             return;
         }
 
-        // 确保任务有必需的属性
         if (!task.id) task.id = generateId();
         if (!task.name) task.name = '新任务';
         if (!task.start) task.start = formatDate(new Date());
@@ -558,14 +535,11 @@
 
     /**
      * 删除任务
-     * 优化：清理相关依赖
      * @param {string} taskId - 任务ID
      */
     GanttChart.prototype.deleteTask = function(taskId) {
-        // 从任务列表中移除
         this.tasks = this.tasks.filter(t => t.id !== taskId);
         
-        // 清理其他任务中对该任务的依赖引用
         this.tasks.forEach(task => {
             if (Array.isArray(task.dependencies)) {
                 task.dependencies = task.dependencies.filter(dep => dep !== taskId);
@@ -582,7 +556,6 @@
 
     /**
      * 更新选项
-     * 优化：只在选项真正改变时重新渲染
      * @param {Object} options - 新选项
      */
     GanttChart.prototype.updateOptions = function(options) {
@@ -608,7 +581,6 @@
 
     /**
      * HTML 转义工具函数
-     * 安全性优化：防止 XSS 攻击
      * @param {string} text - 要转义的文本
      * @returns {string} 转义后的文本
      */
@@ -626,12 +598,120 @@
         return text.replace(/[&<>"']/g, m => map[m]);
     };
 
+    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+    // ▓▓ 新增方法：选中任务居中显示                                         ▓▓
+    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+    /**
+     * 滚动使任务条居中显示
+     * @param {string} taskId - 任务ID
+     */
+    GanttChart.prototype.scrollTaskToCenter = function(taskId) {
+        if (!taskId || !this.container) return;
+        
+        const bar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
+        const rowsContainer = this.container.querySelector('.gantt-rows-container');
+        
+        if (!bar || !rowsContainer) {
+            console.warn('scrollTaskToCenter: Elements not found');
+            return;
+        }
+        
+        try {
+            const barRect = bar.getBoundingClientRect();
+            const containerRect = rowsContainer.getBoundingClientRect();
+            
+            const targetScrollLeft = rowsContainer.scrollLeft + 
+                                    (barRect.left - containerRect.left) - 
+                                    (containerRect.width / 2) + 
+                                    (barRect.width / 2);
+            
+            const targetScrollTop = rowsContainer.scrollTop + 
+                                   (barRect.top - containerRect.top) - 
+                                   (containerRect.height / 2) + 
+                                   (barRect.height / 2);
+            
+            rowsContainer.scrollTo({
+                left: Math.max(0, targetScrollLeft),
+                top: Math.max(0, targetScrollTop),
+                behavior: 'smooth'
+            });
+            
+            const taskName = this.tasks.find(t => t.id === taskId)?.name;
+            if (taskName) {
+                addLog(`任务 "${taskName}" 已居中显示`);
+            }
+        } catch (error) {
+            console.error('scrollTaskToCenter error:', error);
+        }
+    };
+
+    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+    // ▓▓ 新增方法：动态更新甘特图高度                                       ▓▓
+    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+    /**
+     * 更新甘特图高度以适应窗口
+     */
+    GanttChart.prototype.updateHeight = function() {
+        if (!this.container) return;
+        
+        try {
+            const ganttWrapper = this.container.querySelector('.gantt-wrapper');
+            if (!ganttWrapper) return;
+            
+            const headerElement = document.querySelector('h1')?.parentElement;
+            const logPanel = document.getElementById('logPanel');
+            
+            const headerHeight = headerElement ? headerElement.offsetHeight + 40 : 100;
+            const logHeight = logPanel ? 
+                (logPanel.classList.contains('hidden') ? 0 : 
+                 (logPanel.classList.contains('collapsed') ? 60 : 260)) : 0;
+            
+            const availableHeight = window.innerHeight - headerHeight - logHeight - 80;
+            const finalHeight = Math.max(availableHeight, 400);
+            
+            ganttWrapper.style.height = finalHeight + 'px';
+            
+            addLog(`甘特图高度已更新: ${finalHeight}px`);
+        } catch (error) {
+            console.error('updateHeight error:', error);
+        }
+    };
+
+    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+    // ▓▓ 新增方法:切换任务名称栏显示                                       ▓▓
+    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+    /**
+     * 切换任务名称栏的显示/隐藏
+     * @param {boolean} show - 是否显示
+     */
+    GanttChart.prototype.toggleSidebar = function(show) {
+        if (!this.container) return;
+        
+        const sidebar = this.container.querySelector('.gantt-sidebar');
+        if (!sidebar) return;
+        
+        try {
+            if (show) {
+                sidebar.classList.remove('collapsed');
+                this.options.showTaskNames = true;
+                addLog('任务名称栏已展开');
+            } else {
+                sidebar.classList.add('collapsed');
+                this.options.showTaskNames = false;
+                addLog('任务名称栏已折叠');
+            }
+        } catch (error) {
+            console.error('toggleSidebar error:', error);
+        }
+    };
+
     /**
      * 销毁实例
-     * 优化：添加清理方法
      */
     GanttChart.prototype.destroy = function() {
-        // 移除事件监听器
         if (this._mouseMoveHandler) {
             document.removeEventListener('mousemove', this._mouseMoveHandler);
         }
@@ -639,12 +719,10 @@
             document.removeEventListener('mouseup', this._mouseUpHandler);
         }
         
-        // 清空容器
         if (this.container) {
             this.container.innerHTML = '';
         }
         
-        // 清空引用
         this.tasks = null;
         this.container = null;
         this._cachedElements = null;
@@ -653,7 +731,8 @@
         console.log('GanttChart instance destroyed');
     };
 
-    // 导出到全局
     global.GanttChart = GanttChart;
+
+    console.log('✅ gantt-chart.js loaded successfully');
 
 })(typeof window !== 'undefined' ? window : this);

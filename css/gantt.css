@@ -1,7 +1,7 @@
 /**
  * 甘特图样式文件
- * 版本: NewBeta7 - 优化版
- * 现代微光设计 + 性能优化 + 可访问性增强
+ * 版本: Gamma8 - 界面优化版
+ * 现代微光设计 + 自适应布局 + 折叠功能
  */
 
 /* ======================
@@ -78,14 +78,12 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* 提升文本渲染质量 */
 h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
     line-height: 1.2;
     margin: 0;
 }
 
-/* 优化按钮点击反馈 */
 button {
     cursor: pointer;
     border: none;
@@ -100,7 +98,6 @@ button:focus-visible {
     outline-offset: 2px;
 }
 
-/* 优化输入框 */
 input,
 textarea,
 select {
@@ -115,11 +112,19 @@ select:focus {
     outline-offset: 2px;
 }
 
-/* 容器优化 */
+/* ⭐ 容器自适应布局（新增） */
 .container-fluid {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    padding: 20px;
     max-width: 1600px;
     margin: 0 auto;
-    padding: 20px;
+}
+
+.container-fluid > .d-flex {
+    flex-shrink: 0;
 }
 
 /* ======================
@@ -149,7 +154,6 @@ select:focus {
     will-change: transform;
 }
 
-/* 脉冲动画优化 */
 .toolbar-collapsed::before {
     content: '';
     position: absolute;
@@ -165,7 +169,6 @@ select:focus {
     pointer-events: none;
 }
 
-/* 微光效果优化 */
 .toolbar-collapsed::after {
     content: '';
     position: absolute;
@@ -327,7 +330,6 @@ select:focus {
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
-/* 图标颜色定义 */
 .toolbar-btn:nth-child(1) .btn-icon { color: var(--success-color); }
 .toolbar-btn:nth-child(2) .btn-icon { color: var(--danger-color); }
 .toolbar-section:nth-child(1) .toolbar-btn:nth-child(3) .btn-icon { color: var(--info-color); }
@@ -616,69 +618,8 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   任务表单和日志面板
+   日志面板（修改）
    ====================== */
-.task-form-minimal {
-    margin-top: 16px;
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--card-border-radius);
-    padding: 20px;
-    box-shadow: var(--shadow-md);
-    backdrop-filter: blur(10px);
-}
-
-.task-form-minimal .form-label {
-    font-size: 0.75rem;
-    color: var(--gray-500);
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 6px;
-}
-
-.task-form-minimal .form-control,
-.task-form-minimal .form-control-sm {
-    border: 1px solid var(--gray-200);
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 0.875rem;
-    transition: all var(--transition-fast);
-}
-
-.task-form-minimal .form-control:focus,
-.task-form-minimal .form-control-sm:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.task-form-minimal .btn {
-    border-radius: 8px;
-    padding: 8px 20px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    border: none;
-    transition: all var(--transition-fast);
-}
-
-.task-form-minimal .btn-primary {
-    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
-}
-
-.task-form-minimal .btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.task-form-minimal .btn-secondary {
-    background: var(--gray-200);
-    color: var(--gray-600);
-}
-
-.task-form-minimal .btn-secondary:hover {
-    background: var(--gray-300);
-}
-
 .log-panel {
     margin-top: 16px;
     background: rgba(255, 255, 255, 0.95);
@@ -688,6 +629,7 @@ input:checked + .switch-slider:before {
     backdrop-filter: blur(10px);
     overflow: hidden;
     transition: all var(--transition-normal);
+    flex-shrink: 0;
 }
 
 .log-panel.hidden {
@@ -784,7 +726,7 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   甘特图容器
+   甘特图容器（修改 - 自适应）
    ====================== */
 .gantt-container {
     background: white;
@@ -793,6 +735,10 @@ input:checked + .switch-slider:before {
     box-shadow: var(--shadow-md);
     margin-bottom: 20px;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 .gantt-wrapper {
@@ -801,7 +747,10 @@ input:checked + .switch-slider:before {
     border-radius: 6px;
     overflow: hidden;
     min-height: 400px;
-    max-height: 600px;
+    max-height: calc(100vh - 200px);
+    height: 600px;
+    transition: height 0.3s ease;
+    flex: 1;
 }
 
 #pertContainer {
@@ -814,7 +763,7 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   左侧任务名称列
+   左侧任务名称列（修改 - 添加折叠功能）
    ====================== */
 .gantt-sidebar {
     width: 200px;
@@ -824,6 +773,62 @@ input:checked + .switch-slider:before {
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
+    position: relative;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+                min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gantt-sidebar.collapsed {
+    width: 40px !important;
+    min-width: 40px !important;
+}
+
+.gantt-sidebar.collapsed .gantt-task-name {
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.gantt-sidebar.collapsed .gantt-sidebar-header {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 0.75rem;
+    padding: 10px 5px;
+}
+
+.sidebar-toggle-btn {
+    position: absolute;
+    top: 50%;
+    right: -12px;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+    border: none;
+    border-radius: 0 8px 8px 0;
+    color: white;
+    font-size: 0.75rem;
+    cursor: pointer;
+    z-index: 10;
+    transition: all var(--transition-normal);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-toggle-btn:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #6a3d8f 100%);
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 2px 0 12px rgba(102, 126, 234, 0.4);
+}
+
+.sidebar-toggle-icon {
+    transition: transform var(--transition-normal);
+}
+
+.gantt-sidebar.collapsed .sidebar-toggle-icon {
+    transform: rotate(180deg);
 }
 
 .gantt-sidebar-header {
@@ -836,6 +841,7 @@ input:checked + .switch-slider:before {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    transition: all var(--transition-normal);
 }
 
 .gantt-sidebar-body {
@@ -851,8 +857,12 @@ input:checked + .switch-slider:before {
     display: flex;
     align-items: center;
     cursor: pointer;
-    transition: background var(--transition-fast);
+    transition: background var(--transition-fast), 
+                opacity var(--transition-normal);
     font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .gantt-task-name:hover {
@@ -895,6 +905,7 @@ input:checked + .switch-slider:before {
     overflow-y: auto;
     overflow-x: auto;
     position: relative;
+    scroll-behavior: smooth;
 }
 
 .gantt-date-cell {
@@ -959,7 +970,7 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   任务条样式 - 移除紫色背景（优化版）
+   任务条样式（修改 - 增强选中效果）
    ====================== */
 .gantt-bar {
     position: absolute;
@@ -991,8 +1002,10 @@ input:checked + .switch-slider:before {
 
 .gantt-bar.selected {
     border-color: var(--warning-color);
-    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3);
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3),
+                0 4px 12px rgba(255, 193, 7, 0.4);
     z-index: var(--z-gantt-bar-selected);
+    transform: scale(1.02);
 }
 
 .gantt-bar.conflict {
@@ -1043,7 +1056,6 @@ input:checked + .switch-slider:before {
     border-radius: 0 6px 6px 0;
 }
 
-/* 隐藏任务条内部的标签 */
 .gantt-bar-label {
     display: none !important;
 }
@@ -1211,8 +1223,23 @@ input:checked + .switch-slider:before {
     }
 
     .gantt-sidebar {
-        width: 150px;
-        min-width: 150px;
+        width: 120px;
+        min-width: 120px;
+    }
+
+    .gantt-sidebar.collapsed {
+        width: 30px !important;
+        min-width: 30px !important;
+    }
+
+    .sidebar-toggle-btn {
+        width: 20px;
+        height: 40px;
+        font-size: 0.65rem;
+    }
+
+    .gantt-wrapper {
+        max-height: calc(100vh - 250px);
     }
 
     .gantt-task-name {
@@ -1229,21 +1256,31 @@ input:checked + .switch-slider:before {
     .floating-toolbar-expanded,
     .settings-panel,
     .log-panel,
-    .task-form-minimal {
+    .sidebar-toggle-btn {
         display: none !important;
+    }
+
+    .gantt-sidebar.collapsed {
+        width: 200px !important;
+        min-width: 200px !important;
+    }
+
+    .gantt-wrapper {
+        max-height: none;
+        height: auto;
+    }
+
+    body {
+        height: auto;
+    }
+
+    .container-fluid {
+        height: auto;
     }
 
     .gantt-container {
         box-shadow: none;
         border: 1px solid var(--gray-300);
-    }
-
-    .gantt-wrapper {
-        max-height: none;
-    }
-
-    body {
-        background: white;
     }
 }
 
@@ -1270,8 +1307,7 @@ input:checked + .switch-slider:before {
 
     .gantt-container,
     .settings-panel,
-    .log-panel,
-    .task-form-minimal {
+    .log-panel {
         background: rgba(33, 37, 41, 0.95);
     }
 }
@@ -1299,13 +1335,11 @@ input:checked + .switch-slider:before {
     }
 }
 
-/* 焦点可见性增强 */
 *:focus-visible {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
 }
 
-/* 高对比度模式支持 */
 @media (prefers-contrast: high) {
     .gantt-bar {
         border-width: 3px;
