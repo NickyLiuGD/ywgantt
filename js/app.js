@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 应用主文件 - 初始化甘特图、绑定事件、PERT视图                   ▓▓
 // ▓▓ 路径: js/app.js                                                 ▓▓
-// ▓▓ 版本: Gamma8 - 界面优化版                                       ▓▓
+// ▓▓ 版本: Gamma8 - 紧凑优化版                                       ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -60,10 +60,6 @@
     });
     global.gantt = gantt;
 
-    // ❌ 删除：独立的任务表单函数
-    // global.showTaskForm = function(task) { ... }
-    // 现在使用 gantt-events.js 中的内联表单
-
     // ## ==================== 工具函数 ====================
     
     /**
@@ -84,7 +80,7 @@
         };
     }
 
-    // ## ==================== 窗口大小监听 ====================
+    // ## ==================== 窗口大小监听（增强版）====================
     
     /**
      * 监听窗口大小变化，动态调整甘特图高度
@@ -93,7 +89,7 @@
         if (gantt && typeof gantt.updateHeight === 'function') {
             gantt.updateHeight();
         }
-    }, 150);
+    }, 100); // ⭐ 从150ms减少到100ms，更快响应
 
     window.addEventListener('resize', handleResize, { passive: true });
 
@@ -113,7 +109,7 @@
             };
             gantt.addTask(newTask);
             gantt.selectTask(newTask.id);
-            addLog('已添加新任务');
+            addLog('✅ 已添加新任务');
         };
     }
 
@@ -124,7 +120,7 @@
             const task = gantt.getSelectedTask();
             if (task && confirm(`确定删除任务 "${task.name}"?`)) {
                 gantt.deleteTask(task.id);
-                addLog(`已删除任务 "${task.name}"`);
+                addLog(`✅ 已删除任务 "${task.name}"`);
             } else if (!task) {
                 alert('请先选择一个任务');
             }
@@ -137,7 +133,7 @@
         saveDataBtn.onclick = () => {
             const filename = `gantt-${formatDate(new Date()).replace(/-/g, '')}.json`;
             downloadJSON(gantt.tasks, filename);
-            addLog(`已导出文件：${filename}`);
+            addLog(`✅ 已导出文件：${filename}`);
         };
     }
 
@@ -167,7 +163,7 @@
                         gantt.tasks = tasks;
                         gantt.calculateDateRange();
                         gantt.render();
-                        addLog(`已从 ${file.name} 加载 ${tasks.length} 个任务`);
+                        addLog(`✅ 已从 ${file.name} 加载 ${tasks.length} 个任务`);
                     } catch (err) {
                         console.error('Load error:', err);
                         alert('加载失败：' + err.message);
@@ -212,12 +208,12 @@
                 ganttContainer.style.display = 'none';
                 pertContainer.style.display = 'block';
                 renderPertChart(gantt.tasks);
-                addLog('已切换到 PERT 视图');
+                addLog('✅ 已切换到 PERT 视图');
             } else {
                 ganttContainer.style.display = 'block';
                 pertContainer.style.display = 'none';
                 gantt.updateHeight(); // ⭐ 切换回来时更新高度
-                addLog('已切换到 甘特图 视图');
+                addLog('✅ 已切换到 甘特图 视图');
             }
             
             const btnText = toggleButton.querySelector('.btn-text');
@@ -397,14 +393,14 @@
     if (settingsTrigger && settingsPanel) {
         settingsTrigger.onclick = () => {
             settingsPanel.classList.add('active');
-            addLog('已打开设置面板');
+            addLog('✅ 已打开设置面板');
         };
     }
 
     if (settingsClose && settingsPanel) {
         settingsClose.onclick = () => {
             settingsPanel.classList.remove('active');
-            addLog('已关闭设置面板');
+            addLog('✅ 已关闭设置面板');
         };
     }
 
@@ -416,7 +412,7 @@
         }
     });
 
-    // ▒▒ 日志面板开关
+    // ▒▒ 日志面板开关（增强版 - 自动更新高度）
     if (showLogPanelSwitch && logPanel) {
         showLogPanelSwitch.checked = false;
         logPanel.classList.add('hidden');
@@ -424,13 +420,17 @@
         showLogPanelSwitch.onchange = () => {
             if (showLogPanelSwitch.checked) {
                 logPanel.classList.remove('hidden');
-                addLog('日志面板已启用');
+                addLog('✅ 日志面板已启用');
             } else {
                 logPanel.classList.add('hidden');
-                addLog('日志面板已隐藏');
+                addLog('✅ 日志面板已隐藏');
             }
-            // ⭐ 日志面板显示状态改变时，更新甘特图高度
-            setTimeout(() => gantt.updateHeight(), 350);
+            // ⭐ 关键：日志面板状态改变时立即更新高度
+            setTimeout(() => {
+                if (gantt && typeof gantt.updateHeight === 'function') {
+                    gantt.updateHeight();
+                }
+            }, 350); // 等待动画完成
         };
     }
 
@@ -440,7 +440,7 @@
         enableEditSwitch.onchange = (e) => {
             gantt.options.enableEdit = e.target.checked;
             gantt.render();
-            addLog(e.target.checked ? '启用拖拽移动' : '禁用拖拽移动');
+            addLog(e.target.checked ? '✅ 启用拖拽移动' : '❌ 禁用拖拽移动');
         };
     }
 
@@ -449,7 +449,7 @@
         enableResizeSwitch.onchange = (e) => {
             gantt.options.enableResize = e.target.checked;
             gantt.render();
-            addLog(e.target.checked ? '启用调整时长' : '禁用调整时长');
+            addLog(e.target.checked ? '✅ 启用调整时长' : '❌ 禁用调整时长');
         };
     }
 
@@ -458,7 +458,7 @@
         showWeekendsSwitch.onchange = (e) => {
             gantt.options.showWeekends = e.target.checked;
             gantt.render();
-            addLog(e.target.checked ? '显示周末' : '隐藏周末');
+            addLog(e.target.checked ? '✅ 显示周末' : '❌ 隐藏周末');
         };
     }
 
@@ -467,11 +467,11 @@
         showDependenciesSwitch.onchange = (e) => {
             gantt.options.showDependencies = e.target.checked;
             gantt.render();
-            addLog(e.target.checked ? '显示依赖箭头' : '隐藏依赖箭头');
+            addLog(e.target.checked ? '✅ 显示依赖箭头' : '❌ 隐藏依赖箭头');
         };
     }
 
-    // ⭐ 新增：任务名称栏开关
+    // ⭐ 任务名称栏开关
     const showTaskNamesSwitch = document.getElementById('showTaskNames');
     if (showTaskNamesSwitch) {
         showTaskNamesSwitch.checked = true; // 默认显示
@@ -485,6 +485,12 @@
     const cellWidthSlider = document.getElementById('cellWidth');
     const cellWidthValue = document.getElementById('cellWidthValue');
     if (cellWidthSlider && cellWidthValue) {
+        // ⭐ 设置滑块默认值为50px（压缩后的默认值）
+        cellWidthSlider.value = 50;
+        cellWidthSlider.min = 40; // ⭐ 最小值从40px保持
+        cellWidthSlider.max = 80; // ⭐ 最大值从100px降到80px
+        cellWidthValue.textContent = '50px';
+        
         cellWidthSlider.oninput = (e) => {
             const value = parseInt(e.target.value);
             gantt.options.cellWidth = value;
@@ -493,7 +499,7 @@
         };
     }
 
-    // ▒▒ 日志面板折叠
+    // ▒▒ 日志面板折叠（增强版 - 自动更新高度）
     const logHeader = document.getElementById('logHeader');
     const logToggle = document.getElementById('logToggle');
     if (logHeader && logToggle && logPanel) {
@@ -501,10 +507,14 @@
             logPanel.classList.toggle('collapsed');
             const isCollapsed = logPanel.classList.contains('collapsed');
             logToggle.textContent = isCollapsed ? '+' : '−';
-            addLog(isCollapsed ? '日志面板已折叠' : '日志面板已展开');
+            addLog(isCollapsed ? '✅ 日志面板已折叠' : '✅ 日志面板已展开');
             
-            // ⭐ 折叠状态改变时，更新甘特图高度
-            setTimeout(() => gantt.updateHeight(), 350);
+            // ⭐ 关键：折叠状态改变时立即更新高度
+            setTimeout(() => {
+                if (gantt && typeof gantt.updateHeight === 'function') {
+                    gantt.updateHeight();
+                }
+            }, 350);
         };
     }
 
@@ -520,7 +530,7 @@
             clearTimeout(toolbarLeaveTimer);
             toolbarHoverTimer = setTimeout(() => {
                 toolbarExpanded.classList.add('active');
-                addLog('工具栏已展开');
+                addLog('✅ 工具栏已展开');
             }, 150);
         });
 
@@ -529,7 +539,7 @@
             toolbarLeaveTimer = setTimeout(() => {
                 if (!toolbarExpanded.matches(':hover')) {
                     toolbarExpanded.classList.remove('active');
-                    addLog('工具栏已收起');
+                    addLog('✅ 工具栏已收起');
                 }
             }, 200);
         });
@@ -541,7 +551,7 @@
         toolbarExpanded.addEventListener('mouseleave', () => {
             toolbarLeaveTimer = setTimeout(() => {
                 toolbarExpanded.classList.remove('active');
-                addLog('工具栏已收起');
+                addLog('✅ 工具栏已收起');
             }, 300);
         });
     }
@@ -550,9 +560,18 @@
     
     addLog('✅ 甘特图已就绪！');
     addLog('💡 提示：点击任务名称或任务条可编辑');
-    addLog('🔍 新功能：自动居中选中任务');
+    addLog('🎯 新功能：选中任务自动居中显示');
+    addLog('📊 紧凑模式：行高40px，列宽50px');
     
     console.log('✅ app.js loaded successfully');
-    console.log('📊 甘特图版本: Gamma8 - 界面优化版');
+    console.log('📊 甘特图版本: Gamma8 - 紧凑优化版');
+
+    // ⭐ 新增：初始化时立即更新一次高度
+    setTimeout(() => {
+        if (gantt && typeof gantt.updateHeight === 'function') {
+            gantt.updateHeight();
+            addLog('✅ 甘特图高度已初始化');
+        }
+    }, 500);
 
 })(typeof window !== 'undefined' ? window : this);
