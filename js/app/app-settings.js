@@ -36,17 +36,33 @@
         };
     }
 
-    // PERT图表渲染（简化版，详细实现保持不变）
     function renderPertChart(tasks) {
         if (!pertContainer) return;
         
-        pertContainer.innerHTML = '<svg id="pertSvg" width="100%" height="600"></svg>';
-        const svg = document.getElementById('pertSvg');
-        if (!svg) return;
-
-        // 此处省略PERT渲染逻辑（与原代码相同）
-        console.log('PERT图表渲染中...');
+        // 等待 AnyChart 库加载
+        if (typeof anychart === 'undefined') {
+            console.warn('AnyChart 库未加载，无法渲染 PERT 图');
+            pertContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc3545;">⚠️ PERT 图表库加载失败</div>';
+            return;
+        }
+        
+        // 转换数据格式为 AnyChart PERT 格式
+        const pertData = tasks.map(task => ({
+            id: task.id,
+            name: task.name,
+            duration: daysBetween(task.start, task.end) + 1,
+            dependsOn: task.dependencies || []
+        }));
+        
+        // 创建 PERT 图表
+        const chart = anychart.pert();
+        chart.data(pertData, 'asTable');
+        chart.container('pertContainer');
+        chart.draw();
+        
+        addLog('✅ PERT 图表已渲染（AnyChart）');
     }
+
 
     // 设置面板交互
     const settingsPanel = document.getElementById('settingsPanel');
