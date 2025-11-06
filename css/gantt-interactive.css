@@ -1,149 +1,13 @@
 /**
- * 甘特图核心样式文件
- * 路径: css/gantt.css
- * 版本: Delta8 - 完整版（包含时间轴菜单、双层时间标签、全貌视图）
- * 包含: 甘特图容器、侧边栏、时间轴、任务条、依赖箭头、时间标签、视图菜单
+ * 甘特图交互样式文件
+ * 路径: css/gantt-interactive.css
+ * 版本: Delta8
+ * 包含: 时间标签、视图菜单、悬停效果、选中状态、依赖高亮、动画
  */
 
 /* ======================
-   甘特图容器
+   任务名称交互状态
    ====================== */
-.gantt-container {
-    background: white;
-    border-radius: 8px;
-    padding: 15px;
-    box-shadow: var(--shadow-md);
-    margin-bottom: 15px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-}
-
-.gantt-wrapper {
-    display: flex;
-    border: 1px solid var(--gray-300);
-    border-radius: 6px;
-    overflow: hidden;
-    flex: 1;
-    min-height: 350px;
-    transition: height 0.3s ease;
-}
-
-#pertContainer {
-    background: white;
-    border-radius: 8px;
-    padding: 15px;
-    box-shadow: var(--shadow-md);
-    margin-bottom: 15px;
-    overflow: auto;
-}
-
-/* ======================
-   左侧任务名称列
-   ====================== */
-.gantt-sidebar {
-    width: var(--sidebar-width);
-    min-width: var(--sidebar-width);
-    border-right: 2px solid var(--gray-300);
-    background: var(--gray-50);
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-                min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.gantt-sidebar.collapsed {
-    width: 35px !important;
-    min-width: 35px !important;
-}
-
-.gantt-sidebar.collapsed .gantt-task-name {
-    opacity: 0;
-    pointer-events: none;
-    overflow: hidden;
-}
-
-.gantt-sidebar.collapsed .gantt-sidebar-header {
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    font-size: 0.7rem;
-    padding: 8px 4px;
-}
-
-.sidebar-toggle-btn {
-    position: absolute;
-    top: 50%;
-    right: -12px;
-    transform: translateY(-50%);
-    width: 22px;
-    height: 44px;
-    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
-    border: none;
-    border-radius: 0 8px 8px 0;
-    color: white;
-    font-size: 0.7rem;
-    cursor: pointer;
-    z-index: 10;
-    transition: all var(--transition-normal);
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.sidebar-toggle-btn:hover {
-    background: linear-gradient(135deg, #5568d3 0%, #6a3d8f 100%);
-    transform: translateY(-50%) scale(1.1);
-    box-shadow: 2px 0 12px rgba(102, 126, 234, 0.4);
-}
-
-.sidebar-toggle-icon {
-    transition: transform var(--transition-normal);
-}
-
-.gantt-sidebar.collapsed .sidebar-toggle-icon {
-    transform: rotate(180deg);
-}
-
-.gantt-sidebar-header {
-    padding: 12px 8px;
-    background: var(--gray-200);
-    font-weight: 600;
-    border-bottom: 2px solid var(--gray-300);
-    height: var(--header-height);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: all var(--transition-normal);
-    font-size: 0.85rem;
-}
-
-.gantt-sidebar-body {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-.gantt-task-name {
-    padding: 10px 8px;
-    border-bottom: 1px solid var(--gray-300);
-    height: var(--row-height);
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    transition: background var(--transition-fast), 
-                opacity var(--transition-normal);
-    font-size: 0.85rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 .gantt-task-name:hover {
     background: rgba(102, 126, 234, 0.05);
     padding-right: 8px;
@@ -162,45 +26,12 @@
 }
 
 /* ======================
-   右侧时间轴区域
+   时间轴表头交互
    ====================== */
-.gantt-timeline-wrapper {
-    flex: 1;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 0;
-}
-
-.gantt-timeline {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-/* ⭐ 时间轴表头包装器 */
-.gantt-timeline-header-wrapper {
-    position: relative;
-    height: var(--header-height);
-    flex-shrink: 0;
-    background: var(--gray-200);
-    border-bottom: 2px solid var(--gray-300);
-}
-
-.gantt-timeline-header {
-    display: flex;
-    height: 100%;
-    overflow: hidden;
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
 .gantt-timeline-header:hover {
     background: rgba(102, 126, 234, 0.05);
 }
 
-/* ⭐ 悬停提示 */
 .gantt-timeline-header-wrapper::after {
     content: '悬停切换视图 ↓';
     position: absolute;
@@ -219,145 +50,9 @@
     opacity: 1;
 }
 
-.gantt-rows-container {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: auto;
-    position: relative;
-    scroll-behavior: smooth;
-    min-height: 0;
-}
-
-.gantt-date-cell {
-    width: var(--default-cell-width);
-    min-width: var(--default-cell-width);
-    padding: 6px 3px;
-    text-align: center;
-    border-right: 1px solid var(--gray-300);
-    font-size: 0.7rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-.gantt-date-day {
-    font-weight: 600;
-    font-size: 0.9rem;
-    margin-bottom: 1px;
-}
-
-.gantt-date-weekday {
-    font-size: 0.65rem;
-    color: var(--gray-500);
-}
-
-/* 周视图样式 */
-.gantt-date-week {
-    font-weight: 600;
-    font-size: 0.85rem;
-    margin-bottom: 2px;
-    color: var(--gray-700);
-}
-
-.gantt-date-range {
-    font-size: 0.7rem;
-    color: var(--gray-500);
-}
-
-/* 月视图样式 */
-.gantt-date-year {
-    font-size: 0.75rem;
-    color: var(--gray-500);
-    margin-bottom: 2px;
-}
-
-.gantt-date-month {
-    font-weight: 600;
-    font-size: 1rem;
-    color: var(--gray-700);
-}
-
-.gantt-date-cell.weekend {
-    background: var(--gray-100);
-}
-
-.gantt-date-cell.today {
-    background: #fff3cd;
-    border-left: 2px solid var(--warning-color);
-    border-right: 2px solid var(--warning-color);
-}
-
-/* 不同刻度下的单元格样式 */
-.gantt-date-cell[data-scale="week"],
-.gantt-cell[data-scale="week"] {
-    border-right: 2px solid var(--gray-400);
-}
-
-.gantt-date-cell[data-scale="month"],
-.gantt-cell[data-scale="month"] {
-    border-right: 3px solid var(--gray-500);
-}
-
-.gantt-date-cell[data-scale="week"].today,
-.gantt-date-cell[data-scale="month"].today {
-    background: linear-gradient(135deg, #fff3cd 0%, #fffbeb 100%);
-    border-left: 3px solid var(--warning-color);
-    border-right: 3px solid var(--warning-color);
-}
-
-.gantt-rows {
-    position: relative;
-    min-width: 100%;
-}
-
-.gantt-row {
-    display: flex;
-    border-bottom: 1px solid var(--gray-200);
-    height: var(--row-height);
-    position: relative;
-}
-
-.gantt-cell {
-    width: var(--default-cell-width);
-    min-width: var(--default-cell-width);
-    border-right: 1px solid #f0f0f0;
-    position: relative;
-}
-
-.gantt-cell.weekend {
-    background: var(--gray-50);
-}
-
-.gantt-cell.today {
-    background: #fffbeb;
-}
-
 /* ======================
-   任务条样式
+   任务条交互状态
    ====================== */
-.gantt-bar {
-    position: absolute;
-    height: 28px;
-    top: 6px;
-    background: transparent;
-    border: 2px solid var(--gray-300);
-    border-radius: 6px;
-    cursor: move;
-    display: flex;
-    align-items: center;
-    padding: 0 8px;
-    color: var(--gray-600);
-    font-size: 0.75rem;
-    font-weight: 500;
-    box-shadow: var(--shadow-sm);
-    transition: all var(--transition-fast);
-    user-select: none;
-    overflow: hidden;
-    white-space: nowrap;
-    will-change: transform;
-}
-
 .gantt-bar:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
@@ -384,48 +79,8 @@
     box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
 }
 
-.gantt-bar-progress {
-    position: absolute;
-    left: 0;
-    top: 0;
-    height: 100%;
-    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
-    opacity: 0.3;
-    border-radius: 4px;
-    pointer-events: none;
-    transition: width var(--transition-fast);
-}
-
-.gantt-bar-handle {
-    width: 6px;
-    height: 100%;
-    background: var(--gray-400);
-    cursor: ew-resize;
-    position: absolute;
-    top: 0;
-    transition: background var(--transition-fast);
-}
-
-.gantt-bar-handle:hover {
-    background: var(--gray-500);
-}
-
-.gantt-bar-handle.left {
-    left: 0;
-    border-radius: 4px 0 0 4px;
-}
-
-.gantt-bar-handle.right {
-    right: 0;
-    border-radius: 0 4px 4px 0;
-}
-
-.gantt-bar-label {
-    display: none !important;
-}
-
 /* ======================
-   任务条左侧双层时间标签
+   左侧双层时间标签
    ====================== */
 .gantt-bar-label-start {
     position: absolute;
@@ -456,26 +111,23 @@
     gap: 1px;
 }
 
-/* 时间标签行容器 */
 .time-label-row {
     line-height: 1.2;
     transition: all var(--transition-fast);
 }
 
-/* 开始时间样式 */
 .time-start {
     color: var(--info-color);
     font-weight: 600;
     font-size: 0.7rem;
 }
 
-/* 结束时间样式 */
 .time-end {
     color: var(--gray-500);
     font-size: 0.65rem;
 }
 
-/* 悬停效果 */
+/* 时间标签悬停效果 */
 .gantt-bar-label-start:hover {
     transform: translateX(-2px);
     padding-left: 10px;
@@ -499,7 +151,7 @@
     transform: scale(1.05);
 }
 
-/* 选中状态 */
+/* 时间标签选中状态 */
 .gantt-bar-label-start.selected {
     background: rgba(255, 243, 205, 0.3) !important;
     border-right: 3px solid var(--warning-color);
@@ -521,7 +173,7 @@
     font-weight: 600;
 }
 
-/* 冲突任务的左侧时间标签 */
+/* 时间标签冲突状态 */
 .gantt-bar.conflict ~ .gantt-bar-label-start .time-start {
     color: var(--danger-color);
 }
@@ -531,7 +183,7 @@
     opacity: 0.8;
 }
 
-/* 依赖高亮任务的左侧时间标签 */
+/* 时间标签依赖高亮状态 */
 .gantt-bar.dep-highlight ~ .gantt-bar-label-start .time-start {
     color: var(--success-color);
 }
@@ -541,7 +193,7 @@
     opacity: 0.8;
 }
 
-/* 不同时间刻度下的字体大小优化 */
+/* 不同时间刻度下的字体优化 */
 [data-scale="week"] .gantt-bar-label-start {
     font-size: 0.6rem;
 }
@@ -566,7 +218,9 @@
     font-size: 0.55rem;
 }
 
-/* 任务条外部标签（右侧） */
+/* ======================
+   右侧任务名称标签
+   ====================== */
 .gantt-bar-label-external {
     position: absolute;
     top: 6px;
@@ -626,23 +280,8 @@
 }
 
 /* ======================
-   依赖关系箭头
+   依赖箭头交互效果
    ====================== */
-.gantt-dependencies {
-    position: absolute;
-    top: 0;
-    left: 0;
-    pointer-events: none;
-}
-
-.gantt-dependencies path.dependency-arrow {
-    stroke: var(--danger-color);
-    stroke-width: 2;
-    fill: none;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
 .gantt-dependencies path.dependency-arrow:hover {
     stroke: #ff6b6b;
     stroke-width: 3;
@@ -656,22 +295,8 @@
     animation: arrowPulse 2s ease-in-out infinite;
 }
 
-.gantt-dependencies marker path {
-    fill: var(--danger-color);
-    transition: fill 0.3s ease;
-}
-
 .gantt-dependencies path.dep-highlight-arrow + marker path {
     fill: var(--success-color);
-}
-
-/* 不同时间刻度下的箭头粗细 */
-[data-scale="week"] ~ .gantt-dependencies path {
-    stroke-width: 1.5;
-}
-
-[data-scale="month"] ~ .gantt-dependencies path {
-    stroke-width: 1;
 }
 
 [data-scale="week"] ~ .gantt-dependencies path:hover,
@@ -682,6 +307,17 @@
 [data-scale="month"] ~ .gantt-dependencies path:hover,
 [data-scale="month"] ~ .gantt-dependencies path.dep-highlight-arrow {
     stroke-width: 2;
+}
+
+@keyframes arrowPulse {
+    0%, 100% {
+        stroke-width: 3;
+        opacity: 1;
+    }
+    50% {
+        stroke-width: 4;
+        opacity: 0.8;
+    }
 }
 
 /* ======================
@@ -830,7 +466,7 @@
     -webkit-backdrop-filter: blur(20px);
 }
 
-/* ⭐ 菜单分隔线 */
+/* 菜单分隔线 */
 .view-menu-divider {
     height: 1px;
     background: linear-gradient(to right, 
@@ -841,7 +477,9 @@
     margin: 8px 0;
 }
 
-/* ⭐ 全貌视图按钮特殊样式 */
+/* ======================
+   全貌视图按钮特殊样式
+   ====================== */
 .view-menu-overview {
     background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%);
     border: 1px dashed rgba(16, 185, 129, 0.3) !important;
@@ -874,6 +512,10 @@
     animation: overviewPulse 1s ease-in-out infinite;
 }
 
+.view-menu-overview.active::after {
+    color: var(--success-color) !important;
+}
+
 @keyframes overviewPulse {
     0%, 100% {
         transform: scale(1);
@@ -883,36 +525,10 @@
     }
 }
 
-/* 全貌视图激活状态的勾选标记 */
-.view-menu-overview.active::after {
-    color: var(--success-color) !important;
-}
-
 /* ======================
-   响应式设计
+   响应式交互优化
    ====================== */
 @media (max-width: 768px) {
-    .gantt-sidebar {
-        width: 100px;
-        min-width: 100px;
-    }
-
-    .gantt-sidebar.collapsed {
-        width: 30px !important;
-        min-width: 30px !important;
-    }
-
-    .sidebar-toggle-btn {
-        width: 18px;
-        height: 36px;
-        font-size: 0.6rem;
-    }
-
-    .gantt-task-name {
-        font-size: 0.75rem;
-        padding: 8px 6px;
-    }
-    
     .timeline-view-menu {
         right: 10px;
         min-width: 120px;
@@ -951,28 +567,9 @@
 }
 
 /* ======================
-   打印样式
+   打印交互优化
    ====================== */
 @media print {
-    .gantt-sidebar.collapsed {
-        width: var(--sidebar-width) !important;
-        min-width: var(--sidebar-width) !important;
-    }
-
-    .gantt-wrapper {
-        max-height: none;
-        height: auto;
-    }
-
-    .sidebar-toggle-btn {
-        display: none !important;
-    }
-
-    .gantt-container {
-        box-shadow: none;
-        border: 1px solid var(--gray-300);
-    }
-    
     .timeline-view-menu {
         display: none !important;
     }
