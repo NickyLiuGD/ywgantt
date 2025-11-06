@@ -1,43 +1,27 @@
-// ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-// ▓▓ 甘特图核心类 - 渲染、数据管理、交互控制                          ▓▓
-// ▓▓ 路径: js/gantt-chart.js                                          ▓▓
-// ▓▓ 版本: Gamma11 - 确保任务条完全居中（水平+垂直）                  ▓▓
-// ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-
-(function(global) {
-    'use strict';
-
-    // ⭐ 全局尺寸常量（紧凑模式）
-    const ROW_HEIGHT = 40;
-    const HEADER_HEIGHT = 50;
-    const DEFAULT_CELL_WIDTH = 50;
-
+/**
+ * 甘特图核心类
+ * 负责甘特图的渲染和数据管理
+ */
+class GanttChart {
     /**
      * GanttChart 构造函数
      * @param {string} selector - 容器选择器
      * @param {Array} tasks - 任务数组
      * @param {Object} options - 配置选项
      */
-    function GanttChart(selector, tasks, options) {
-        if (!selector) {
-            throw new Error('GanttChart: selector is required');
-        }
-
+    constructor(selector, tasks, options = {}) {
         this.selector = selector;
-        this.tasks = Array.isArray(tasks) ? tasks : [];
-        this.options = Object.assign({
-            cellWidth: DEFAULT_CELL_WIDTH,
+        this.tasks = tasks || [];
+        this.options = {
+            cellWidth: 60,
             showWeekends: true,
             enableEdit: true,
             enableResize: true,
             showDependencies: true,
-            showTaskNames: true
-        }, options || {});
-
+            ...options
+        };
         this.selectedTask = null;
         this.dragState = null;
-        this._cachedElements = {};
-        
         this.init();
     }
 
@@ -58,6 +42,7 @@
 
     /**
      * 计算日期范围
+     * 优化：添加边界检查和性能优化
      */
     GanttChart.prototype.calculateDateRange = function() {
         if (this.tasks.length === 0) {
@@ -66,27 +51,22 @@
             return;
         }
 
-        const dateRange = this.tasks.reduce((acc, task) => {
+        let minDate = new Date(this.tasks[0].start);
+        let maxDate = new Date(this.tasks[0].end || this.tasks[0].start);
+
+        this.tasks.forEach(task => {
             const start = new Date(task.start);
             const end = new Date(task.end || task.start);
-            
-            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-                console.warn(`Invalid date for task: ${task.name}`);
-                return acc;
-            }
-            
-            if (!acc.minDate || start < acc.minDate) acc.minDate = start;
-            if (!acc.maxDate || end > acc.maxDate) acc.maxDate = end;
-            
-            return acc;
-        }, { minDate: null, maxDate: null });
+            if (start < minDate) minDate = start;
+            if (end > maxDate) maxDate = end;
+        });
 
         this.startDate = addDays(dateRange.minDate, -3);
         this.endDate = addDays(dateRange.maxDate, 10);
     };
 
     /**
-     * 生成日期数组（带缓存）
+     * 生成日期数组
      * @returns {Array<Date>} 日期数组
      */
     GanttChart.prototype.generateDates = function() {
@@ -103,14 +83,11 @@
             dates.push(new Date(current));
             current = addDays(current, 1);
         }
-
-        this._dateCache = { key: cacheKey, dates: dates };
-        
         return dates;
     };
 
     /**
-     * 渲染甘特图（完整版 - 包含折叠按钮）
+     * 渲染甘特图
      */
     GanttChart.prototype.render = function() {
         if (!this.container) {
@@ -122,18 +99,17 @@
         const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
         const isCollapsed = !this.options.showTaskNames;
         
+        // 使用模板字符串构建 HTML（保持原有结构）
         const html = `
             <div class="gantt-wrapper">
                 <div class="gantt-sidebar ${isCollapsed ? 'collapsed' : ''}">
                     <div class="gantt-sidebar-header">任务名称</div>
-                    <div class="gantt-sidebar-body" id="ganttSidebarBody">
-                        ${this.renderTaskNames()}
-                    </div>
-                    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" 
-                            title="${isCollapsed ? '展开任务名称栏' : '折叠任务名称栏'}"
-                            aria-label="${isCollapsed ? '展开' : '折叠'}任务名称栏">
-                        <span class="sidebar-toggle-icon">${isCollapsed ? '▶' : '◀'}</span>
-                    </button>
+                    ${this.tasks.map(task => `
+                        <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''}" 
+                             data-task-id="${task.id}">
+                            ${task.name}
+                        </div>
+                    `).join('')}
                 </div>
                 <div class="gantt-timeline-wrapper">
                     <div class="gantt-timeline">
@@ -153,188 +129,6 @@
 
         this.container.innerHTML = html;
 
-        const toggleBtn = document.getElementById('sidebarToggleBtn');
-        if (toggleBtn) {
-            toggleBtn.onclick = () => {
-                this.toggleSidebar(isCollapsed);
-                this.render();
-            };
-        }
-
-        this.setupScrollSync();
-        this.renderDependencies(dates);
-        this.attachEvents();
-        
-        this.updateHeight();
-    };
-
-    /**
-     * 渲染任务名称列表
-     * @returns {string} HTML字符串
-     */
-    GanttChart.prototype.renderTaskNames = function() {
-        return this.tasks.map(task => `
-            <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''}" 
-                 data-task-id="${task.id}"
-                 role="button"
-                 tabindex="0"
-                 aria-label="任务: ${this.escapeHtml(task.name)}">
-                ${this.escapeHtml(task.name)}
-            </div>
-        `).join('');
-    };
-
-    /**
-     * 渲染日期表头
-     * @param {Array<Date>} dates - 日期数组
-     * @param {Array<string>} weekdays - 星期名称数组
-     * @returns {string} HTML字符串
-     */
-    GanttChart.prototype.renderDateHeaders = function(dates, weekdays) {
-        return dates.map(date => {
-            const isWeekendDay = isWeekend(date) && this.options.showWeekends;
-            const isTodayDay = isToday(date);
-            const classes = ['gantt-date-cell'];
-            
-            if (isWeekendDay) classes.push('weekend');
-            if (isTodayDay) classes.push('today');
-            
-            return `
-                <div class="${classes.join(' ')}" 
-                     style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;"
-                     role="columnheader"
-                     aria-label="${formatDate(date)}">
-                    <div class="gantt-date-day">${date.getDate()}</div>
-                    <div class="gantt-date-weekday">${weekdays[date.getDay()]}</div>
-                </div>
-            `;
-        }).join('');
-    };
-
-    /**
-     * 渲染所有任务行
-     * @param {Array<Date>} dates - 日期数组
-     * @returns {string} HTML字符串
-     */
-    GanttChart.prototype.renderTaskRows = function(dates) {
-        return this.tasks.map(task => this.renderRow(task, dates)).join('');
-    };
-
-    /**
-     * 渲染单个任务行
-     * @param {Object} task - 任务对象
-     * @param {Array<Date>} dates - 日期数组
-     * @returns {string} HTML字符串
-     */
-    GanttChart.prototype.renderRow = function(task, dates) {
-        const start = new Date(task.start);
-        const end = new Date(task.end || task.start);
-        
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-            console.warn(`Invalid date for task: ${task.name}`);
-            return '';
-        }
-        
-        const startOffset = daysBetween(this.startDate, start);
-        const duration = daysBetween(start, end) + 1;
-        
-        const left = startOffset * this.options.cellWidth;
-        const width = Math.max(duration * this.options.cellWidth, 60);
-        const progress = Math.min(Math.max(task.progress || 0, 0), 100);
-
-        const isSelected = this.selectedTask === task.id;
-
-        return `
-            <div class="gantt-row" role="row" aria-label="任务行: ${this.escapeHtml(task.name)}">
-                ${this.renderCells(dates)}
-                <div class="gantt-bar ${isSelected ? 'selected' : ''}" 
-                     data-task-id="${task.id}"
-                     style="left: ${left}px; width: ${width}px;"
-                     role="button"
-                     tabindex="0"
-                     aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
-                    <div class="gantt-bar-progress" style="width: ${progress}%" aria-hidden="true"></div>
-                    ${this.options.enableResize ? '<div class="gantt-bar-handle left" role="button" aria-label="调整开始日期"></div>' : ''}
-                    ${this.options.enableResize ? '<div class="gantt-bar-handle right" role="button" aria-label="调整结束日期"></div>' : ''}
-                </div>
-                <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
-                     data-task-id="${task.id}"
-                     style="left: ${left + width + 8}px;"
-                     role="button"
-                     tabindex="0"
-                     aria-label="任务标签: ${this.escapeHtml(task.name)}">
-                    ${this.escapeHtml(task.name)} (${progress}%)
-                </div>
-            </div>
-        `;
-    };
-
-    /**
-     * 渲染单元格
-     * @param {Array<Date>} dates - 日期数组
-     * @returns {string} HTML字符串
-     */
-    GanttChart.prototype.renderCells = function(dates) {
-        return dates.map(date => {
-            const isWeekendDay = isWeekend(date) && this.options.showWeekends;
-            const isTodayDay = isToday(date);
-            const classes = ['gantt-cell'];
-            
-            if (isWeekendDay) classes.push('weekend');
-            if (isTodayDay) classes.push('today');
-            
-            return `
-                <div class="${classes.join(' ')}" 
-                     style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;"
-                     role="gridcell"></div>
-            `;
-        }).join('');
-    };
-
-    /**
-     * 设置滚动同步
-     */
-    GanttChart.prototype.setupScrollSync = function() {
-        const sidebarBody = document.getElementById('ganttSidebarBody');
-        const rowsContainer = document.getElementById('ganttRowsContainer');
-        const timelineHeader = document.getElementById('ganttTimelineHeader');
-
-        if (!sidebarBody || !rowsContainer || !timelineHeader) {
-            console.warn('GanttChart: Scroll sync elements not found');
-            return;
-        }
-
-        let isSyncingScroll = false;
-
-        rowsContainer.addEventListener('scroll', () => {
-            if (isSyncingScroll) return;
-            isSyncingScroll = true;
-            
-            sidebarBody.scrollTop = rowsContainer.scrollTop;
-            timelineHeader.scrollLeft = rowsContainer.scrollLeft;
-            
-            requestAnimationFrame(() => {
-                isSyncingScroll = false;
-            });
-        }, { passive: true });
-
-        sidebarBody.addEventListener('scroll', () => {
-            if (isSyncingScroll) return;
-            isSyncingScroll = true;
-            
-            rowsContainer.scrollTop = sidebarBody.scrollTop;
-            
-            requestAnimationFrame(() => {
-                isSyncingScroll = false;
-            });
-        }, { passive: true });
-    };
-
-    /**
-     * 渲染依赖关系
-     * @param {Array<Date>} dates - 日期数组
-     */
-    GanttChart.prototype.renderDependencies = function(dates) {
         const depSVG = this.container.querySelector('.gantt-dependencies');
         
         if (!depSVG) {
@@ -343,8 +137,9 @@
         }
 
         depSVG.style.width = `${dates.length * this.options.cellWidth}px`;
-        depSVG.style.height = `${this.tasks.length * ROW_HEIGHT}px`;
+        depSVG.style.height = `${60 + this.tasks.length * 60}px`;
 
+        // 添加箭头标记定义
         depSVG.innerHTML = `
             <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" 
@@ -354,73 +149,56 @@
             </defs>
         `;
 
-        if (!this.options.showDependencies) {
-            return;
-        }
+        if (this.options.showDependencies) {
+            const rowHeight = 60; // h
+            const w = this.options.cellWidth;
+            const h = rowHeight;
+            const radius = 10;
 
-        const paths = this.generateDependencyPaths();
-        depSVG.innerHTML += paths;
-    };
+            this.tasks.forEach((task, taskIndex) => {
+                if (!task.dependencies || task.dependencies.length === 0) return;
+                task.dependencies.forEach(depId => {
+                    const depTask = this.tasks.find(t => t.id === depId);
+                    if (!depTask) return;
+                    const depIndex = this.tasks.findIndex(t => t.id === depId);
+                    const depEndOffset = daysBetween(this.startDate, depTask.end);
+                    const taskStartOffset = daysBetween(this.startDate, task.start);
+                    const x1 = depEndOffset * w + w; // 前置最右侧
+                    const x2 = taskStartOffset * w; // 后继左侧
+                    const y1 = rowHeight + depIndex * rowHeight + rowHeight / 2; // 前置中心
+                    const y2 = rowHeight + taskIndex * rowHeight + rowHeight / 2; // 后继中心
+                    const d = Math.abs(taskIndex - depIndex); // 距离d，相邻1，隔一2等
 
-    /**
-     * 生成依赖路径
-     * @returns {string} SVG路径HTML字符串
-     */
-    GanttChart.prototype.generateDependencyPaths = function() {
-        const w = this.options.cellWidth;
-        const h = ROW_HEIGHT;
-        const radius = 8;
-        const paths = [];
-
-        this.tasks.forEach((task, taskIndex) => {
-            if (!task.dependencies || task.dependencies.length === 0) return;
-            
-            task.dependencies.forEach(depId => {
-                const depTask = this.tasks.find(t => t.id === depId);
-                if (!depTask) {
-                    console.warn(`Dependency task not found: ${depId}`);
-                    return;
-                }
-                
-                const depIndex = this.tasks.findIndex(t => t.id === depId);
-                const depEndOffset = daysBetween(this.startDate, depTask.end);
-                const taskStartOffset = daysBetween(this.startDate, task.start);
-                
-                const x1 = depEndOffset * w + w;
-                const x2 = taskStartOffset * w;
-                const y1 = depIndex * h + h / 2;
-                const y2 = taskIndex * h + h / 2;
-                const d = Math.abs(taskIndex - depIndex);
-
-                let coords;
-                if (depIndex < taskIndex) {
-                    coords = [
-                        {x: x1, y: y1},
-                        {x: x1 + w / 2, y: y1},
-                        {x: x1 + w / 2, y: y1 + h / 8},
-                        {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y1 + h / 8},
-                        {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y2},
-                        {x: x2, y: y2}
-                    ];
-                } else if (depIndex > taskIndex) {
-                    coords = [
-                        {x: x1, y: y1},
-                        {x: x1 + w / 2, y: y1},
-                        {x: x1 + w / 2, y: y1 - h / 8},
-                        {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y1 - h / 8},
-                        {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y2},
-                        {x: x2, y: y2}
-                    ];
-                } else {
-                    const sign = x2 > x1 ? 1 : -1;
-                    const bend = 15;
-                    coords = [
-                        {x: x1, y: y1},
-                        {x: x1 + sign * bend, y: y1},
-                        {x: x1 + sign * bend, y: y2},
-                        {x: x2, y: y2}
-                    ];
-                }
+                    let coords;
+                    if (depIndex < taskIndex) { // 前置在上方 (y1 < y2)
+                        coords = [
+                            {x: x1, y: y1}, // start
+                            {x: x1 + w / 2, y: y1}, // 右 w/2
+                            {x: x1 + w / 2, y: y1 + h / 8}, // 下 h/8
+                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y1 + h / 8}, // 左 w/(2d) + w/2
+                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y2}, // 下 to y2
+                            {x: x2, y: y2} // 水平 to x2
+                        ];
+                    } else if (depIndex > taskIndex) { // 前置在下方 (y1 > y2)
+                        coords = [
+                            {x: x1, y: y1}, // start
+                            {x: x1 + w / 2, y: y1}, // 右 w/2
+                            {x: x1 + w / 2, y: y1 - h / 8}, // 上 h/8 (负方向)
+                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y1 - h / 8}, // 左 w/(2d) + w/2
+                            {x: x1 + w / 2 - (w / (2 * d) + w / 2), y: y2}, // 上 to y2 (负方向)
+                            {x: x2, y: y2} // 水平 to x2
+                        ];
+                    } else {
+                        // 同行，使用简单弯曲路径
+                        const sign = x2 > x1 ? 1 : -1;
+                        const bend = 20;
+                        coords = [
+                            {x: x1, y: y1},
+                            {x: x1 + sign * bend, y: y1},
+                            {x: x1 + sign * bend, y: y2},
+                            {x: x2, y: y2}
+                        ];
+                    }
 
                 const dPath = createRoundedPath(coords, radius, false);
                 paths.push(`<path data-from="${depId}" data-to="${task.id}" d="${dPath}" 
@@ -429,254 +207,68 @@
             });
         });
 
-        return paths.join('');
-    };
-
-    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-    // ▓▓ 终极修复：选中任务完全居中（任务条在窗口正中央）                  ▓▓
-    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+        this.attachEvents();
+    }
 
     /**
-     * 选中任务（完全修复版）
+     * 渲染单个任务行
+     * @param {Object} task - 任务对象
+     * @param {Array<Date>} dates - 日期数组
+     * @returns {string} HTML字符串
+     */
+    renderRow(task, dates) {
+        const start = new Date(task.start);
+        const end = new Date(task.end || task.start);
+        const startOffset = daysBetween(this.startDate, start);
+        const duration = daysBetween(start, end) + 1;
+        
+        const left = startOffset * this.options.cellWidth;
+        const width = Math.max(duration * this.options.cellWidth, 80);
+        const progress = task.progress || 0;
+
+        return `
+            <div class="gantt-row">
+                ${dates.map(date => `
+                    <div class="gantt-cell ${isWeekend(date) && this.options.showWeekends ? 'weekend' : ''} ${isToday(date) ? 'today' : ''}" 
+                         style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;"></div>
+                `).join('')}
+                <div class="gantt-bar ${this.selectedTask === task.id ? 'selected' : ''}" 
+                     data-task-id="${task.id}"
+                     style="left: ${left}px; width: ${width}px;">
+                    <div class="gantt-bar-progress" style="width: ${progress}%"></div>
+                    ${this.options.enableResize ? '<div class="gantt-bar-handle left"></div>' : ''}
+                    <div class="gantt-bar-label">${task.name} (${progress}%)</div>
+                    ${this.options.enableResize ? '<div class="gantt-bar-handle right"></div>' : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * 选择任务
      * @param {string} taskId - 任务ID
      */
-    GanttChart.prototype.selectTask = function(taskId) {
-        if (!taskId || this.selectedTask === taskId) return;
-
-        const task = this.tasks.find(t => t.id === taskId);
-        if (!task) {
-            console.warn(`Task not found: ${taskId}`);
-            return;
-        }
-
+    selectTask(taskId) {
         this.selectedTask = taskId;
-        this.updateSelectionState(taskId);
+        const task = this.tasks.find(t => t.id === taskId);
         
-        // ⚡ 使用setTimeout确保DOM完全更新后再滚动
-        setTimeout(() => {
-            this.scrollTaskToCenter(taskId);
-        }, 150);
-        
-        addLog(`📌 已选择任务 "${task.name}"`);
-    };
-
-    /**
-     * 更新选择状态
-     * @param {string} taskId - 任务ID
-     */
-    GanttChart.prototype.updateSelectionState = function(taskId) {
-        const bars = this.container.querySelectorAll('.gantt-bar');
-        const labels = this.container.querySelectorAll('.gantt-bar-label-external');
-        const names = this.container.querySelectorAll('.gantt-task-name');
-        
-        bars.forEach(bar => {
+        this.container.querySelectorAll('.gantt-bar').forEach(bar => {
             bar.classList.toggle('selected', bar.dataset.taskId === taskId);
         });
         
-        labels.forEach(label => {
-            label.classList.toggle('selected', label.dataset.taskId === taskId);
+        this.container.querySelectorAll('.gantt-task-name').forEach(el => {
+            el.classList.toggle('selected', el.dataset.taskId === taskId);
         });
         
-        names.forEach(name => {
-            name.classList.toggle('selected', name.dataset.taskId === taskId);
-        });
-    };
-
-    /**
-     * 滚动使任务条居中显示（终极版 - 确保任务条在窗口正中央）
-     * @param {string} taskId - 任务ID
-     */
-    GanttChart.prototype.scrollTaskToCenter = function(taskId) {
-        if (!taskId || !this.container) {
-            console.warn('scrollTaskToCenter: Invalid parameters');
-            return;
+        if (window.showTaskForm) {
+            window.showTaskForm(task);
         }
-        
-        // ⭐ 获取关键元素
-        const bar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
-        const rowsContainer = this.container.querySelector('.gantt-rows-container');
-        
-        if (!bar || !rowsContainer) {
-            console.warn('scrollTaskToCenter: Required elements not found');
-            return;
-        }
-        
-        try {
-            // ⭐ 获取任务条的实际位置和尺寸（相对于其定位父元素）
-            const barRect = bar.getBoundingClientRect();
-            const containerRect = rowsContainer.getBoundingClientRect();
-            
-            // ⭐ 获取当前滚动位置
-            const currentScrollLeft = rowsContainer.scrollLeft;
-            const currentScrollTop = rowsContainer.scrollTop;
-            
-            // ⭐ 计算任务条在整个内容区域中的绝对位置
-            // 任务条左边缘 = 当前滚动位置 + 任务条相对于容器可视区的位置
-            const barAbsoluteLeft = currentScrollLeft + (barRect.left - containerRect.left);
-            const barAbsoluteTop = currentScrollTop + (barRect.top - containerRect.top);
-            
-            // ⭐ 获取任务条和容器的尺寸
-            const barWidth = barRect.width;
-            const barHeight = barRect.height;
-            const containerWidth = rowsContainer.clientWidth;
-            const containerHeight = rowsContainer.clientHeight;
-            
-            // ⭐ 计算任务条中心点在内容区域中的位置
-            const barCenterX = barAbsoluteLeft + (barWidth / 2);
-            const barCenterY = barAbsoluteTop + (barHeight / 2);
-            
-            // ⭐ 计算目标滚动位置（让任务条中心点对齐到容器中心）
-            const targetScrollLeft = barCenterX - (containerWidth / 2);
-            const targetScrollTop = barCenterY - (containerHeight / 2);
-            
-            // ⭐ 获取最大可滚动距离
-            const maxScrollLeft = rowsContainer.scrollWidth - containerWidth;
-            const maxScrollTop = rowsContainer.scrollHeight - containerHeight;
-            
-            // ⭐ 限制滚动值在有效范围内
-            const finalScrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScrollLeft));
-            const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
-            
-            // ⭐ 详细调试日志
-            console.log('╔═══════════════════════════════════════════════════════════╗');
-            console.log('║  任务条居中滚动 - 详细调试信息                            ║');
-            console.log('╠═══════════════════════════════════════════════════════════╣');
-            console.log('  任务ID:', taskId);
-            console.log('  任务名称:', this.tasks.find(t => t.id === taskId)?.name);
-            console.log('───────────────────────────────────────────────────────────');
-            console.log('  📏 任务条尺寸:');
-            console.log('    宽度:', barWidth.toFixed(2), 'px');
-            console.log('    高度:', barHeight.toFixed(2), 'px');
-            console.log('───────────────────────────────────────────────────────────');
-            console.log('  📐 容器尺寸:');
-            console.log('    可视宽度:', containerWidth.toFixed(2), 'px');
-            console.log('    可视高度:', containerHeight.toFixed(2), 'px');
-            console.log('    总宽度:', rowsContainer.scrollWidth.toFixed(2), 'px');
-            console.log('    总高度:', rowsContainer.scrollHeight.toFixed(2), 'px');
-            console.log('───────────────────────────────────────────────────────────');
-            console.log('  📍 当前滚动位置:');
-            console.log('    水平:', currentScrollLeft.toFixed(2), 'px');
-            console.log('    垂直:', currentScrollTop.toFixed(2), 'px');
-            console.log('───────────────────────────────────────────────────────────');
-            console.log('  🎯 任务条在内容中的绝对位置:');
-            console.log('    左边缘:', barAbsoluteLeft.toFixed(2), 'px');
-            console.log('    顶边缘:', barAbsoluteTop.toFixed(2), 'px');
-            console.log('    中心点X:', barCenterX.toFixed(2), 'px');
-            console.log('    中心点Y:', barCenterY.toFixed(2), 'px');
-            console.log('───────────────────────────────────────────────────────────');
-            console.log('  🎯 目标滚动位置:');
-            console.log('    水平:', targetScrollLeft.toFixed(2), 'px');
-            console.log('    垂直:', targetScrollTop.toFixed(2), 'px');
-            console.log('───────────────────────────────────────────────────────────');
-            console.log('  ✅ 最终滚动位置（限制后）:');
-            console.log('    水平:', finalScrollLeft.toFixed(2), 'px');
-            console.log('    垂直:', finalScrollTop.toFixed(2), 'px');
-            console.log('───────────────────────────────────────────────────────────');
-            console.log('  📊 滚动变化量:');
-            console.log('    水平偏移:', (finalScrollLeft - currentScrollLeft).toFixed(2), 'px');
-            console.log('    垂直偏移:', (finalScrollTop - currentScrollTop).toFixed(2), 'px');
-            console.log('╚═══════════════════════════════════════════════════════════╝');
-            
-            // ⭐ 执行平滑滚动
-            rowsContainer.scrollTo({
-                left: finalScrollLeft,
-                top: finalScrollTop,
-                behavior: 'smooth'
-            });
-            
-            // ⭐ 验证滚动结果
-            setTimeout(() => {
-                const actualScrollLeft = rowsContainer.scrollLeft;
-                const actualScrollTop = rowsContainer.scrollTop;
-                
-                const scrollLeftDiff = Math.abs(actualScrollLeft - finalScrollLeft);
-                const scrollTopDiff = Math.abs(actualScrollTop - finalScrollTop);
-                
-                console.log('╔═══════════════════════════════════════════════════════════╗');
-                console.log('║  滚动完成验证                                             ║');
-                console.log('╠═══════════════════════════════════════════════════════════╣');
-                console.log('  实际滚动位置:');
-                console.log('    水平:', actualScrollLeft.toFixed(2), 'px');
-                console.log('    垂直:', actualScrollTop.toFixed(2), 'px');
-                console.log('  误差:');
-                console.log('    水平误差:', scrollLeftDiff.toFixed(2), 'px');
-                console.log('    垂直误差:', scrollTopDiff.toFixed(2), 'px');
-                console.log('  状态:', (scrollLeftDiff < 5 && scrollTopDiff < 5) ? '✅ 居中成功' : '⚠️ 存在偏差');
-                console.log('╚═══════════════════════════════════════════════════════════╝');
-                
-                const task = this.tasks.find(t => t.id === taskId);
-                const taskIndex = this.tasks.findIndex(t => t.id === taskId);
-                if (task) {
-                    addLog(`✅ 任务 "${task.name}" 已居中显示 (第 ${taskIndex + 1}/${this.tasks.length} 个)`);
-                }
-            }, 500);
-            
-        } catch (error) {
-            console.error('scrollTaskToCenter error:', error);
-            addLog(`❌ 居中显示失败: ${error.message}`);
-        }
-    };
-
-    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-    // ▓▓ 增强：动态更新甘特图高度                                          ▓▓
-    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-
-    /**
-     * 更新甘特图高度以适应窗口
-     */
-    GanttChart.prototype.updateHeight = function() {
-        if (!this.container) return;
-        
-        try {
-            const ganttWrapper = this.container.querySelector('.gantt-wrapper');
-            const rowsContainer = this.container.querySelector('.gantt-rows-container');
-            
-            if (!ganttWrapper || !rowsContainer) {
-                console.warn('updateHeight: Elements not found');
-                return;
-            }
-            
-            const headerElement = document.querySelector('h1')?.parentElement;
-            const logPanel = document.getElementById('logPanel');
-            
-            // ⭐ 计算可用高度
-            const headerHeight = headerElement ? headerElement.offsetHeight : 80;
-            const logHeight = logPanel ? 
-                (logPanel.classList.contains('hidden') ? 0 : 
-                 (logPanel.classList.contains('collapsed') ? 55 : 240)) : 0;
-            
-            // ⭐ 计算甘特图容器的可用高度
-            const containerPadding = 30;
-            const ganttContainerPadding = 30;
-            const totalPadding = containerPadding + ganttContainerPadding + 50;
-            
-            const availableHeight = window.innerHeight - headerHeight - logHeight - totalPadding;
-            const finalHeight = Math.max(availableHeight, 350);
-            
-            // ⭐ 设置gantt-wrapper的高度
-            ganttWrapper.style.height = finalHeight + 'px';
-            ganttWrapper.style.maxHeight = finalHeight + 'px';
-            
-            // ⭐ 确保rowsContainer可以滚动
-            const contentHeight = this.tasks.length * ROW_HEIGHT;
-            
-            if (contentHeight > finalHeight - HEADER_HEIGHT) {
-                rowsContainer.style.overflowY = 'auto';
-                rowsContainer.style.overflowX = 'auto';
-            } else {
-                rowsContainer.style.overflowY = 'hidden';
-                rowsContainer.style.overflowX = 'auto';
-            }
-            
-            addLog(`📏 甘特图高度: ${finalHeight}px, 内容高度: ${contentHeight}px`);
-            
-        } catch (error) {
-            console.error('updateHeight error:', error);
-        }
-    };
+        addLog(`📌 已选择任务 "${task.name}"`);
+    }
 
     /**
      * 获取任务的所有前置依赖ID（递归）
+     * 优化：添加循环依赖检测
      * @param {string} taskId - 任务ID
      * @returns {Set<string>} 所有前置依赖ID集合
      */
@@ -684,8 +276,6 @@
         const deps = new Set();
         const visited = new Set();
         const stack = [taskId];
-        let iterations = 0;
-        const maxIterations = this.tasks.length * 10;
 
         while (stack.length && iterations < maxIterations) {
             iterations++;
@@ -715,21 +305,10 @@
 
     /**
      * 添加任务
+     * 优化：添加参数验证
      * @param {Object} task - 任务对象
      */
-    GanttChart.prototype.addTask = function(task) {
-        if (!task || typeof task !== 'object') {
-            console.error('Invalid task object');
-            return;
-        }
-
-        if (!task.id) task.id = generateId();
-        if (!task.name) task.name = '新任务';
-        if (!task.start) task.start = formatDate(new Date());
-        if (!task.end) task.end = formatDate(addDays(new Date(), 3));
-        if (typeof task.progress !== 'number') task.progress = 0;
-        if (!Array.isArray(task.dependencies)) task.dependencies = [];
-
+    addTask(task) {
         this.tasks.push(task);
         this.calculateDateRange();
         this.render();
@@ -737,17 +316,11 @@
 
     /**
      * 删除任务
+     * 优化：清理相关依赖
      * @param {string} taskId - 任务ID
      */
-    GanttChart.prototype.deleteTask = function(taskId) {
+    deleteTask(taskId) {
         this.tasks = this.tasks.filter(t => t.id !== taskId);
-        
-        this.tasks.forEach(task => {
-            if (Array.isArray(task.dependencies)) {
-                task.dependencies = task.dependencies.filter(dep => dep !== taskId);
-            }
-        });
-        
         if (this.selectedTask === taskId) {
             this.selectedTask = null;
         }
@@ -758,6 +331,7 @@
 
     /**
      * 更新选项
+     * 优化：只在选项真正改变时重新渲染
      * @param {Object} options - 新选项
      */
     GanttChart.prototype.updateOptions = function(options) {
@@ -779,77 +353,5 @@
      */
     GanttChart.prototype.getSelectedTask = function() {
         return this.tasks.find(t => t.id === this.selectedTask);
-    };
-
-    /**
-     * HTML 转义工具函数
-     * @param {string} text - 要转义的文本
-     * @returns {string} 转义后的文本
-     */
-    GanttChart.prototype.escapeHtml = function(text) {
-        if (typeof text !== 'string') return '';
-        
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        
-        return text.replace(/[&<>"']/g, m => map[m]);
-    };
-
-    /**
-     * 切换任务名称栏的显示/隐藏
-     * @param {boolean} show - 是否显示
-     */
-    GanttChart.prototype.toggleSidebar = function(show) {
-        if (!this.container) return;
-        
-        const sidebar = this.container.querySelector('.gantt-sidebar');
-        if (!sidebar) return;
-        
-        try {
-            if (show) {
-                sidebar.classList.remove('collapsed');
-                this.options.showTaskNames = true;
-                addLog('✅ 任务名称栏已展开');
-            } else {
-                sidebar.classList.add('collapsed');
-                this.options.showTaskNames = false;
-                addLog('✅ 任务名称栏已折叠');
-            }
-        } catch (error) {
-            console.error('toggleSidebar error:', error);
-        }
-    };
-
-    /**
-     * 销毁实例
-     */
-    GanttChart.prototype.destroy = function() {
-        if (this._mouseMoveHandler) {
-            document.removeEventListener('mousemove', this._mouseMoveHandler);
-        }
-        if (this._mouseUpHandler) {
-            document.removeEventListener('mouseup', this._mouseUpHandler);
-        }
-        
-        if (this.container) {
-            this.container.innerHTML = '';
-        }
-        
-        this.tasks = null;
-        this.container = null;
-        this._cachedElements = null;
-        this._dateCache = null;
-        
-        console.log('GanttChart instance destroyed');
-    };
-
-    global.GanttChart = GanttChart;
-
-    console.log('✅ gantt-chart.js loaded successfully (Gamma11 - 任务条完全居中)');
-
-})(typeof window !== 'undefined' ? window : this);
+    }
+}

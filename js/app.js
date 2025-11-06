@@ -53,65 +53,83 @@
         }
     ];
 
-    // ## ==================== 创建甘特图实例 ====================
-    
-    const gantt = new GanttChart('#gantt', initialTasks, {
-        showTaskNames: true // ⭐ 默认显示任务名称栏
-    });
-    global.gantt = gantt;
+// ==================== 创建甘特图实例 ====================
+const gantt = new GanttChart('#gantt', initialTasks);
 
-    // ## ==================== 工具函数 ====================
-    
-    /**
-     * 防抖函数
-     * @param {Function} func - 要防抖的函数
-     * @param {number} wait - 等待时间（毫秒）
-     * @returns {Function} 防抖后的函数
-     */
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
+// ==================== 任务表单函数 ====================
+window.showTaskForm = function(task) {
+    const container = document.getElementById('taskFormContainer');
+    const availableTasks = gantt.tasks.filter(t => t.id !== task.id);
 
-    // ## ==================== 窗口大小监听（增强版）====================
-    
-    /**
-     * 监听窗口大小变化，动态调整甘特图高度
-     */
-    const handleResize = debounce(() => {
-        if (gantt && typeof gantt.updateHeight === 'function') {
-            gantt.updateHeight();
-        }
-    }, 100); // ⭐ 从150ms减少到100ms，更快响应
+    container.innerHTML = `
+        <div class="task-form">
+            <h6 class="mb-3">编辑任务</h6>
+            <div class="mb-2">
+                <label class="form-label">任务名称</label>
+                <input type="text" class="form-control form-control-sm" id="editName" value="${task.name}">
+            </div>
+            <div class="row">
+                <div class="col-6 mb-2">
+                    <label class="form-label">开始日期</label>
+                    <input type="date" class="form-control form-control-sm" id="editStart" value="${task.start}">
+                </div>
+                <div class="col-6 mb-2">
+                    <label class="form-label">结束日期</label>
+                    <input type="date" class="form-control form-control-sm" id="editEnd" value="${task.end}">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">完成进度: <strong id="progressVal">${task.progress}%</strong></label>
+                <input type="range" class="form-range" id="editProgress" value="${task.progress}" min="0" max="100" step="5">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">依赖任务（点击甘特图任务条选择）</label>
+                <div id="depList" class="dep-list border rounded p-2" style="max-height:120px;overflow-y:auto;">
+                    ${availableTasks.length > 0 ? availableTasks.map(t => `
+                        <div class="dep-item form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" value="${t.id}" id="dep_${t.id}"
+                                ${task.dependencies?.includes(t.id) ? 'checked' : ''}>
+                            <label class="form-check-label small" for="dep_${t.id}">${t.name}</label>
+                        </div>
+                    `).join('') : '<small class="text-muted">无其他任务</small>'}
+                </div>
+                <small class="text-muted">提示：点击甘特图任务条可快速切换依赖</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary btn-sm" id="saveTask">保存</button>
+                <button class="btn btn-secondary btn-sm" id="cancelEdit">取消</button>
+            </div>
+        </div>
+    `;
 
-    window.addEventListener('resize', handleResize, { passive: true });
+    const progressInput = document.getElementById('editProgress');
+    const progressVal = document.getElementById('progressVal');
+    progressInput.oninput = () => progressVal.textContent = progressInput.value + '%';
 
-    // ## ==================== 控制按钮事件 ====================
-    
-    // ▒▒ 添加任务
-    const addTaskBtn = document.getElementById('addTask');
-    if (addTaskBtn) {
-        addTaskBtn.onclick = () => {
-            const newTask = {
-                id: generateId(),
-                name: '新任务',
-                start: formatDate(today),
-                end: formatDate(addDays(today, 3)),
-                progress: 0,
-                dependencies: []
-            };
-            gantt.addTask(newTask);
-            gantt.selectTask(newTask.id);
-            addLog('✅ 已添加新任务');
-        };
-    }
+    document.getElementById('saveTask').onclick = () => {
+        const newName = document.getElementById('editName').value.trim();
+        if (!newName) { alert('任务名称不能为空'); return; }
+        task.name = newName;
+        task.start = document.getElementById('editStart').value;
+        task.end = document.getElementById('editEnd').value;
+        task.progress = parseInt(progressInput.value);
+        task.dependencies = Array.from(document.querySelectorAll('#depList input[type="checkbox"]:checked')).map(cb => cb.value);
+        gantt.calculateDateRange();
+        gantt.render();
+        addLog(`任务 "${task.name}" 已更新`);
+        container.innerHTML = '';
+    };
+
+    document.getElementById('cancelEdit').onclick = () => container.innerHTML = '';
+};
+
+// ==================== 控制按钮事件 ====================
+document.getElementById('addTask').onclick = () => {
+    const newTask = { id: generateId(), name: '新任务', start: formatDate(today), end: formatDate(addDays(today, 3)), progress: 0, dependencies: [] };
+    gantt.addTask(newTask);
+    gantt.selectTask(newTask.id);
+    addLog(`已添加新任务`);
+};
 
     // ▒▒ 删除任务
     const deleteTaskBtn = document.getElementById('deleteTask');
@@ -404,100 +422,35 @@
         };
     }
 
-    document.addEventListener('click', (e) => {
-        if (settingsPanel && settingsPanel.classList.contains('active') &&
-            !settingsPanel.contains(e.target) && 
-            !settingsTrigger.contains(e.target)) {
-            settingsPanel.classList.remove('active');
-        }
-    });
+document.addEventListener('click', (e) => {
+    if (settingsPanel.classList.contains('active') && !settingsPanel.contains(e.target) && !settingsTrigger.contains(e.target)) {
+        settingsPanel.classList.remove('active');
+    }
+});
 
-    // ▒▒ 日志面板开关（增强版 - 自动更新高度）
-    if (showLogPanelSwitch && logPanel) {
-        showLogPanelSwitch.checked = false;
+showLogPanelSwitch.onchange = () => {
+    if (showLogPanelSwitch.checked) {
+        logPanel.classList.remove('hidden');
+        addLog('日志面板已启用');
+    } else {
         logPanel.classList.add('hidden');
-
-        showLogPanelSwitch.onchange = () => {
-            if (showLogPanelSwitch.checked) {
-                logPanel.classList.remove('hidden');
-                addLog('✅ 日志面板已启用');
-            } else {
-                logPanel.classList.add('hidden');
-                addLog('✅ 日志面板已隐藏');
-            }
-            // ⭐ 关键：日志面板状态改变时立即更新高度
-            setTimeout(() => {
-                if (gantt && typeof gantt.updateHeight === 'function') {
-                    gantt.updateHeight();
-                }
-            }, 350); // 等待动画完成
-        };
+        addLog('日志面板已隐藏');
     }
+};
 
-    // ▒▒ 其他设置项
-    const enableEditSwitch = document.getElementById('enableEdit');
-    if (enableEditSwitch) {
-        enableEditSwitch.onchange = (e) => {
-            gantt.options.enableEdit = e.target.checked;
-            gantt.render();
-            addLog(e.target.checked ? '✅ 启用拖拽移动' : '❌ 禁用拖拽移动');
-        };
-    }
+if (!showLogPanelSwitch.checked) logPanel.classList.add('hidden');
 
-    const enableResizeSwitch = document.getElementById('enableResize');
-    if (enableResizeSwitch) {
-        enableResizeSwitch.onchange = (e) => {
-            gantt.options.enableResize = e.target.checked;
-            gantt.render();
-            addLog(e.target.checked ? '✅ 启用调整时长' : '❌ 禁用调整时长');
-        };
-    }
-
-    const showWeekendsSwitch = document.getElementById('showWeekends');
-    if (showWeekendsSwitch) {
-        showWeekendsSwitch.onchange = (e) => {
-            gantt.options.showWeekends = e.target.checked;
-            gantt.render();
-            addLog(e.target.checked ? '✅ 显示周末' : '❌ 隐藏周末');
-        };
-    }
-
-    const showDependenciesSwitch = document.getElementById('showDependencies');
-    if (showDependenciesSwitch) {
-        showDependenciesSwitch.onchange = (e) => {
-            gantt.options.showDependencies = e.target.checked;
-            gantt.render();
-            addLog(e.target.checked ? '✅ 显示依赖箭头' : '❌ 隐藏依赖箭头');
-        };
-    }
-
-    // ⭐ 任务名称栏开关
-    const showTaskNamesSwitch = document.getElementById('showTaskNames');
-    if (showTaskNamesSwitch) {
-        showTaskNamesSwitch.checked = true; // 默认显示
-        
-        showTaskNamesSwitch.onchange = (e) => {
-            gantt.toggleSidebar(e.target.checked);
-            gantt.render(); // 重新渲染以更新折叠状态
-        };
-    }
-
-    const cellWidthSlider = document.getElementById('cellWidth');
-    const cellWidthValue = document.getElementById('cellWidthValue');
-    if (cellWidthSlider && cellWidthValue) {
-        // ⭐ 设置滑块默认值为50px（压缩后的默认值）
-        cellWidthSlider.value = 50;
-        cellWidthSlider.min = 40; // ⭐ 最小值从40px保持
-        cellWidthSlider.max = 80; // ⭐ 最大值从100px降到80px
-        cellWidthValue.textContent = '50px';
-        
-        cellWidthSlider.oninput = (e) => {
-            const value = parseInt(e.target.value);
-            gantt.options.cellWidth = value;
-            cellWidthValue.textContent = `${value}px`;
-            gantt.render();
-        };
-    }
+// 其他设置项
+document.getElementById('enableEdit').onchange = (e) => { gantt.options.enableEdit = e.target.checked; gantt.render(); addLog(e.target.checked ? '启用拖拽移动' : '禁用拖拽移动'); };
+document.getElementById('enableResize').onchange = (e) => { gantt.options.enableResize = e.target.checked; gantt.render(); addLog(e.target.checked ? '启用调整时长' : '禁用调整时长'); };
+document.getElementById('showWeekends').onchange = (e) => { gantt.options.showWeekends = e.target.checked; gantt.render(); addLog(e.target.checked ? '显示周末' : '隐藏周末'); };
+document.getElementById('showDependencies').onchange = (e) => { gantt.options.showDependencies = e.target.checked; gantt.render(); addLog(e.target.checked ? '显示依赖箭头' : '隐藏依赖箭头'); };
+document.getElementById('cellWidth').oninput = (e) => {
+    const value = parseInt(e.target.value);
+    gantt.options.cellWidth = value;
+    document.getElementById('cellWidthValue').textContent = `${value}px`;
+    gantt.render();
+};
 
     // ▒▒ 日志面板折叠（增强版 - 自动更新高度）
     const logHeader = document.getElementById('logHeader');
@@ -525,14 +478,14 @@
     let toolbarHoverTimer = null;
     let toolbarLeaveTimer = null;
 
-    if (toolbarCollapsed && toolbarExpanded) {
-        toolbarCollapsed.addEventListener('mouseenter', () => {
-            clearTimeout(toolbarLeaveTimer);
-            toolbarHoverTimer = setTimeout(() => {
-                toolbarExpanded.classList.add('active');
-                addLog('✅ 工具栏已展开');
-            }, 150);
-        });
+// 鼠标进入折叠按钮
+toolbarCollapsed.addEventListener('mouseenter', () => {
+    clearTimeout(toolbarLeaveTimer);
+    toolbarHoverTimer = setTimeout(() => {
+        toolbarExpanded.classList.add('active');
+        addLog('工具栏已展开');
+    }, 150); // 150ms延迟，避免误触
+});
 
         toolbarCollapsed.addEventListener('mouseleave', () => {
             clearTimeout(toolbarHoverTimer);

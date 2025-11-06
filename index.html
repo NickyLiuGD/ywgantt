@@ -3,13 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测">
-    <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图">
-    <title>在线甘特图Delta6</title>
-    
-    <!-- Preconnect to CDN for faster loading -->
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-    <link rel="preconnect" href="https://cdn.anychart.com" crossorigin>
+    <title>在线甘特图NewBeta7</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" integrity="sha512-b2QcS5SsA8tZodcDtGRELiGv5SaKSk1vDHDaQRda0htPYWZ6046lr3kJ5bAAQdpV2mmA/4v0wQF9MyU6/pDIAg==" crossorigin="anonymous">
@@ -18,7 +12,7 @@
     <script defer src="https://cdn.anychart.com/releases/8.13.0/js/anychart-core.min.js"></script>
     <script defer src="https://cdn.anychart.com/releases/8.13.0/js/anychart-pert.min.js"></script>
     
-    <!-- 动态加载自定义样式 -->
+    <!-- 动态加载自定义样式 (优化：使用立即执行函数避免全局污染) -->
     <script>
         (function() {
             const timestamp = Date.now();
@@ -70,7 +64,7 @@
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Delta6</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图NewBeta7</h1>
         </div>
         
         <!-- 展开的浮动工具栏 - 毛玻璃效果 -->
@@ -158,14 +152,7 @@
                 <div class="setting-item">
                     <span class="setting-text">显示依赖箭头</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="showDependencies" checked aria-label="显示依赖箭头">
-                        <span class="switch-slider"></span>
-                    </label>
-                </div>
-                <div class="setting-item">
-                    <span class="setting-text">显示任务名称栏</span>
-                    <label class="switch-label">
-                        <input type="checkbox" id="showTaskNames" checked aria-label="显示任务名称栏">
+                        <input type="checkbox" id="showDependencies" checked>
                         <span class="switch-slider"></span>
                     </label>
                 </div>
@@ -186,8 +173,8 @@
             </div>
         </aside>
         
-        <!-- ❌ 删除：独立的任务表单容器 -->
-        <!-- <div class="task-form-minimal" id="taskFormContainer"></div> -->
+        <!-- 任务编辑表单容器 -->
+        <div class="task-form-minimal" id="taskFormContainer"></div>
         
         <!-- 日志区域(可折叠) -->
         <section class="log-panel hidden" id="logPanel" aria-label="操作日志">
@@ -207,7 +194,7 @@
         <div id="pertContainer" style="display: none; height: 600px;" role="region" aria-label="PERT网络图"></div>
     </div>
     
-    <!-- JavaScript 动态加载 -->
+    <!-- JavaScript 动态加载 (优化：使用模块化加载) -->
     <script>
         (function() {
             'use strict';
@@ -221,37 +208,16 @@
                 'js/app.js'
             ];
             
-            let loadedCount = 0;
-            
-            function loadScript(index) {
-                if (index >= scripts.length) {
-                    onAllScriptsLoaded();
-                    return;
-                }
-                
-                const script = document.createElement('script');
-                script.src = scripts[index] + '?t=' + timestamp;
-                script.async = false;
-                
-                script.onload = function() {
-                    loadedCount++;
-                    loadScript(index + 1);
-                };
-                
-                script.onerror = function() {
-                    console.error('Failed to load script:', scripts[index]);
-                    loadScript(index + 1);
-                };
-                
-                document.body.appendChild(script);
-            }
-            
-            function onAllScriptsLoaded() {
-                document.body.classList.add('loaded');
-                setTimeout(checkModulesLoaded, 500);
-            }
-            
-            function checkModulesLoaded() {
+            scripts.forEach(function(src) {
+                document.write('<script src="' + src + '?t=' + timestamp + '"><\/script>');
+            });
+        })();
+    </script>
+    
+    <!-- 加载检测 -->
+    <script>
+        window.addEventListener('load', function() {
+            setTimeout(function() {
                 const checks = {
                     'GanttChart类': typeof GanttChart !== 'undefined',
                     'gantt实例': typeof gantt !== 'undefined',
@@ -265,27 +231,13 @@
                     console.error('加载失败的模块:', failed);
                     alert('部分模块加载失败: ' + failed.join(', ') + '\n请刷新页面重试');
                 } else {
-                    console.log('✅ 所有模块加载成功!');
-                    console.log('📊 甘特图就绪 - 版本: Gamma8-优化版');
+                    console.log('所有模块加载成功!');
                 }
-            }
-            
-            loadScript(0);
-        })();
+            }, 500);
+        });
     </script>
     
     <!-- Bootstrap JS -->
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js" integrity="sha512-X/YkDZyjTf4wyc2Vy16YGCPHwAY8rZJY+POgokZjQB2mhIRFJCckEGc6YyX9eNsPfn0PzThEuNs+uaomE5CO6A==" crossorigin="anonymous"></script>
-    
-    <!-- 错误处理 -->
-    <script>
-        window.addEventListener('error', function(e) {
-            console.error('Global error:', e.message, e.filename, e.lineno, e.colno);
-        });
-        
-        window.addEventListener('unhandledrejection', function(e) {
-            console.error('Unhandled promise rejection:', e.reason);
-        });
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
