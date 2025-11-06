@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 时间轴缩放工具模块                                              ▓▓
 // ▓▓ 路径: js/utils/time-scale-utils.js                             ▓▓
-// ▓▓ 版本: Delta6 - 修复周/月视图任务条位置计算                     ▓▓
+// ▓▓ 版本: Delta8 - 添加全貌视图计算函数                            ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -13,7 +13,8 @@
     const TimeScale = {
         DAY: 'day',
         WEEK: 'week',
-        MONTH: 'month'
+        MONTH: 'month',
+        OVERVIEW: 'overview' // ⭐ 新增
     };
 
     /**
@@ -202,7 +203,7 @@
     }
 
     /**
-     * 计算任务在指定刻度下的位置和宽度（修复版）
+     * 计算任务在指定刻度下的位置和宽度
      * @param {Object} task - 任务对象
      * @param {Date} timelineStart - 时间轴开始日期
      * @param {string} scale - 时间刻度
@@ -213,17 +214,11 @@
         const taskStart = new Date(task.start);
         const taskEnd = new Date(task.end);
         
-        // ⭐ 关键：所有刻度下都按天数计算像素位置
-        // cellWidth 在不同刻度下代表"每天的像素宽度"
-        
-        // 计算任务开始日期距离时间轴起点的天数
         const startDays = daysBetween(timelineStart, taskStart);
-        // 计算任务的工期（天数）
         const durationDays = daysBetween(taskStart, taskEnd) + 1;
         
-        // ⭐ 位置 = 天数 × 每天宽度
         const left = startDays * cellWidth;
-        const width = Math.max(durationDays * cellWidth, 30); // 最小宽度30px
+        const width = Math.max(durationDays * cellWidth, 30);
         
         return { left, width };
     }
@@ -237,10 +232,64 @@
     function calculateTotalWidth(dates, cellWidth) {
         if (!dates || dates.length === 0) return 0;
         
-        // 计算总天数
         const totalDays = dates.reduce((sum, dateObj) => sum + dateObj.span, 0);
         
         return totalDays * cellWidth;
+    }
+
+    /**
+     * ⭐ 计算项目全貌视图的最优参数
+     * @param {Array} tasks - 任务数组
+     * @param {number} containerWidth - 容器宽度
+     * @returns {Object} {scale, cellWidth, startDate, endDate, projectDays, availableWidth}
+     */
+    function calculateOverviewParams(tasks, containerWidth) {
+        if (!tasks || tasks.length === 0) {
+            return null;
+        }
+
+        // 计算项目日期范围
+        let minDate = new Date(tasks[0].start);
+        let maxDate = new Date(tasks[0].end);
+        
+        tasks.forEach(task => {
+            const start = new Date(task.start);
+            const end = new Date(task.end);
+            if (start < minDate) minDate = start;
+            if (end > maxDate) maxDate = end;
+        });
+        
+        const projectDays = daysBetween(minDate, maxDate) + 1;
+        
+        // 预留空间
+        const leftLabelSpace = 120;
+        const rightLabelSpace = 150;
+        const scrollbarSpace = 20;
+        const reservedSpace = leftLabelSpace + rightLabelSpace + scrollbarSpace;
+        const availableWidth = containerWidth - reservedSpace;
+        
+        // 计算最优 cellWidth
+        let cellWidth = Math.floor(availableWidth / projectDays);
+        cellWidth = Math.max(2, Math.min(cellWidth, 50));
+        
+        // 选择时间刻度
+        let scale = TimeScale.WEEK;
+        if (cellWidth >= 30) {
+            scale = TimeScale.DAY;
+        } else if (cellWidth <= 3) {
+            scale = TimeScale.MONTH;
+        }
+        
+        return {
+            scale: scale,
+            cellWidth: cellWidth,
+            startDate: minDate,
+            endDate: maxDate,
+            projectDays: projectDays,
+            availableWidth: availableWidth,
+            containerWidth: containerWidth,
+            reservedSpace: reservedSpace
+        };
     }
 
     // 导出到全局
@@ -256,7 +305,8 @@
     global.getRecommendedCellWidth = getRecommendedCellWidth;
     global.calculateTaskPosition = calculateTaskPosition;
     global.calculateTotalWidth = calculateTotalWidth;
+    global.calculateOverviewParams = calculateOverviewParams; // ⭐ 新增
 
-    console.log('✅ time-scale-utils.js loaded successfully (Delta6 - 修复版)');
+    console.log('✅ time-scale-utils.js loaded successfully (Delta8 - 全貌视图计算)');
 
 })(typeof window !== 'undefined' ? window : this);

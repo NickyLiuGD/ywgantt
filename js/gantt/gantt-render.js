@@ -1,14 +1,14 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Delta7 - 添加时间轴视图切换菜单                          ▓▓
+// ▓▓ 版本: Delta8 - 添加项目全貌视图按钮                            ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
     'use strict';
 
     /**
-     * 渲染甘特图（完整版 + 时间轴菜单）
+     * 渲染甘特图（完整版 + 全貌视图）
      */
     GanttChart.prototype.render = function() {
         if (!this.container) {
@@ -43,20 +43,30 @@
                             <!-- ⭐ 时间轴视图切换菜单 -->
                             <div class="timeline-view-menu" id="timelineViewMenu">
                                 <div class="view-menu-title">时间刻度</div>
-                                <button class="view-menu-btn ${this.options.timeScale === 'day' ? 'active' : ''}" 
+                                <button class="view-menu-btn ${this.options.timeScale === 'day' && !this.options.isOverviewMode ? 'active' : ''}" 
                                         data-scale="day" title="按天显示">
                                     <span class="view-icon">📅</span>
                                     <span class="view-text">日视图</span>
                                 </button>
-                                <button class="view-menu-btn ${this.options.timeScale === 'week' ? 'active' : ''}" 
+                                <button class="view-menu-btn ${this.options.timeScale === 'week' && !this.options.isOverviewMode ? 'active' : ''}" 
                                         data-scale="week" title="按周显示">
                                     <span class="view-icon">📆</span>
                                     <span class="view-text">周视图</span>
                                 </button>
-                                <button class="view-menu-btn ${this.options.timeScale === 'month' ? 'active' : ''}" 
+                                <button class="view-menu-btn ${this.options.timeScale === 'month' && !this.options.isOverviewMode ? 'active' : ''}" 
                                         data-scale="month" title="按月显示">
                                     <span class="view-icon">🗓️</span>
                                     <span class="view-text">月视图</span>
+                                </button>
+                                
+                                <!-- ⭐ 分隔线 -->
+                                <div class="view-menu-divider"></div>
+                                
+                                <!-- ⭐ 新增：项目全貌视图 -->
+                                <button class="view-menu-btn view-menu-overview ${this.options.isOverviewMode ? 'active' : ''}" 
+                                        data-scale="overview" title="自适应显示整个项目">
+                                    <span class="view-icon">🔭</span>
+                                    <span class="view-text">全貌视图</span>
                                 </button>
                             </div>
                         </div>
@@ -86,7 +96,7 @@
         this.attachEvents();
         this.attachQuickMenus();
         
-        // ⭐ 延迟绑定时间轴菜单事件，确保 DOM 已完全生成
+        // 延迟绑定时间轴菜单事件，确保 DOM 已完全生成
         setTimeout(() => {
             this.attachTimelineViewMenu();
         }, 100);
@@ -202,7 +212,7 @@
         const left = startDays * this.options.cellWidth;
         const width = Math.max(durationDays * this.options.cellWidth, 30);
 
-        // ⭐ 统一使用完整日期格式
+        // 统一使用完整日期格式
         const startTimeLabel = formatDate(start);
         const endTimeLabel = formatDate(end);
 
@@ -210,7 +220,7 @@
             <div class="gantt-row" role="row" aria-label="任务行: ${this.escapeHtml(task.name)}">
                 ${this.renderCells(dates)}
                 
-                <!-- ⭐ 左侧双层时间标签 -->
+                <!-- 左侧双层时间标签 -->
                 <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
                      data-task-id="${task.id}"
                      style="right: calc(100% - ${left}px + 8px);"
@@ -318,7 +328,7 @@
     };
 
     /**
-     * 绑定时间轴视图切换菜单事件（修复版）
+     * 绑定时间轴视图切换菜单事件（支持全貌视图）
      */
     GanttChart.prototype.attachTimelineViewMenu = function() {
         const headerWrapper = document.getElementById('ganttTimelineHeaderWrapper');
@@ -326,29 +336,25 @@
         
         if (!headerWrapper || !viewMenu) {
             console.warn('Timeline view menu elements not found');
-            console.log('headerWrapper:', headerWrapper);
-            console.log('viewMenu:', viewMenu);
             return;
         }
 
         let menuTimer = null;
 
-        // ⭐ 鼠标进入时间轴表头区域：显示菜单
+        // 鼠标进入时间轴表头区域：显示菜单
         headerWrapper.addEventListener('mouseenter', (e) => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
                 viewMenu.classList.add('show');
-                console.log('✅ 菜单显示');
             }, 300);
         });
 
-        // ⭐ 鼠标离开时间轴表头区域：延迟隐藏菜单
+        // 鼠标离开时间轴表头区域：延迟隐藏菜单
         headerWrapper.addEventListener('mouseleave', (e) => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
                 if (!viewMenu.matches(':hover')) {
                     viewMenu.classList.remove('show');
-                    console.log('✅ 菜单隐藏');
                 }
             }, 200);
         });
@@ -362,7 +368,6 @@
         viewMenu.addEventListener('mouseleave', () => {
             menuTimer = setTimeout(() => {
                 viewMenu.classList.remove('show');
-                console.log('✅ 菜单隐藏');
             }, 200);
         });
 
@@ -372,21 +377,29 @@
                 e.stopPropagation();
                 const scale = btn.dataset.scale;
                 
-                // 切换视图
-                this.options.timeScale = scale;
-                this.options.cellWidth = getRecommendedCellWidth(scale);
-                this.calculateDateRange();
-                this.render();
+                // ⭐ 判断是否为全貌视图
+                if (scale === 'overview') {
+                    this.switchToOverviewMode();
+                } else {
+                    // 普通视图切换
+                    this.options.isOverviewMode = false;
+                    this.options.timeScale = scale;
+                    this.options.cellWidth = getRecommendedCellWidth(scale);
+                    this.calculateDateRange();
+                    this.render();
+                    
+                    const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
+                    addLog(`✅ 已切换到${scaleNames[scale]}视图`);
+                }
                 
-                // 记录日志
-                const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
-                addLog(`✅ 已切换到${scaleNames[scale]}视图`);
+                // 隐藏菜单
+                viewMenu.classList.remove('show');
             };
         });
 
-        console.log('✅ 时间轴视图菜单事件已绑定');
+        console.log('✅ 时间轴视图菜单事件已绑定（支持全貌视图）');
     };
 
-    console.log('✅ gantt-render.js loaded successfully (Delta7 - 时间轴菜单修复版)');
+    console.log('✅ gantt-render.js loaded successfully (Delta8 - 全貌视图)');
 
 })();

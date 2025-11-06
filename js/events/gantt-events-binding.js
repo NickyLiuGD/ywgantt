@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图事件绑定模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-binding.js                        ▓▓
-// ▓▓ 版本: Delta7 - 完整版（包含所有事件处理 + 双层时间标签）       ▓▓
+// ▓▓ 版本: Delta8 - 完整版（包含所有事件处理 + 双层时间标签）       ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -228,7 +228,7 @@
             const newName = input.value.trim();
             if (newName && newName !== originalName) {
                 task.name = newName;
-                addLog(`任务名称从 "${originalName}" 改为 "${newName}"`);
+                addLog(`✏️ 任务名称从 "${originalName}" 改为 "${newName}"`);
             }
             
             // 恢复显示
@@ -261,6 +261,6 @@
         input.onclick = (e) => e.stopPropagation();
     };
 
-    console.log('✅ gantt-events-binding.js loaded successfully (Delta7 - 完整版)');
+    console.log('✅ gantt-events-binding.js loaded successfully (Delta8 - 完整版)');
 
 })();

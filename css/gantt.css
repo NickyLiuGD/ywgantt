@@ -1,7 +1,7 @@
 /**
  * 甘特图核心样式文件
  * 路径: css/gantt.css
- * 版本: Delta7 - 完整版（包含时间轴菜单和双层时间标签）
+ * 版本: Delta8 - 完整版（包含时间轴菜单、双层时间标签、全貌视图）
  * 包含: 甘特图容器、侧边栏、时间轴、任务条、依赖箭头、时间标签、视图菜单
  */
 
@@ -830,6 +830,64 @@
     -webkit-backdrop-filter: blur(20px);
 }
 
+/* ⭐ 菜单分隔线 */
+.view-menu-divider {
+    height: 1px;
+    background: linear-gradient(to right, 
+        transparent, 
+        var(--gray-300) 20%, 
+        var(--gray-300) 80%, 
+        transparent);
+    margin: 8px 0;
+}
+
+/* ⭐ 全貌视图按钮特殊样式 */
+.view-menu-overview {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%);
+    border: 1px dashed rgba(16, 185, 129, 0.3) !important;
+}
+
+.view-menu-overview:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%);
+    border-color: rgba(16, 185, 129, 0.5) !important;
+}
+
+.view-menu-overview.active {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 182, 212, 0.25) 100%);
+    border: 2px solid rgba(16, 185, 129, 0.6) !important;
+}
+
+.view-menu-overview .view-icon {
+    color: var(--success-color);
+}
+
+.view-menu-overview .view-text {
+    color: var(--success-color);
+    font-weight: 600;
+}
+
+.view-menu-overview:hover .view-icon {
+    animation: overviewPulse 1s ease-in-out infinite;
+}
+
+.view-menu-overview.active .view-icon {
+    animation: overviewPulse 1s ease-in-out infinite;
+}
+
+@keyframes overviewPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+/* 全貌视图激活状态的勾选标记 */
+.view-menu-overview.active::after {
+    color: var(--success-color) !important;
+}
+
 /* ======================
    响应式设计
    ====================== */
@@ -953,6 +1011,10 @@
     .view-menu-btn.active {
         border: 2px solid var(--primary-color);
     }
+    
+    .view-menu-overview {
+        border: 2px dashed var(--success-color) !important;
+    }
 }
 
 /* ======================
@@ -984,5 +1046,18 @@
     
     .view-menu-btn.active {
         background: linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%);
+    }
+    
+    .view-menu-overview {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+        border-color: rgba(16, 185, 129, 0.4) !important;
+    }
+    
+    .view-menu-overview:hover {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(6, 182, 212, 0.2) 100%);
+    }
+    
+    .view-menu-overview.active {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(6, 182, 212, 0.3) 100%);
     }
 }

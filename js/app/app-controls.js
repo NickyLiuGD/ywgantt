@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 应用控制按钮模块                                                ▓▓
 // ▓▓ 路径: js/app/app-controls.js                                   ▓▓
-// ▓▓ 版本: Delta6 - 添加时间刻度切换                                ▓▓
+// ▓▓ 版本: Delta8 - 添加全貌视图按钮                                ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -114,6 +114,7 @@
 
     if (timeScaleDayBtn) {
         timeScaleDayBtn.onclick = () => {
+            gantt.options.isOverviewMode = false;
             gantt.options.timeScale = 'day';
             gantt.options.cellWidth = getRecommendedCellWidth('day');
             gantt.calculateDateRange();
@@ -125,6 +126,7 @@
 
     if (timeScaleWeekBtn) {
         timeScaleWeekBtn.onclick = () => {
+            gantt.options.isOverviewMode = false;
             gantt.options.timeScale = 'week';
             gantt.options.cellWidth = getRecommendedCellWidth('week');
             gantt.calculateDateRange();
@@ -136,6 +138,7 @@
 
     if (timeScaleMonthBtn) {
         timeScaleMonthBtn.onclick = () => {
+            gantt.options.isOverviewMode = false;
             gantt.options.timeScale = 'month';
             gantt.options.cellWidth = getRecommendedCellWidth('month');
             gantt.calculateDateRange();
@@ -210,6 +213,6 @@
         });
     }
 
-    console.log('✅ app-controls.js loaded successfully (Delta6 - 时间刻度切换)');
+    console.log('✅ app-controls.js loaded successfully (Delta8 - 全貌视图)');
 
 })();
