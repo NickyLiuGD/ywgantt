@@ -332,38 +332,38 @@
 
         let menuTimer = null;
 
-        // 鼠标进入时间轴表头：显示菜单
+        // ⭐ 鼠标进入时间轴表头：显示菜单
         timelineHeader.addEventListener('mouseenter', (e) => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
-                viewMenu.style.display = 'flex';
+                viewMenu.style.display = 'flex';  // ▌ 先设置为 flex
                 requestAnimationFrame(() => {
-                    viewMenu.classList.add('show');
+                    viewMenu.classList.add('show');  // ▌ 下一帧添加 show 类触发动画
                 });
-            }, 300); // 300ms 延迟，避免误触发
+            }, 300);
         });
 
-        // 鼠标离开时间轴表头：延迟隐藏菜单
+        // ⭐ 鼠标离开时间轴表头：延迟隐藏菜单
         timelineHeader.addEventListener('mouseleave', (e) => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
-                if (!viewMenu.matches(':hover')) {
-                    viewMenu.classList.remove('show');
+                if (!viewMenu.matches(':hover')) {  // ▌ 检查鼠标是否在菜单上
+                    viewMenu.classList.remove('show');  // ▌ 移除 show 类触发淡出
                     setTimeout(() => {
-                        if (!viewMenu.classList.contains('show')) {
-                            viewMenu.style.display = 'none';
+                        if (!viewMenu.classList.contains('show')) {  // ▌ 确认没有重新显示
+                            viewMenu.style.display = 'none';  // ▌ 隐藏元素
                         }
-                    }, 200);
+                    }, 200);  // ▌ 等待 CSS 过渡完成
                 }
             }, 200);
         });
 
-        // 鼠标进入菜单：保持显示
+        // ⭐ 鼠标进入菜单：保持显示
         viewMenu.addEventListener('mouseenter', () => {
             clearTimeout(menuTimer);
         });
 
-        // 鼠标离开菜单：隐藏
+        // ⭐ 鼠标离开菜单：隐藏
         viewMenu.addEventListener('mouseleave', () => {
             menuTimer = setTimeout(() => {
                 viewMenu.classList.remove('show');
@@ -373,7 +373,7 @@
             }, 200);
         });
 
-        // 菜单按钮点击事件
+        // ⭐ 菜单按钮点击事件
         viewMenu.querySelectorAll('.view-menu-btn').forEach(btn => {
             btn.onclick = (e) => {
                 e.stopPropagation();
@@ -389,7 +389,7 @@
                 const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
                 addLog(`✅ 已切换到${scaleNames[scale]}视图`);
                 
-                // 隐藏菜单
+                // ⭐ 隐藏菜单
                 viewMenu.classList.remove('show');
                 setTimeout(() => {
                     viewMenu.style.display = 'none';
@@ -397,5 +397,6 @@
             };
         });
     };
+
 
 })();
