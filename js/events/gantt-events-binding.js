@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图事件绑定模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-binding.js                        ▓▓
-// ▓▓ 版本: Delta6 - 完整版（包含所有事件处理）                      ▓▓
+// ▓▓ 版本: Delta7 - 完整版（包含所有事件处理 + 双层时间标签）       ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -57,6 +57,63 @@
             };
         });
 
+        // ==================== 左侧双层时间标签事件 ====================
+        this.container.querySelectorAll('.gantt-bar-label-start').forEach(label => {
+            // 单击：选中任务并打开编辑表单
+            label.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const taskId = label.dataset.taskId;
+                const task = this.tasks.find(t => t.id === taskId);
+                if (!task) return;
+
+                this.selectTask(taskId);
+                this.showInlineTaskForm(task);
+            };
+
+            // 双击：快速修改开始或结束日期
+            label.ondblclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const taskId = label.dataset.taskId;
+                const task = this.tasks.find(t => t.id === taskId);
+                if (!task) return;
+                
+                // 判断点击的是上层还是下层
+                const clickedElement = e.target;
+                const isStartTime = clickedElement.classList.contains('time-start');
+                
+                if (isStartTime) {
+                    // 修改开始日期
+                    const newDate = prompt('修改开始日期 (YYYY-MM-DD):', task.start);
+                    if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+                        const duration = daysBetween(task.start, task.end);
+                        task.start = newDate;
+                        task.end = formatDate(addDays(new Date(newDate), duration));
+                        this.calculateDateRange();
+                        this.render();
+                        addLog(`✅ 已修改任务"${task.name}"的开始日期为 ${newDate}`);
+                    }
+                } else {
+                    // 修改结束日期
+                    const newDate = prompt('修改结束日期 (YYYY-MM-DD):', task.end);
+                    if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+                        const newEndDate = new Date(newDate);
+                        const startDate = new Date(task.start);
+                        if (newEndDate >= startDate) {
+                            task.end = newDate;
+                            this.calculateDateRange();
+                            this.render();
+                            addLog(`✅ 已修改任务"${task.name}"的结束日期为 ${newDate}`);
+                        } else {
+                            alert('结束日期不能早于开始日期！');
+                        }
+                    }
+                }
+            };
+        });
+
         // ==================== 甘特图任务条事件 ====================
         this.container.querySelectorAll('.gantt-bar').forEach(bar => {
             const taskId = bar.dataset.taskId;
@@ -80,64 +137,6 @@
                     return;
                 }
             };
-
-            // ==================== 左侧双层时间标签事件 ====================
-            this.container.querySelectorAll('.gantt-bar-label-start').forEach(label => {
-                // 单击：选中任务并打开编辑表单
-                label.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const taskId = label.dataset.taskId;
-                    const task = this.tasks.find(t => t.id === taskId);
-                    if (!task) return;
-
-                    this.selectTask(taskId);
-                    this.showInlineTaskForm(task);
-                };
-
-                // 双击：快速修改开始或结束日期
-                label.ondblclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const taskId = label.dataset.taskId;
-                    const task = this.tasks.find(t => t.id === taskId);
-                    if (!task) return;
-                    
-                    // 判断点击的是上层还是下层
-                    const clickedElement = e.target;
-                    const isStartTime = clickedElement.classList.contains('time-start');
-                    
-                    if (isStartTime) {
-                        // 修改开始日期
-                        const newDate = prompt('修改开始日期 (YYYY-MM-DD):', task.start);
-                        if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-                            const duration = daysBetween(task.start, task.end);
-                            task.start = newDate;
-                            task.end = formatDate(addDays(new Date(newDate), duration));
-                            this.calculateDateRange();
-                            this.render();
-                            addLog(`✅ 已修改任务"${task.name}"的开始日期为 ${newDate}`);
-                        }
-                    } else {
-                        // 修改结束日期
-                        const newDate = prompt('修改结束日期 (YYYY-MM-DD):', task.end);
-                        if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-                            const newEndDate = new Date(newDate);
-                            const startDate = new Date(task.start);
-                            if (newEndDate >= startDate) {
-                                task.end = newDate;
-                                this.calculateDateRange();
-                                this.render();
-                                addLog(`✅ 已修改任务"${task.name}"的结束日期为 ${newDate}`);
-                            } else {
-                                alert('结束日期不能早于开始日期！');
-                            }
-                        }
-                    }
-                };
-            });
-
 
             // 鼠标按下：开始拖拽或调整大小
             bar.onmousedown = (e) => {
@@ -174,7 +173,7 @@
         if (timelineWrapper) {
             timelineWrapper.addEventListener('click', (e) => {
                 // 如果点击的不是任务条、手柄、表单或标签，则取消选择
-                if (!e.target.closest('.gantt-bar, .gantt-bar-handle, .inline-task-form, .gantt-bar-label-external')) {
+                if (!e.target.closest('.gantt-bar, .gantt-bar-handle, .inline-task-form, .gantt-bar-label-external, .gantt-bar-label-start')) {
                     this.deselect();
                 }
             });
@@ -262,6 +261,6 @@
         input.onclick = (e) => e.stopPropagation();
     };
 
-    console.log('✅ gantt-events-binding.js loaded successfully (Delta6 - 完整版)');
+    console.log('✅ gantt-events-binding.js loaded successfully (Delta7 - 完整版)');
 
 })();

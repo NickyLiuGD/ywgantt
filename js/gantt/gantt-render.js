@@ -1,14 +1,14 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Delta6 - 修复周/月视图任务条位置                         ▓▓
+// ▓▓ 版本: Delta7 - 添加时间轴视图切换菜单                          ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
     'use strict';
 
     /**
-     * 渲染甘特图（添加时间轴菜单版）
+     * 渲染甘特图（完整版 + 时间轴菜单）
      */
     GanttChart.prototype.render = function() {
         if (!this.container) {
@@ -35,11 +35,13 @@
                 </div>
                 <div class="gantt-timeline-wrapper">
                     <div class="gantt-timeline">
-                        <div class="gantt-timeline-header" id="ganttTimelineHeader">
-                            ${this.renderDateHeaders(dates, weekdays)}
+                        <div class="gantt-timeline-header-wrapper" id="ganttTimelineHeaderWrapper">
+                            <div class="gantt-timeline-header" id="ganttTimelineHeader">
+                                ${this.renderDateHeaders(dates, weekdays)}
+                            </div>
                             
                             <!-- ⭐ 时间轴视图切换菜单 -->
-                            <div class="timeline-view-menu" id="timelineViewMenu" style="display: none;">
+                            <div class="timeline-view-menu" id="timelineViewMenu">
                                 <div class="view-menu-title">时间刻度</div>
                                 <button class="view-menu-btn ${this.options.timeScale === 'day' ? 'active' : ''}" 
                                         data-scale="day" title="按天显示">
@@ -83,7 +85,11 @@
         this.renderDependencies(dates);
         this.attachEvents();
         this.attachQuickMenus();
-        this.attachTimelineViewMenu(); // ⭐ 绑定时间轴菜单事件
+        
+        // ⭐ 延迟绑定时间轴菜单事件，确保 DOM 已完全生成
+        setTimeout(() => {
+            this.attachTimelineViewMenu();
+        }, 100);
 
         this.updateHeight();
     };
@@ -122,11 +128,8 @@
             if (isWeekendDay) classes.push('weekend');
             if (isTodayDay) classes.push('today');
             
-            // ⭐ 关键修复：根据时间刻度计算单元格宽度
-            // cellWidth 是"每天的宽度"，span 是"天数"
             const cellWidth = this.options.cellWidth * dateObj.span;
             
-            // 根据时间刻度显示不同内容
             let content = '';
             switch (scale) {
                 case 'day':
@@ -173,9 +176,9 @@
     GanttChart.prototype.renderTaskRows = function(dates) {
         return this.tasks.map(task => this.renderRow(task, dates)).join('');
     };
-    
+
     /**
-     * 渲染单个任务行（统一日期格式版）
+     * 渲染单个任务行（统一日期格式 + 双层时间标签）
      * @param {Object} task - 任务对象
      * @param {Array<Object>} dates - 日期对象数组
      * @returns {string} HTML字符串
@@ -193,16 +196,15 @@
         const progress = Math.min(Math.max(task.progress || 0, 0), 100);
         const isSelected = this.selectedTask === task.id;
         
-        // ⭐ 统一使用天数计算位置
         const startDays = daysBetween(this.startDate, start);
         const durationDays = daysBetween(start, end) + 1;
         
         const left = startDays * this.options.cellWidth;
         const width = Math.max(durationDays * this.options.cellWidth, 30);
 
-        // ⭐ 统一使用完整日期格式（所有时间刻度都一致）
-        const startTimeLabel = formatDate(start); // 2025-01-10
-        const endTimeLabel = formatDate(end);     // 2025-01-15
+        // ⭐ 统一使用完整日期格式
+        const startTimeLabel = formatDate(start);
+        const endTimeLabel = formatDate(end);
 
         return `
             <div class="gantt-row" role="row" aria-label="任务行: ${this.escapeHtml(task.name)}">
@@ -210,11 +212,11 @@
                 
                 <!-- ⭐ 左侧双层时间标签 -->
                 <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
-                    data-task-id="${task.id}"
-                    style="right: calc(100% - ${left}px + 8px);"
-                    role="button"
-                    tabindex="0"
-                    aria-label="时间范围: ${startTimeLabel} 至 ${endTimeLabel}">
+                     data-task-id="${task.id}"
+                     style="right: calc(100% - ${left}px + 8px);"
+                     role="button"
+                     tabindex="0"
+                     aria-label="时间范围: ${startTimeLabel} 至 ${endTimeLabel}">
                     <div class="time-label-row time-start" title="开始时间">
                         ${this.escapeHtml(startTimeLabel)}
                     </div>
@@ -225,11 +227,11 @@
                 
                 <!-- 任务条 -->
                 <div class="gantt-bar ${isSelected ? 'selected' : ''}" 
-                    data-task-id="${task.id}"
-                    style="left: ${left}px; width: ${width}px;"
-                    role="button"
-                    tabindex="0"
-                    aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
+                     data-task-id="${task.id}"
+                     style="left: ${left}px; width: ${width}px;"
+                     role="button"
+                     tabindex="0"
+                     aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
                     <div class="gantt-bar-progress" style="width: ${progress}%" aria-hidden="true"></div>
                     ${this.options.enableResize ? '<div class="gantt-bar-handle left" role="button" aria-label="调整开始日期"></div>' : ''}
                     ${this.options.enableResize ? '<div class="gantt-bar-handle right" role="button" aria-label="调整结束日期"></div>' : ''}
@@ -237,11 +239,11 @@
                 
                 <!-- 右侧任务名称标签 -->
                 <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
-                    data-task-id="${task.id}"
-                    style="left: ${left + width + 8}px;"
-                    role="button"
-                    tabindex="0"
-                    aria-label="任务标签: ${this.escapeHtml(task.name)}">
+                     data-task-id="${task.id}"
+                     style="left: ${left + width + 8}px;"
+                     role="button"
+                     tabindex="0"
+                     aria-label="任务标签: ${this.escapeHtml(task.name)}">
                     ${this.escapeHtml(task.name)} (${progress}%)
                 </div>
             </div>
@@ -249,7 +251,7 @@
     };
 
     /**
-     * 渲染单元格（修复版 - 正确计算单元格宽度）
+     * 渲染单元格
      * @param {Array<Object>} dates - 日期对象数组
      * @returns {string} HTML字符串
      */
@@ -265,7 +267,6 @@
             if (isWeekendDay) classes.push('weekend');
             if (isTodayDay) classes.push('today');
             
-            // ⭐ 关键修复：单元格宽度 = 每天宽度 × 天数
             const cellWidth = this.options.cellWidth * dateObj.span;
             
             return `
@@ -316,81 +317,56 @@
         }, { passive: true });
     };
 
-    console.log('✅ gantt-render.js loaded successfully (Delta6 - 修复周/月视图)');
-
     /**
-     * 绑定时间轴视图切换菜单事件
+     * 绑定时间轴视图切换菜单事件（修复版）
      */
     GanttChart.prototype.attachTimelineViewMenu = function() {
-        const timelineHeader = document.getElementById('ganttTimelineHeader');
+        const headerWrapper = document.getElementById('ganttTimelineHeaderWrapper');
         const viewMenu = document.getElementById('timelineViewMenu');
         
-        if (!timelineHeader || !viewMenu) {
+        if (!headerWrapper || !viewMenu) {
             console.warn('Timeline view menu elements not found');
+            console.log('headerWrapper:', headerWrapper);
+            console.log('viewMenu:', viewMenu);
             return;
         }
 
         let menuTimer = null;
 
-        // ⭐ 移除旧的事件监听器（防止重复绑定）
-        const showMenu = () => {
+        // ⭐ 鼠标进入时间轴表头区域：显示菜单
+        headerWrapper.addEventListener('mouseenter', (e) => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
-                viewMenu.style.display = 'flex';
-                // ⭐ 使用 requestAnimationFrame 确保 display 生效后再添加 show 类
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        viewMenu.classList.add('show');
-                    });
-                });
+                viewMenu.classList.add('show');
+                console.log('✅ 菜单显示');
             }, 300);
-        };
+        });
 
-        const hideMenu = () => {
+        // ⭐ 鼠标离开时间轴表头区域：延迟隐藏菜单
+        headerWrapper.addEventListener('mouseleave', (e) => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
                 if (!viewMenu.matches(':hover')) {
                     viewMenu.classList.remove('show');
-                    setTimeout(() => {
-                        if (!viewMenu.classList.contains('show')) {
-                            viewMenu.style.display = 'none';
-                        }
-                    }, 200);
+                    console.log('✅ 菜单隐藏');
                 }
             }, 200);
-        };
+        });
 
-        // ⭐ 使用命名函数便于移除旧监听器
-        timelineHeader._menuShowHandler = showMenu;
-        timelineHeader._menuHideHandler = hideMenu;
-
-        // 移除旧监听器（如果存在）
-        if (timelineHeader._menuShowHandler) {
-            timelineHeader.removeEventListener('mouseenter', timelineHeader._menuShowHandler);
-        }
-        if (timelineHeader._menuHideHandler) {
-            timelineHeader.removeEventListener('mouseleave', timelineHeader._menuHideHandler);
-        }
-
-        // 绑定新监听器
-        timelineHeader.addEventListener('mouseenter', showMenu);
-        timelineHeader.addEventListener('mouseleave', hideMenu);
-
-        // ⭐ 菜单自身的事件（防止菜单消失）
+        // 鼠标进入菜单：保持显示
         viewMenu.addEventListener('mouseenter', () => {
             clearTimeout(menuTimer);
         });
 
+        // 鼠标离开菜单：隐藏
         viewMenu.addEventListener('mouseleave', () => {
             menuTimer = setTimeout(() => {
                 viewMenu.classList.remove('show');
-                setTimeout(() => {
-                    viewMenu.style.display = 'none';
-                }, 200);
+                console.log('✅ 菜单隐藏');
             }, 200);
         });
 
-        // ⭐ 菜单按钮点击事件
+        // 菜单按钮点击事件
         viewMenu.querySelectorAll('.view-menu-btn').forEach(btn => {
             btn.onclick = (e) => {
                 e.stopPropagation();
@@ -405,14 +381,12 @@
                 // 记录日志
                 const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
                 addLog(`✅ 已切换到${scaleNames[scale]}视图`);
-                
-                // 隐藏菜单
-                viewMenu.classList.remove('show');
-                setTimeout(() => {
-                    viewMenu.style.display = 'none';
-                }, 200);
             };
         });
+
+        console.log('✅ 时间轴视图菜单事件已绑定');
     };
+
+    console.log('✅ gantt-render.js loaded successfully (Delta7 - 时间轴菜单修复版)');
 
 })();

@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图拖拽操作模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-drag.js                           ▓▓
-// ▓▓ 版本: Gamma8                                                   ▓▓
+// ▓▓ 版本: Delta7 - 支持双层时间标签更新                            ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -41,7 +41,7 @@
     };
 
     /**
-     * 鼠标移动处理（添加左侧标签更新）
+     * 鼠标移动处理（支持双层时间标签更新）
      */
     GanttChart.prototype.onMouseMove = function(e) {
         if (!this.dragState) return;
@@ -57,19 +57,18 @@
             const offset = daysBetween(this.startDate, newStart);
             this.dragState.bar.style.left = offset * this.options.cellWidth + 'px';
             
-            // ⭐ 更新右侧任务名称标签
+            // 更新右侧任务名称标签
             const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${this.dragState.task.id}"]`);
             if (externalLabel) {
                 const barWidth = parseFloat(this.dragState.bar.style.width) || this.dragState.bar.offsetWidth;
                 externalLabel.style.left = (offset * this.options.cellWidth + barWidth + 8) + 'px';
             }
             
-            // ⭐ 更新左侧双层时间标签（移动任务）
+            // ⭐ 更新左侧双层时间标签
             const startLabel = this.container.querySelector(`.gantt-bar-label-start[data-task-id="${this.dragState.task.id}"]`);
             if (startLabel) {
                 startLabel.style.right = `calc(100% - ${offset * this.options.cellWidth}px + 8px)`;
                 
-                // ⭐ 统一使用完整日期格式
                 const startTimeLabel = formatDate(newStart);
                 const endTimeLabel = formatDate(newEnd);
                 
@@ -108,7 +107,7 @@
                             timeEndEl.textContent = formatDate(newEnd);
                         }
                     }
-                }            
+                }
             } else {
                 const newStart = addDays(new Date(this.dragState.originalStart), deltaDays);
                 const end = new Date(this.dragState.task.end);
@@ -120,7 +119,6 @@
                     this.dragState.bar.style.left = offset * this.options.cellWidth + 'px';
                     this.dragState.bar.style.width = w + 'px';
                     
-                    // ⭐ 更新右侧标签
                     const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${this.dragState.task.id}"]`);
                     if (externalLabel) {
                         externalLabel.style.left = (offset * this.options.cellWidth + w + 8) + 'px';
@@ -138,7 +136,7 @@
                     }
                 }
             }
-                        
+            
             const form = this.container.querySelector('.inline-task-form');
             const rowsContainer = this.container.querySelector('.gantt-rows-container');
             if (form && form.dataset.taskId === this.dragState.task.id && rowsContainer) {
@@ -146,7 +144,6 @@
             }
         }
     };
-
 
     /**
      * 鼠标释放处理
@@ -162,6 +159,6 @@
         this.render();
     };
 
-    console.log('✅ gantt-events-drag.js loaded successfully');
+    console.log('✅ gantt-events-drag.js loaded successfully (Delta7)');
 
 })();

@@ -1,8 +1,8 @@
 /**
  * 甘特图核心样式文件
  * 路径: css/gantt.css
- * 版本: Delta6
- * 包含: 甘特图容器、侧边栏、时间轴、任务条、依赖箭头
+ * 版本: Delta7 - 完整版（包含时间轴菜单和双层时间标签）
+ * 包含: 甘特图容器、侧边栏、时间轴、任务条、依赖箭头、时间标签、视图菜单
  */
 
 /* ======================
@@ -179,37 +179,43 @@
     height: 100%;
 }
 
-.gantt-timeline-header {
-    display: flex;
-    background: var(--gray-200);
-    border-bottom: 2px solid var(--gray-300);
+/* ⭐ 时间轴表头包装器 */
+.gantt-timeline-header-wrapper {
+    position: relative;
     height: var(--header-height);
     flex-shrink: 0;
+    background: var(--gray-200);
+    border-bottom: 2px solid var(--gray-300);
+}
+
+.gantt-timeline-header {
+    display: flex;
+    height: 100%;
     overflow: hidden;
-    position: relative; /* ⭐ 添加相对定位，用于菜单定位 */
-    cursor: pointer; /* ⭐ 添加指针样式，提示可交互 */
+    cursor: pointer;
     transition: background 0.2s ease;
 }
 
 .gantt-timeline-header:hover {
-    background: var(--gray-100); /* ⭐ 悬停时背景变浅 */
+    background: rgba(102, 126, 234, 0.05);
 }
 
-/* ⭐ 添加悬停提示文字 */
-.gantt-timeline-header::after {
-    content: '悬停切换视图';
+/* ⭐ 悬停提示 */
+.gantt-timeline-header-wrapper::after {
+    content: '悬停切换视图 ↓';
     position: absolute;
-    right: 10px;
+    right: 15px;
     top: 50%;
     transform: translateY(-50%);
     font-size: 0.7rem;
     color: var(--gray-400);
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.3s ease;
     pointer-events: none;
+    z-index: 1;
 }
 
-.gantt-timeline-header:hover::after {
+.gantt-timeline-header-wrapper:hover::after {
     opacity: 1;
 }
 
@@ -418,170 +424,6 @@
     display: none !important;
 }
 
-/* 任务条外部标签 */
-.gantt-bar-label-external {
-    position: absolute;
-    top: 6px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    padding: 0 8px;
-    color: var(--gray-700);
-    font-size: 0.75rem;
-    font-weight: 500;
-    white-space: nowrap;
-    pointer-events: auto;
-    z-index: var(--z-gantt-label);
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    text-shadow: 
-        1px 1px 2px rgba(255, 255, 255, 0.9),
-        -1px -1px 2px rgba(255, 255, 255, 0.9),
-        1px -1px 2px rgba(255, 255, 255, 0.9),
-        -1px 1px 2px rgba(255, 255, 255, 0.9);
-    border-radius: 4px;
-    transition: all var(--transition-fast);
-    cursor: pointer;
-}
-
-.gantt-bar-label-external:hover {
-    color: var(--primary-color);
-    transform: translateX(2px);
-    padding-right: 8px;
-    border-left: 2px solid rgba(102, 126, 234, 0.4);
-    padding-left: 6px;
-    text-shadow: 
-        1px 1px 3px rgba(255, 255, 255, 1),
-        -1px -1px 3px rgba(255, 255, 255, 1),
-        1px -1px 3px rgba(255, 255, 255, 1),
-        -1px 1px 3px rgba(255, 255, 255, 1);
-}
-
-.gantt-bar-label-external.selected {
-    color: var(--primary-color);
-    font-weight: 600;
-    text-shadow: 
-        1px 1px 3px rgba(255, 255, 255, 1),
-        -1px -1px 3px rgba(255, 255, 255, 1),
-        1px -1px 3px rgba(255, 255, 255, 1),
-        -1px 1px 3px rgba(255, 255, 255, 1),
-        0 0 8px rgba(102, 126, 234, 0.4);
-}
-
-.gantt-bar.conflict + .gantt-bar-label-external {
-    color: var(--danger-color);
-}
-
-.gantt-bar.dep-highlight + .gantt-bar-label-external {
-    color: var(--success-color);
-}
-
-/* ======================
-   依赖关系箭头
-   ====================== */
-.gantt-dependencies {
-    position: absolute;
-    top: 0;
-    left: 0;
-    pointer-events: none;
-}
-
-.gantt-dependencies path.dependency-arrow {
-    stroke: var(--danger-color);
-    stroke-width: 2;
-    fill: none;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.gantt-dependencies path.dependency-arrow:hover {
-    stroke: #ff6b6b;
-    stroke-width: 3;
-    filter: drop-shadow(0 0 4px rgba(220, 53, 69, 0.5));
-}
-
-.gantt-dependencies path.dep-highlight-arrow {
-    stroke: var(--success-color) !important;
-    stroke-width: 3 !important;
-    filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6));
-    animation: arrowPulse 2s ease-in-out infinite;
-}
-
-.gantt-dependencies marker path {
-    fill: var(--danger-color);
-    transition: fill 0.3s ease;
-}
-
-.gantt-dependencies path.dep-highlight-arrow + marker path {
-    fill: var(--success-color);
-}
-
-/* 不同时间刻度下的箭头粗细 */
-[data-scale="week"] ~ .gantt-dependencies path {
-    stroke-width: 1.5;
-}
-
-[data-scale="month"] ~ .gantt-dependencies path {
-    stroke-width: 1;
-}
-
-[data-scale="week"] ~ .gantt-dependencies path:hover,
-[data-scale="week"] ~ .gantt-dependencies path.dep-highlight-arrow {
-    stroke-width: 2.5;
-}
-
-[data-scale="month"] ~ .gantt-dependencies path:hover,
-[data-scale="month"] ~ .gantt-dependencies path.dep-highlight-arrow {
-    stroke-width: 2;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-    .gantt-sidebar {
-        width: 100px;
-        min-width: 100px;
-    }
-
-    .gantt-sidebar.collapsed {
-        width: 30px !important;
-        min-width: 30px !important;
-    }
-
-    .sidebar-toggle-btn {
-        width: 18px;
-        height: 36px;
-        font-size: 0.6rem;
-    }
-
-    .gantt-task-name {
-        font-size: 0.75rem;
-        padding: 8px 6px;
-    }
-}
-
-/* 打印样式 */
-@media print {
-    .gantt-sidebar.collapsed {
-        width: var(--sidebar-width) !important;
-        min-width: var(--sidebar-width) !important;
-    }
-
-    .gantt-wrapper {
-        max-height: none;
-        height: auto;
-    }
-
-    .sidebar-toggle-btn {
-        display: none !important;
-    }
-
-    .gantt-container {
-        box-shadow: none;
-        border: 1px solid var(--gray-300);
-    }
-}
-
 /* ======================
    任务条左侧双层时间标签
    ====================== */
@@ -724,37 +566,122 @@
     font-size: 0.55rem;
 }
 
-/* 响应式优化 */
-@media (max-width: 768px) {
-    .gantt-bar-label-start {
-        font-size: 0.6rem;
-        padding: 1px 6px;
-    }
-    
-    .time-start {
-        font-size: 0.65rem;
-    }
-    
-    .time-end {
-        font-size: 0.6rem;
-    }
+/* 任务条外部标签（右侧） */
+.gantt-bar-label-external {
+    position: absolute;
+    top: 6px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    color: var(--gray-700);
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: auto;
+    z-index: var(--z-gantt-label);
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    text-shadow: 
+        1px 1px 2px rgba(255, 255, 255, 0.9),
+        -1px -1px 2px rgba(255, 255, 255, 0.9),
+        1px -1px 2px rgba(255, 255, 255, 0.9),
+        -1px 1px 2px rgba(255, 255, 255, 0.9);
+    border-radius: 4px;
+    transition: all var(--transition-fast);
+    cursor: pointer;
 }
 
-/* 打印优化 */
-@media print {
-    .gantt-bar-label-start {
-        background: white !important;
-        border: 1px solid var(--gray-300) !important;
-        text-shadow: none !important;
-    }
-    
-    .time-start {
-        color: black !important;
-    }
-    
-    .time-end {
-        color: var(--gray-600) !important;
-    }
+.gantt-bar-label-external:hover {
+    color: var(--primary-color);
+    transform: translateX(2px);
+    padding-right: 8px;
+    border-left: 2px solid rgba(102, 126, 234, 0.4);
+    padding-left: 6px;
+    text-shadow: 
+        1px 1px 3px rgba(255, 255, 255, 1),
+        -1px -1px 3px rgba(255, 255, 255, 1),
+        1px -1px 3px rgba(255, 255, 255, 1),
+        -1px 1px 3px rgba(255, 255, 255, 1);
+}
+
+.gantt-bar-label-external.selected {
+    color: var(--primary-color);
+    font-weight: 600;
+    text-shadow: 
+        1px 1px 3px rgba(255, 255, 255, 1),
+        -1px -1px 3px rgba(255, 255, 255, 1),
+        1px -1px 3px rgba(255, 255, 255, 1),
+        -1px 1px 3px rgba(255, 255, 255, 1),
+        0 0 8px rgba(102, 126, 234, 0.4);
+}
+
+.gantt-bar.conflict + .gantt-bar-label-external {
+    color: var(--danger-color);
+}
+
+.gantt-bar.dep-highlight + .gantt-bar-label-external {
+    color: var(--success-color);
+}
+
+/* ======================
+   依赖关系箭头
+   ====================== */
+.gantt-dependencies {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+.gantt-dependencies path.dependency-arrow {
+    stroke: var(--danger-color);
+    stroke-width: 2;
+    fill: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.gantt-dependencies path.dependency-arrow:hover {
+    stroke: #ff6b6b;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 4px rgba(220, 53, 69, 0.5));
+}
+
+.gantt-dependencies path.dep-highlight-arrow {
+    stroke: var(--success-color) !important;
+    stroke-width: 3 !important;
+    filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6));
+    animation: arrowPulse 2s ease-in-out infinite;
+}
+
+.gantt-dependencies marker path {
+    fill: var(--danger-color);
+    transition: fill 0.3s ease;
+}
+
+.gantt-dependencies path.dep-highlight-arrow + marker path {
+    fill: var(--success-color);
+}
+
+/* 不同时间刻度下的箭头粗细 */
+[data-scale="week"] ~ .gantt-dependencies path {
+    stroke-width: 1.5;
+}
+
+[data-scale="month"] ~ .gantt-dependencies path {
+    stroke-width: 1;
+}
+
+[data-scale="week"] ~ .gantt-dependencies path:hover,
+[data-scale="week"] ~ .gantt-dependencies path.dep-highlight-arrow {
+    stroke-width: 2.5;
+}
+
+[data-scale="month"] ~ .gantt-dependencies path:hover,
+[data-scale="month"] ~ .gantt-dependencies path.dep-highlight-arrow {
+    stroke-width: 2;
 }
 
 /* ======================
@@ -763,7 +690,7 @@
 .timeline-view-menu {
     position: absolute;
     top: 100%;
-    right: 20px;
+    right: 15px;
     margin-top: 8px;
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(20px);
@@ -774,7 +701,7 @@
                 0 2px 8px rgba(0, 0, 0, 0.1),
                 inset 0 1px 0 rgba(255, 255, 255, 0.8);
     border: 1px solid rgba(102, 126, 234, 0.2);
-    z-index: 1000;
+    z-index: 1001;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -783,12 +710,14 @@
     transform: translateY(-10px) scale(0.95);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
+    visibility: hidden;
 }
 
 .timeline-view-menu.show {
     opacity: 1;
     transform: translateY(0) scale(1);
     pointer-events: auto;
+    visibility: visible;
 }
 
 .view-menu-title {
@@ -854,6 +783,8 @@
     font-size: 1.2rem;
     transition: all 0.2s ease;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+    position: relative;
+    z-index: 1;
 }
 
 .view-menu-btn:hover .view-icon {
@@ -870,6 +801,8 @@
     font-weight: 500;
     color: var(--gray-700);
     transition: all 0.2s ease;
+    position: relative;
+    z-index: 1;
 }
 
 .view-menu-btn:hover .view-text {
@@ -897,8 +830,31 @@
     -webkit-backdrop-filter: blur(20px);
 }
 
-/* 响应式优化 */
+/* ======================
+   响应式设计
+   ====================== */
 @media (max-width: 768px) {
+    .gantt-sidebar {
+        width: 100px;
+        min-width: 100px;
+    }
+
+    .gantt-sidebar.collapsed {
+        width: 30px !important;
+        min-width: 30px !important;
+    }
+
+    .sidebar-toggle-btn {
+        width: 18px;
+        height: 36px;
+        font-size: 0.6rem;
+    }
+
+    .gantt-task-name {
+        font-size: 0.75rem;
+        padding: 8px 6px;
+    }
+    
     .timeline-view-menu {
         right: 10px;
         min-width: 120px;
@@ -921,16 +877,70 @@
     .view-menu-title {
         font-size: 0.7rem;
     }
-}
-
-/* 打印时隐藏 */
-@media print {
-    .timeline-view-menu {
-        display: none !important;
+    
+    .gantt-bar-label-start {
+        font-size: 0.6rem;
+        padding: 1px 6px;
+    }
+    
+    .time-start {
+        font-size: 0.65rem;
+    }
+    
+    .time-end {
+        font-size: 0.6rem;
     }
 }
 
-/* 高对比度模式 */
+/* ======================
+   打印样式
+   ====================== */
+@media print {
+    .gantt-sidebar.collapsed {
+        width: var(--sidebar-width) !important;
+        min-width: var(--sidebar-width) !important;
+    }
+
+    .gantt-wrapper {
+        max-height: none;
+        height: auto;
+    }
+
+    .sidebar-toggle-btn {
+        display: none !important;
+    }
+
+    .gantt-container {
+        box-shadow: none;
+        border: 1px solid var(--gray-300);
+    }
+    
+    .timeline-view-menu {
+        display: none !important;
+    }
+    
+    .gantt-timeline-header-wrapper::after {
+        display: none !important;
+    }
+    
+    .gantt-bar-label-start {
+        background: white !important;
+        border: 1px solid var(--gray-300) !important;
+        text-shadow: none !important;
+    }
+    
+    .time-start {
+        color: black !important;
+    }
+    
+    .time-end {
+        color: var(--gray-600) !important;
+    }
+}
+
+/* ======================
+   高对比度模式
+   ====================== */
 @media (prefers-contrast: high) {
     .timeline-view-menu {
         border: 2px solid var(--primary-color);
@@ -945,7 +955,9 @@
     }
 }
 
-/* 深色模式支持 */
+/* ======================
+   深色模式支持
+   ====================== */
 @media (prefers-color-scheme: dark) {
     .timeline-view-menu {
         background: rgba(33, 37, 41, 0.98);
