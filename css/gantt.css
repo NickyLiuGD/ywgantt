@@ -186,6 +186,31 @@
     height: var(--header-height);
     flex-shrink: 0;
     overflow: hidden;
+    position: relative; /* ⭐ 添加相对定位，用于菜单定位 */
+    cursor: pointer; /* ⭐ 添加指针样式，提示可交互 */
+    transition: background 0.2s ease;
+}
+
+.gantt-timeline-header:hover {
+    background: var(--gray-100); /* ⭐ 悬停时背景变浅 */
+}
+
+/* ⭐ 添加悬停提示文字 */
+.gantt-timeline-header::after {
+    content: '悬停切换视图';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    color: var(--gray-400);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.gantt-timeline-header:hover::after {
+    opacity: 1;
 }
 
 .gantt-rows-container {
@@ -729,5 +754,223 @@
     
     .time-end {
         color: var(--gray-600) !important;
+    }
+}
+
+/* ======================
+   时间轴视图切换菜单
+   ====================== */
+.timeline-view-menu {
+    position: absolute;
+    top: 100%;
+    right: 20px;
+    margin-top: 8px;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15),
+                0 2px 8px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 140px;
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.timeline-view-menu.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.view-menu-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 8px 4px;
+    border-bottom: 1px solid var(--gray-200);
+    margin-bottom: 4px;
+}
+
+.view-menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.view-menu-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: linear-gradient(135deg, transparent 0%, rgba(102, 126, 234, 0.1) 100%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.view-menu-btn:hover::before {
+    opacity: 1;
+}
+
+.view-menu-btn:hover {
+    background: rgba(102, 126, 234, 0.08);
+}
+
+.view-menu-btn.active {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+.view-menu-btn.active::after {
+    content: '✓';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary-color);
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.view-icon {
+    font-size: 1.2rem;
+    transition: all 0.2s ease;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.view-menu-btn:hover .view-icon {
+    transform: scale(1.15);
+}
+
+.view-menu-btn.active .view-icon {
+    transform: scale(1.2);
+    filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.4));
+}
+
+.view-text {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    transition: all 0.2s ease;
+}
+
+.view-menu-btn:hover .view-text {
+    color: var(--primary-color);
+}
+
+.view-menu-btn.active .view-text {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* 菜单箭头指示器 */
+.timeline-view-menu::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    right: 30px;
+    width: 12px;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.98);
+    border-left: 1px solid rgba(102, 126, 234, 0.2);
+    border-top: 1px solid rgba(102, 126, 234, 0.2);
+    transform: rotate(45deg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+    .timeline-view-menu {
+        right: 10px;
+        min-width: 120px;
+        padding: 10px;
+    }
+    
+    .view-menu-btn {
+        padding: 8px 10px;
+        gap: 8px;
+    }
+    
+    .view-icon {
+        font-size: 1rem;
+    }
+    
+    .view-text {
+        font-size: 0.8rem;
+    }
+    
+    .view-menu-title {
+        font-size: 0.7rem;
+    }
+}
+
+/* 打印时隐藏 */
+@media print {
+    .timeline-view-menu {
+        display: none !important;
+    }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+    .timeline-view-menu {
+        border: 2px solid var(--primary-color);
+    }
+    
+    .view-menu-btn {
+        border: 1px solid var(--gray-300);
+    }
+    
+    .view-menu-btn.active {
+        border: 2px solid var(--primary-color);
+    }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .timeline-view-menu {
+        background: rgba(33, 37, 41, 0.98);
+        border-color: rgba(102, 126, 234, 0.4);
+    }
+    
+    .timeline-view-menu::before {
+        background: rgba(33, 37, 41, 0.98);
+        border-color: rgba(102, 126, 234, 0.4);
+    }
+    
+    .view-menu-title {
+        color: var(--gray-400);
+        border-bottom-color: var(--gray-600);
+    }
+    
+    .view-text {
+        color: var(--gray-300);
+    }
+    
+    .view-menu-btn:hover {
+        background: rgba(102, 126, 234, 0.15);
+    }
+    
+    .view-menu-btn.active {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%);
     }
 }

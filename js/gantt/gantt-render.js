@@ -8,7 +8,7 @@
     'use strict';
 
     /**
-     * 渲染甘特图（完整版）
+     * 渲染甘特图（添加时间轴菜单版）
      */
     GanttChart.prototype.render = function() {
         if (!this.container) {
@@ -37,6 +37,26 @@
                     <div class="gantt-timeline">
                         <div class="gantt-timeline-header" id="ganttTimelineHeader">
                             ${this.renderDateHeaders(dates, weekdays)}
+                            
+                            <!-- ⭐ 时间轴视图切换菜单 -->
+                            <div class="timeline-view-menu" id="timelineViewMenu" style="display: none;">
+                                <div class="view-menu-title">时间刻度</div>
+                                <button class="view-menu-btn ${this.options.timeScale === 'day' ? 'active' : ''}" 
+                                        data-scale="day" title="按天显示">
+                                    <span class="view-icon">📅</span>
+                                    <span class="view-text">日视图</span>
+                                </button>
+                                <button class="view-menu-btn ${this.options.timeScale === 'week' ? 'active' : ''}" 
+                                        data-scale="week" title="按周显示">
+                                    <span class="view-icon">📆</span>
+                                    <span class="view-text">周视图</span>
+                                </button>
+                                <button class="view-menu-btn ${this.options.timeScale === 'month' ? 'active' : ''}" 
+                                        data-scale="month" title="按月显示">
+                                    <span class="view-icon">🗓️</span>
+                                    <span class="view-text">月视图</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="gantt-rows-container" id="ganttRowsContainer">
                             <div class="gantt-rows">
@@ -62,7 +82,8 @@
         this.setupScrollSync();
         this.renderDependencies(dates);
         this.attachEvents();
-        this.attachQuickMenus(); // ⭐ 新增：绑定快捷菜单
+        this.attachQuickMenus();
+        this.attachTimelineViewMenu(); // ⭐ 绑定时间轴菜单事件
 
         this.updateHeight();
     };
@@ -296,5 +317,85 @@
     };
 
     console.log('✅ gantt-render.js loaded successfully (Delta6 - 修复周/月视图)');
+
+    /**
+     * 绑定时间轴视图切换菜单事件
+     */
+    GanttChart.prototype.attachTimelineViewMenu = function() {
+        const timelineHeader = document.getElementById('ganttTimelineHeader');
+        const viewMenu = document.getElementById('timelineViewMenu');
+        
+        if (!timelineHeader || !viewMenu) {
+            console.warn('Timeline view menu elements not found');
+            return;
+        }
+
+        let menuTimer = null;
+
+        // 鼠标进入时间轴表头：显示菜单
+        timelineHeader.addEventListener('mouseenter', (e) => {
+            clearTimeout(menuTimer);
+            menuTimer = setTimeout(() => {
+                viewMenu.style.display = 'flex';
+                requestAnimationFrame(() => {
+                    viewMenu.classList.add('show');
+                });
+            }, 300); // 300ms 延迟，避免误触发
+        });
+
+        // 鼠标离开时间轴表头：延迟隐藏菜单
+        timelineHeader.addEventListener('mouseleave', (e) => {
+            clearTimeout(menuTimer);
+            menuTimer = setTimeout(() => {
+                if (!viewMenu.matches(':hover')) {
+                    viewMenu.classList.remove('show');
+                    setTimeout(() => {
+                        if (!viewMenu.classList.contains('show')) {
+                            viewMenu.style.display = 'none';
+                        }
+                    }, 200);
+                }
+            }, 200);
+        });
+
+        // 鼠标进入菜单：保持显示
+        viewMenu.addEventListener('mouseenter', () => {
+            clearTimeout(menuTimer);
+        });
+
+        // 鼠标离开菜单：隐藏
+        viewMenu.addEventListener('mouseleave', () => {
+            menuTimer = setTimeout(() => {
+                viewMenu.classList.remove('show');
+                setTimeout(() => {
+                    viewMenu.style.display = 'none';
+                }, 200);
+            }, 200);
+        });
+
+        // 菜单按钮点击事件
+        viewMenu.querySelectorAll('.view-menu-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const scale = btn.dataset.scale;
+                
+                // 切换视图
+                this.options.timeScale = scale;
+                this.options.cellWidth = getRecommendedCellWidth(scale);
+                this.calculateDateRange();
+                this.render();
+                
+                // 记录日志
+                const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
+                addLog(`✅ 已切换到${scaleNames[scale]}视图`);
+                
+                // 隐藏菜单
+                viewMenu.classList.remove('show');
+                setTimeout(() => {
+                    viewMenu.style.display = 'none';
+                }, 200);
+            };
+        });
+    };
 
 })();
