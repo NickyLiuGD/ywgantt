@@ -558,17 +558,18 @@
 }
 
 /* ======================
-   任务条左侧时间标签
+   任务条左侧双层时间标签
    ====================== */
 .gantt-bar-label-start {
     position: absolute;
     top: 6px;
     height: 28px;
     display: flex;
-    align-items: center;
-    padding: 0 8px;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2px 8px;
     color: var(--gray-600);
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-weight: 500;
     white-space: nowrap;
     pointer-events: auto;
@@ -585,14 +586,35 @@
     transition: all var(--transition-fast);
     cursor: pointer;
     text-align: right;
+    gap: 1px;
 }
 
-.gantt-bar-label-start:hover {
+/* 时间标签行容器 */
+.time-label-row {
+    line-height: 1.2;
+    transition: all var(--transition-fast);
+}
+
+/* 开始时间样式 */
+.time-start {
     color: var(--info-color);
+    font-weight: 600;
+    font-size: 0.7rem;
+}
+
+/* 结束时间样式 */
+.time-end {
+    color: var(--gray-500);
+    font-size: 0.65rem;
+}
+
+/* 悬停效果 */
+.gantt-bar-label-start:hover {
     transform: translateX(-2px);
-    padding-left: 8px;
+    padding-left: 10px;
     border-right: 2px solid rgba(59, 130, 246, 0.4);
     padding-right: 6px;
+    background: rgba(255, 255, 255, 0.5) !important;
     text-shadow: 
         1px 1px 3px rgba(255, 255, 255, 1),
         -1px -1px 3px rgba(255, 255, 255, 1),
@@ -600,31 +622,112 @@
         -1px 1px 3px rgba(255, 255, 255, 1);
 }
 
+.gantt-bar-label-start:hover .time-start {
+    color: var(--primary-color);
+    transform: scale(1.05);
+}
+
+.gantt-bar-label-start:hover .time-end {
+    color: var(--gray-700);
+    transform: scale(1.05);
+}
+
+/* 选中状态 */
 .gantt-bar-label-start.selected {
-    color: var(--info-color);
-    font-weight: 600;
+    background: rgba(255, 243, 205, 0.3) !important;
+    border-right: 3px solid var(--warning-color);
+}
+
+.gantt-bar-label-start.selected .time-start {
+    color: var(--primary-color);
+    font-weight: 700;
     text-shadow: 
         1px 1px 3px rgba(255, 255, 255, 1),
         -1px -1px 3px rgba(255, 255, 255, 1),
         1px -1px 3px rgba(255, 255, 255, 1),
         -1px 1px 3px rgba(255, 255, 255, 1),
-        0 0 8px rgba(59, 130, 246, 0.4);
+        0 0 8px rgba(102, 126, 234, 0.4);
+}
+
+.gantt-bar-label-start.selected .time-end {
+    color: var(--gray-700);
+    font-weight: 600;
 }
 
 /* 冲突任务的左侧时间标签 */
-.gantt-bar.conflict ~ .gantt-bar-label-start {
+.gantt-bar.conflict ~ .gantt-bar-label-start .time-start {
     color: var(--danger-color);
 }
 
+.gantt-bar.conflict ~ .gantt-bar-label-start .time-end {
+    color: var(--danger-color);
+    opacity: 0.8;
+}
+
 /* 依赖高亮任务的左侧时间标签 */
-.gantt-bar.dep-highlight ~ .gantt-bar-label-start {
+.gantt-bar.dep-highlight ~ .gantt-bar-label-start .time-start {
     color: var(--success-color);
+}
+
+.gantt-bar.dep-highlight ~ .gantt-bar-label-start .time-end {
+    color: var(--success-color);
+    opacity: 0.8;
+}
+
+/* 不同时间刻度下的字体大小优化 */
+[data-scale="week"] .gantt-bar-label-start {
+    font-size: 0.6rem;
+}
+
+[data-scale="week"] .time-start {
+    font-size: 0.65rem;
+}
+
+[data-scale="week"] .time-end {
+    font-size: 0.6rem;
+}
+
+[data-scale="month"] .gantt-bar-label-start {
+    font-size: 0.55rem;
+}
+
+[data-scale="month"] .time-start {
+    font-size: 0.6rem;
+}
+
+[data-scale="month"] .time-end {
+    font-size: 0.55rem;
 }
 
 /* 响应式优化 */
 @media (max-width: 768px) {
     .gantt-bar-label-start {
+        font-size: 0.6rem;
+        padding: 1px 6px;
+    }
+    
+    .time-start {
         font-size: 0.65rem;
-        padding: 0 6px;
+    }
+    
+    .time-end {
+        font-size: 0.6rem;
+    }
+}
+
+/* 打印优化 */
+@media print {
+    .gantt-bar-label-start {
+        background: white !important;
+        border: 1px solid var(--gray-300) !important;
+        text-shadow: none !important;
+    }
+    
+    .time-start {
+        color: black !important;
+    }
+    
+    .time-end {
+        color: var(--gray-600) !important;
     }
 }

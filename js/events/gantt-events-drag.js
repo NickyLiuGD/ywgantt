@@ -64,28 +64,40 @@
                 externalLabel.style.left = (offset * this.options.cellWidth + barWidth + 8) + 'px';
             }
             
-            // ⭐ 更新左侧起始时间标签
+            // ⭐ 更新左侧双层时间标签
             const startLabel = this.container.querySelector(`.gantt-bar-label-start[data-task-id="${this.dragState.task.id}"]`);
             if (startLabel) {
                 startLabel.style.right = `calc(100% - ${offset * this.options.cellWidth}px + 8px)`;
                 
-                // 更新标签文本
+                // 更新双层文本
                 const scale = this.options.timeScale || 'day';
                 let startTimeLabel = '';
+                let endTimeLabel = '';
+                
                 switch (scale) {
                     case 'day':
                         startTimeLabel = formatDate(newStart);
+                        endTimeLabel = formatDate(new Date(this.dragState.task.end));
                         break;
                     case 'week':
-                        const weekNum = getWeekNumber(newStart);
-                        startTimeLabel = `第${weekNum}周`;
+                        const startWeek = getWeekNumber(newStart);
+                        const endWeek = getWeekNumber(new Date(this.dragState.task.end));
+                        startTimeLabel = `第${startWeek}周`;
+                        endTimeLabel = `第${endWeek}周`;
                         break;
                     case 'month':
                         startTimeLabel = `${newStart.getMonth() + 1}月${newStart.getDate()}日`;
+                        const endDate = new Date(this.dragState.task.end);
+                        endTimeLabel = `${endDate.getMonth() + 1}月${endDate.getDate()}日`;
                         break;
                 }
-                startLabel.textContent = startTimeLabel;
+                
+                const timeStartEl = startLabel.querySelector('.time-start');
+                const timeEndEl = startLabel.querySelector('.time-end');
+                if (timeStartEl) timeStartEl.textContent = startTimeLabel;
+                if (timeEndEl) timeEndEl.textContent = endTimeLabel;
             }
+
             
             const form = this.container.querySelector('.inline-task-form');
             const rowsContainer = this.container.querySelector('.gantt-rows-container');
@@ -125,27 +137,38 @@
                         externalLabel.style.left = (offset * this.options.cellWidth + w + 8) + 'px';
                     }
                     
-                    // ⭐ 更新左侧时间标签
+                    // ⭐ 更新左侧双层时间标签（调整大小时）
                     const startLabel = this.container.querySelector(`.gantt-bar-label-start[data-task-id="${this.dragState.task.id}"]`);
                     if (startLabel) {
                         startLabel.style.right = `calc(100% - ${offset * this.options.cellWidth}px + 8px)`;
                         
                         const scale = this.options.timeScale || 'day';
                         let startTimeLabel = '';
+                        let endTimeLabel = '';
+                        
                         switch (scale) {
                             case 'day':
                                 startTimeLabel = formatDate(newStart);
+                                endTimeLabel = formatDate(end);
                                 break;
                             case 'week':
-                                const weekNum = getWeekNumber(newStart);
-                                startTimeLabel = `第${weekNum}周`;
+                                const startWeek = getWeekNumber(newStart);
+                                const endWeek = getWeekNumber(end);
+                                startTimeLabel = `第${startWeek}周`;
+                                endTimeLabel = `第${endWeek}周`;
                                 break;
                             case 'month':
                                 startTimeLabel = `${newStart.getMonth() + 1}月${newStart.getDate()}日`;
+                                endTimeLabel = `${end.getMonth() + 1}月${end.getDate()}日`;
                                 break;
                         }
-                        startLabel.textContent = startTimeLabel;
+                        
+                        const timeStartEl = startLabel.querySelector('.time-start');
+                        const timeEndEl = startLabel.querySelector('.time-end');
+                        if (timeStartEl) timeStartEl.textContent = startTimeLabel;
+                        if (timeEndEl) timeEndEl.textContent = endTimeLabel;
                     }
+
                 }
             }
             

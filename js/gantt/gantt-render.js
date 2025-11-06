@@ -154,85 +154,95 @@
     };
     
     /**
-     * 渲染单个任务行（修复版 - 添加左侧时间标签）
+     * 渲染单个任务行（双层时间标签版）
      * @param {Object} task - 任务对象
      * @param {Array<Object>} dates - 日期对象数组
      * @returns {string} HTML字符串
      */
-        GanttChart.prototype.renderRow = function(task, dates) {
-            const start = new Date(task.start);
-            const end = new Date(task.end || task.start);
-            
-            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-                console.warn(`Invalid date for task: ${task.name}`);
-                return '';
-            }
-            
-            const scale = this.options.timeScale || 'day';
-            const progress = Math.min(Math.max(task.progress || 0, 0), 100);
-            const isSelected = this.selectedTask === task.id;
-            
-            // ⭐ 统一使用天数计算位置
-            const startDays = daysBetween(this.startDate, start);
-            const durationDays = daysBetween(start, end) + 1;
-            
-            const left = startDays * this.options.cellWidth;
-            const width = Math.max(durationDays * this.options.cellWidth, 30);
+    GanttChart.prototype.renderRow = function(task, dates) {
+        const start = new Date(task.start);
+        const end = new Date(task.end || task.start);
+        
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            console.warn(`Invalid date for task: ${task.name}`);
+            return '';
+        }
+        
+        const scale = this.options.timeScale || 'day';
+        const progress = Math.min(Math.max(task.progress || 0, 0), 100);
+        const isSelected = this.selectedTask === task.id;
+        
+        // ⭐ 统一使用天数计算位置
+        const startDays = daysBetween(this.startDate, start);
+        const durationDays = daysBetween(start, end) + 1;
+        
+        const left = startDays * this.options.cellWidth;
+        const width = Math.max(durationDays * this.options.cellWidth, 30);
 
-            // ⭐ 格式化起始时间（根据时间刻度显示不同格式）
-            let startTimeLabel = '';
-            switch (scale) {
-                case 'day':
-                    startTimeLabel = formatDate(start); // 2025-01-10
-                    break;
-                case 'week':
-                    const weekNum = getWeekNumber(start);
-                    startTimeLabel = `第${weekNum}周`; // 第2周
-                    break;
-                case 'month':
-                    startTimeLabel = `${start.getMonth() + 1}月${start.getDate()}日`; // 1月10日
-                    break;
-            }
+        // ⭐ 格式化开始时间和结束时间（根据时间刻度显示不同格式）
+        let startTimeLabel = '';
+        let endTimeLabel = '';
+        
+        switch (scale) {
+            case 'day':
+                startTimeLabel = formatDate(start); // 2025-01-10
+                endTimeLabel = formatDate(end);     // 2025-01-15
+                break;
+            case 'week':
+                const startWeek = getWeekNumber(start);
+                const endWeek = getWeekNumber(end);
+                startTimeLabel = `第${startWeek}周`;
+                endTimeLabel = `第${endWeek}周`;
+                break;
+            case 'month':
+                startTimeLabel = `${start.getMonth() + 1}月${start.getDate()}日`;
+                endTimeLabel = `${end.getMonth() + 1}月${end.getDate()}日`;
+                break;
+        }
 
-            return `
-                <div class="gantt-row" role="row" aria-label="任务行: ${this.escapeHtml(task.name)}">
-                    ${this.renderCells(dates)}
-                    
-                    <!-- ⭐ 左侧起始时间标签 -->
-                    <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
-                        data-task-id="${task.id}"
-                        style="right: calc(100% - ${left}px + 8px);"
-                        role="button"
-                        tabindex="0"
-                        aria-label="起始时间: ${startTimeLabel}">
+        return `
+            <div class="gantt-row" role="row" aria-label="任务行: ${this.escapeHtml(task.name)}">
+                ${this.renderCells(dates)}
+                
+                <!-- ⭐ 左侧双层时间标签 -->
+                <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
+                    data-task-id="${task.id}"
+                    style="right: calc(100% - ${left}px + 8px);"
+                    role="button"
+                    tabindex="0"
+                    aria-label="时间范围: ${startTimeLabel} 至 ${endTimeLabel}">
+                    <div class="time-label-row time-start" title="开始时间">
                         ${this.escapeHtml(startTimeLabel)}
                     </div>
-                    
-                    <!-- 任务条 -->
-                    <div class="gantt-bar ${isSelected ? 'selected' : ''}" 
-                        data-task-id="${task.id}"
-                        style="left: ${left}px; width: ${width}px;"
-                        role="button"
-                        tabindex="0"
-                        aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
-                        <div class="gantt-bar-progress" style="width: ${progress}%" aria-hidden="true"></div>
-                        ${this.options.enableResize ? '<div class="gantt-bar-handle left" role="button" aria-label="调整开始日期"></div>' : ''}
-                        ${this.options.enableResize ? '<div class="gantt-bar-handle right" role="button" aria-label="调整结束日期"></div>' : ''}
-                    </div>
-                    
-                    <!-- 右侧任务名称标签 -->
-                    <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
-                        data-task-id="${task.id}"
-                        style="left: ${left + width + 8}px;"
-                        role="button"
-                        tabindex="0"
-                        aria-label="任务标签: ${this.escapeHtml(task.name)}">
-                        ${this.escapeHtml(task.name)} (${progress}%)
+                    <div class="time-label-row time-end" title="结束时间">
+                        ${this.escapeHtml(endTimeLabel)}
                     </div>
                 </div>
-            `;
-        };
-
+                
+                <!-- 任务条 -->
+                <div class="gantt-bar ${isSelected ? 'selected' : ''}" 
+                    data-task-id="${task.id}"
+                    style="left: ${left}px; width: ${width}px;"
+                    role="button"
+                    tabindex="0"
+                    aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
+                    <div class="gantt-bar-progress" style="width: ${progress}%" aria-hidden="true"></div>
+                    ${this.options.enableResize ? '<div class="gantt-bar-handle left" role="button" aria-label="调整开始日期"></div>' : ''}
+                    ${this.options.enableResize ? '<div class="gantt-bar-handle right" role="button" aria-label="调整结束日期"></div>' : ''}
+                </div>
+                
+                <!-- 右侧任务名称标签 -->
+                <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
+                    data-task-id="${task.id}"
+                    style="left: ${left + width + 8}px;"
+                    role="button"
+                    tabindex="0"
+                    aria-label="任务标签: ${this.escapeHtml(task.name)}">
+                    ${this.escapeHtml(task.name)} (${progress}%)
+                </div>
+            </div>
+        `;
+    };
 
     /**
      * 渲染单元格（修复版 - 正确计算单元格宽度）
