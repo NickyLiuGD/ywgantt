@@ -332,38 +332,55 @@
 
         let menuTimer = null;
 
-        // ⭐ 鼠标进入时间轴表头：显示菜单
-        timelineHeader.addEventListener('mouseenter', (e) => {
+        // ⭐ 移除旧的事件监听器（防止重复绑定）
+        const showMenu = () => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
-                viewMenu.style.display = 'flex';  // ▌ 先设置为 flex
+                viewMenu.style.display = 'flex';
+                // ⭐ 使用 requestAnimationFrame 确保 display 生效后再添加 show 类
                 requestAnimationFrame(() => {
-                    viewMenu.classList.add('show');  // ▌ 下一帧添加 show 类触发动画
+                    requestAnimationFrame(() => {
+                        viewMenu.classList.add('show');
+                    });
                 });
             }, 300);
-        });
+        };
 
-        // ⭐ 鼠标离开时间轴表头：延迟隐藏菜单
-        timelineHeader.addEventListener('mouseleave', (e) => {
+        const hideMenu = () => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
-                if (!viewMenu.matches(':hover')) {  // ▌ 检查鼠标是否在菜单上
-                    viewMenu.classList.remove('show');  // ▌ 移除 show 类触发淡出
+                if (!viewMenu.matches(':hover')) {
+                    viewMenu.classList.remove('show');
                     setTimeout(() => {
-                        if (!viewMenu.classList.contains('show')) {  // ▌ 确认没有重新显示
-                            viewMenu.style.display = 'none';  // ▌ 隐藏元素
+                        if (!viewMenu.classList.contains('show')) {
+                            viewMenu.style.display = 'none';
                         }
-                    }, 200);  // ▌ 等待 CSS 过渡完成
+                    }, 200);
                 }
             }, 200);
-        });
+        };
 
-        // ⭐ 鼠标进入菜单：保持显示
+        // ⭐ 使用命名函数便于移除旧监听器
+        timelineHeader._menuShowHandler = showMenu;
+        timelineHeader._menuHideHandler = hideMenu;
+
+        // 移除旧监听器（如果存在）
+        if (timelineHeader._menuShowHandler) {
+            timelineHeader.removeEventListener('mouseenter', timelineHeader._menuShowHandler);
+        }
+        if (timelineHeader._menuHideHandler) {
+            timelineHeader.removeEventListener('mouseleave', timelineHeader._menuHideHandler);
+        }
+
+        // 绑定新监听器
+        timelineHeader.addEventListener('mouseenter', showMenu);
+        timelineHeader.addEventListener('mouseleave', hideMenu);
+
+        // ⭐ 菜单自身的事件（防止菜单消失）
         viewMenu.addEventListener('mouseenter', () => {
             clearTimeout(menuTimer);
         });
 
-        // ⭐ 鼠标离开菜单：隐藏
         viewMenu.addEventListener('mouseleave', () => {
             menuTimer = setTimeout(() => {
                 viewMenu.classList.remove('show');
@@ -389,7 +406,7 @@
                 const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
                 addLog(`✅ 已切换到${scaleNames[scale]}视图`);
                 
-                // ⭐ 隐藏菜单
+                // 隐藏菜单
                 viewMenu.classList.remove('show');
                 setTimeout(() => {
                     viewMenu.style.display = 'none';
@@ -397,6 +414,5 @@
             };
         });
     };
-
 
 })();
