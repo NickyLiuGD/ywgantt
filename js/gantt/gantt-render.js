@@ -154,7 +154,7 @@
     };
     
     /**
-     * 渲染单个任务行（双层时间标签版）
+     * 渲染单个任务行（统一日期格式版）
      * @param {Object} task - 任务对象
      * @param {Array<Object>} dates - 日期对象数组
      * @returns {string} HTML字符串
@@ -179,26 +179,9 @@
         const left = startDays * this.options.cellWidth;
         const width = Math.max(durationDays * this.options.cellWidth, 30);
 
-        // ⭐ 格式化开始时间和结束时间（根据时间刻度显示不同格式）
-        let startTimeLabel = '';
-        let endTimeLabel = '';
-        
-        switch (scale) {
-            case 'day':
-                startTimeLabel = formatDate(start); // 2025-01-10
-                endTimeLabel = formatDate(end);     // 2025-01-15
-                break;
-            case 'week':
-                const startWeek = getWeekNumber(start);
-                const endWeek = getWeekNumber(end);
-                startTimeLabel = `第${startWeek}周`;
-                endTimeLabel = `第${endWeek}周`;
-                break;
-            case 'month':
-                startTimeLabel = `${start.getMonth() + 1}月${start.getDate()}日`;
-                endTimeLabel = `${end.getMonth() + 1}月${end.getDate()}日`;
-                break;
-        }
+        // ⭐ 统一使用完整日期格式（所有时间刻度都一致）
+        const startTimeLabel = formatDate(start); // 2025-01-10
+        const endTimeLabel = formatDate(end);     // 2025-01-15
 
         return `
             <div class="gantt-row" role="row" aria-label="任务行: ${this.escapeHtml(task.name)}">
