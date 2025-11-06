@@ -1377,3 +1377,62 @@ input:checked + .switch-slider:before {
         border: 1px solid currentColor;
     }
 }
+
+/* ======================
+   时间刻度样式（周视图/月视图）
+   ====================== */
+
+/* 周视图样式 */
+.gantt-date-week {
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 2px;
+    color: var(--gray-700);
+}
+
+.gantt-date-range {
+    font-size: 0.7rem;
+    color: var(--gray-500);
+}
+
+/* 月视图样式 */
+.gantt-date-year {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-bottom: 2px;
+}
+
+.gantt-date-month {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--gray-700);
+}
+
+/* 时间刻度按钮激活状态 */
+.toolbar-btn.active {
+    background: rgba(102, 126, 234, 0.2) !important;
+    border: 1px solid rgba(102, 126, 234, 0.4);
+}
+
+.toolbar-btn.active .btn-icon {
+    transform: scale(1.15);
+}
+
+/* 不同刻度下的单元格样式 */
+.gantt-date-cell[data-scale="week"],
+.gantt-cell[data-scale="week"] {
+    border-right: 2px solid var(--gray-400);
+}
+
+.gantt-date-cell[data-scale="month"],
+.gantt-cell[data-scale="month"] {
+    border-right: 3px solid var(--gray-500);
+}
+
+/* 周视图和月视图的今日标记 */
+.gantt-date-cell[data-scale="week"].today,
+.gantt-date-cell[data-scale="month"].today {
+    background: linear-gradient(135deg, #fff3cd 0%, #fffbeb 100%);
+    border-left: 3px solid var(--warning-color);
+    border-right: 3px solid var(--warning-color);
+}

@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图依赖关系模块                                              ▓▓
 // ▓▓ 路径: js/gantt/gantt-dependencies.js                           ▓▓
-// ▓▓ 版本: Gamma11                                                  ▓▓
+// ▓▓ 版本: Delta6 - 支持时间刻度缩放                                ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -9,7 +9,7 @@
 
     /**
      * 渲染依赖关系
-     * @param {Array<Date>} dates - 日期数组
+     * @param {Array<Object>} dates - 日期对象数组
      */
     GanttChart.prototype.renderDependencies = function(dates) {
         const depSVG = this.container.querySelector('.gantt-dependencies');
@@ -19,7 +19,16 @@
             return;
         }
 
-        depSVG.style.width = `${dates.length * this.options.cellWidth}px`;
+        const scale = this.options.timeScale || 'day';
+        let totalWidth;
+        
+        if (scale === 'day') {
+            totalWidth = dates.length * this.options.cellWidth;
+        } else {
+            totalWidth = dates.reduce((sum, dateObj) => sum + (this.options.cellWidth * dateObj.span), 0);
+        }
+
+        depSVG.style.width = `${totalWidth}px`;
         depSVG.style.height = `${this.tasks.length * ROW_HEIGHT}px`;
 
         depSVG.innerHTML = `
@@ -40,11 +49,11 @@
     };
 
     /**
-     * 生成依赖路径
+     * 生成依赖路径（支持不同时间刻度）
      * @returns {string} SVG路径HTML字符串
      */
     GanttChart.prototype.generateDependencyPaths = function() {
-        const w = this.options.cellWidth;
+        const scale = this.options.timeScale || 'day';
         const h = ROW_HEIGHT;
         const radius = 8;
         const paths = [];
@@ -60,16 +69,37 @@
                 }
                 
                 const depIndex = this.tasks.findIndex(t => t.id === depId);
-                const depEndOffset = daysBetween(this.startDate, depTask.end);
-                const taskStartOffset = daysBetween(this.startDate, task.start);
                 
-                const x1 = depEndOffset * w + w;
-                const x2 = taskStartOffset * w;
+                // ⭐ 根据时间刻度计算位置
+                let depPosition, taskPosition;
+                
+                if (scale === 'day') {
+                    const depEndOffset = daysBetween(this.startDate, depTask.end);
+                    const depDuration = daysBetween(depTask.start, depTask.end) + 1;
+                    const taskStartOffset = daysBetween(this.startDate, task.start);
+                    
+                    depPosition = {
+                        left: depEndOffset * this.options.cellWidth,
+                        width: depDuration * this.options.cellWidth
+                    };
+                    taskPosition = {
+                        left: taskStartOffset * this.options.cellWidth,
+                        width: 0
+                    };
+                } else {
+                    depPosition = calculateTaskPosition(depTask, this.startDate, scale, this.options.cellWidth);
+                    taskPosition = calculateTaskPosition(task, this.startDate, scale, this.options.cellWidth);
+                }
+                
+                const x1 = depPosition.left + depPosition.width;
+                const x2 = taskPosition.left;
                 const y1 = depIndex * h + h / 2;
                 const y2 = taskIndex * h + h / 2;
                 const d = Math.abs(taskIndex - depIndex);
 
                 let coords;
+                const w = this.options.cellWidth;
+                
                 if (depIndex < taskIndex) {
                     coords = [
                         {x: x1, y: y1},
@@ -147,6 +177,6 @@
         return deps;
     };
 
-    console.log('✅ gantt-dependencies.js loaded successfully');
+    console.log('✅ gantt-dependencies.js loaded successfully (Delta6 - 支持时间刻度)');
 
 })();

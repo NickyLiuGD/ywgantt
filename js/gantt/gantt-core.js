@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图核心类定义                                                ▓▓
 // ▓▓ 路径: js/gantt/gantt-core.js                                   ▓▓
-// ▓▓ 版本: Gamma11                                                  ▓▓
+// ▓▓ 版本: Delta6 - 支持时间刻度缩放                                ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -30,7 +30,8 @@
             enableEdit: true,
             enableResize: true,
             showDependencies: true,
-            showTaskNames: true
+            showTaskNames: true,
+            timeScale: 'day' // ⭐ 新增：时间刻度 (day/week/month)
         }, options || {});
 
         this.selectedTask = null;
@@ -85,24 +86,18 @@
     };
 
     /**
-     * 生成日期数组（带缓存）
-     * @returns {Array<Date>} 日期数组
+     * 生成日期数组（支持不同时间刻度）
+     * @returns {Array<Object>} 日期对象数组
      */
     GanttChart.prototype.generateDates = function() {
-        const cacheKey = `${this.startDate.getTime()}_${this.endDate.getTime()}`;
+        const scale = this.options.timeScale || 'day';
+        const cacheKey = `${this.startDate.getTime()}_${this.endDate.getTime()}_${scale}`;
         
         if (this._dateCache && this._dateCache.key === cacheKey) {
             return this._dateCache.dates;
         }
 
-        const dates = [];
-        let current = new Date(this.startDate);
-        
-        while (current <= this.endDate) {
-            dates.push(new Date(current));
-            current = addDays(current, 1);
-        }
-
+        const dates = generateDatesByScale(this.startDate, this.endDate, scale);
         this._dateCache = { key: cacheKey, dates: dates };
         
         return dates;
@@ -154,6 +149,6 @@
     global.ROW_HEIGHT = ROW_HEIGHT;
     global.HEADER_HEIGHT = HEADER_HEIGHT;
 
-    console.log('✅ gantt-core.js loaded successfully');
+    console.log('✅ gantt-core.js loaded successfully (Delta6 - 支持时间刻度)');
 
 })(typeof window !== 'undefined' ? window : this);

@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Gamma11                                                  ▓▓
+// ▓▓ 版本: Delta6 - 支持时间刻度缩放                                ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -83,13 +83,16 @@
     };
 
     /**
-     * 渲染日期表头
-     * @param {Array<Date>} dates - 日期数组
+     * 渲染日期表头（支持不同时间刻度）
+     * @param {Array<Object>} dates - 日期对象数组
      * @param {Array<string>} weekdays - 星期名称数组
      * @returns {string} HTML字符串
      */
     GanttChart.prototype.renderDateHeaders = function(dates, weekdays) {
-        return dates.map(date => {
+        const scale = this.options.timeScale || 'day';
+        
+        return dates.map(dateObj => {
+            const date = dateObj.date;
             const isWeekendDay = isWeekend(date) && this.options.showWeekends;
             const isTodayDay = isToday(date);
             const classes = ['gantt-date-cell'];
@@ -97,13 +100,46 @@
             if (isWeekendDay) classes.push('weekend');
             if (isTodayDay) classes.push('today');
             
+            // 根据时间刻度计算宽度
+            let cellWidth;
+            if (scale === 'day') {
+                cellWidth = this.options.cellWidth;
+            } else {
+                cellWidth = this.options.cellWidth * dateObj.span;
+            }
+            
+            // 根据时间刻度显示不同内容
+            let content = '';
+            switch (scale) {
+                case 'day':
+                    content = `
+                        <div class="gantt-date-day">${date.getDate()}</div>
+                        <div class="gantt-date-weekday">${weekdays[date.getDay()]}</div>
+                    `;
+                    break;
+                case 'week':
+                    const weekLabel = dateObj.label.split('\n');
+                    content = `
+                        <div class="gantt-date-week">${weekLabel[0]}</div>
+                        <div class="gantt-date-range">${weekLabel[1]}</div>
+                    `;
+                    break;
+                case 'month':
+                    const monthLabel = dateObj.label.split('\n');
+                    content = `
+                        <div class="gantt-date-year">${monthLabel[0]}</div>
+                        <div class="gantt-date-month">${monthLabel[1]}</div>
+                    `;
+                    break;
+            }
+            
             return `
                 <div class="${classes.join(' ')}" 
-                     style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;"
+                     style="width: ${cellWidth}px; min-width: ${cellWidth}px;"
+                     data-scale="${scale}"
                      role="columnheader"
                      aria-label="${formatDate(date)}">
-                    <div class="gantt-date-day">${date.getDate()}</div>
-                    <div class="gantt-date-weekday">${weekdays[date.getDay()]}</div>
+                    ${content}
                 </div>
             `;
         }).join('');
@@ -111,7 +147,7 @@
 
     /**
      * 渲染所有任务行
-     * @param {Array<Date>} dates - 日期数组
+     * @param {Array<Object>} dates - 日期对象数组
      * @returns {string} HTML字符串
      */
     GanttChart.prototype.renderTaskRows = function(dates) {
@@ -119,9 +155,9 @@
     };
 
     /**
-     * 渲染单个任务行
+     * 渲染单个任务行（支持不同时间刻度）
      * @param {Object} task - 任务对象
-     * @param {Array<Date>} dates - 日期数组
+     * @param {Array<Object>} dates - 日期对象数组
      * @returns {string} HTML字符串
      */
     GanttChart.prototype.renderRow = function(task, dates) {
@@ -133,14 +169,22 @@
             return '';
         }
         
-        const startOffset = daysBetween(this.startDate, start);
-        const duration = daysBetween(start, end) + 1;
-        
-        const left = startOffset * this.options.cellWidth;
-        const width = Math.max(duration * this.options.cellWidth, 60);
+        const scale = this.options.timeScale || 'day';
         const progress = Math.min(Math.max(task.progress || 0, 0), 100);
-
         const isSelected = this.selectedTask === task.id;
+        
+        // ⭐ 根据时间刻度计算位置
+        let left, width;
+        if (scale === 'day') {
+            const startOffset = daysBetween(this.startDate, start);
+            const duration = daysBetween(start, end) + 1;
+            left = startOffset * this.options.cellWidth;
+            width = Math.max(duration * this.options.cellWidth, 60);
+        } else {
+            const position = calculateTaskPosition(task, this.startDate, scale, this.options.cellWidth);
+            left = position.left;
+            width = position.width;
+        }
 
         return `
             <div class="gantt-row" role="row" aria-label="任务行: ${this.escapeHtml(task.name)}">
@@ -168,12 +212,15 @@
     };
 
     /**
-     * 渲染单元格
-     * @param {Array<Date>} dates - 日期数组
+     * 渲染单元格（支持不同时间刻度）
+     * @param {Array<Object>} dates - 日期对象数组
      * @returns {string} HTML字符串
      */
     GanttChart.prototype.renderCells = function(dates) {
-        return dates.map(date => {
+        const scale = this.options.timeScale || 'day';
+        
+        return dates.map(dateObj => {
+            const date = dateObj.date;
             const isWeekendDay = isWeekend(date) && this.options.showWeekends;
             const isTodayDay = isToday(date);
             const classes = ['gantt-cell'];
@@ -181,9 +228,18 @@
             if (isWeekendDay) classes.push('weekend');
             if (isTodayDay) classes.push('today');
             
+            // 根据时间刻度计算宽度
+            let cellWidth;
+            if (scale === 'day') {
+                cellWidth = this.options.cellWidth;
+            } else {
+                cellWidth = this.options.cellWidth * dateObj.span;
+            }
+            
             return `
                 <div class="${classes.join(' ')}" 
-                     style="width: ${this.options.cellWidth}px; min-width: ${this.options.cellWidth}px;"
+                     style="width: ${cellWidth}px; min-width: ${cellWidth}px;"
+                     data-scale="${scale}"
                      role="gridcell"></div>
             `;
         }).join('');
@@ -228,6 +284,6 @@
         }, { passive: true });
     };
 
-    console.log('✅ gantt-render.js loaded successfully');
+    console.log('✅ gantt-render.js loaded successfully (Delta6 - 支持时间刻度)');
 
 })();

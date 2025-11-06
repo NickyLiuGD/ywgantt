@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测">
-    <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图">
-    <title>在线甘特图Zeta1</title>
+    <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测、时间刻度缩放">
+    <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图,时间刻度">
+    <title>在线甘特图Zeta2</title>
     
     <!-- Preconnect to CDN for faster loading -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -70,7 +70,7 @@
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Zeta1</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Zeta2</h1>
         </div>
         
         <!-- 展开的浮动工具栏 - 毛玻璃效果 -->
@@ -117,6 +117,19 @@
                 <button class="toolbar-btn" id="toggleView" title="切换视图" aria-label="切换PERT视图">
                     <span class="btn-icon icon" aria-hidden="true">🔄</span>
                     <span class="btn-text">PERT视图</span>
+                </button>
+                <!-- ⭐ 新增时间刻度按钮 -->
+                <button class="toolbar-btn active" id="timeScaleDay" title="按天显示" aria-label="日视图">
+                    <span class="btn-icon icon" aria-hidden="true">📅</span>
+                    <span class="btn-text">日视图</span>
+                </button>
+                <button class="toolbar-btn" id="timeScaleWeek" title="按周显示" aria-label="周视图">
+                    <span class="btn-icon icon" aria-hidden="true">📆</span>
+                    <span class="btn-text">周视图</span>
+                </button>
+                <button class="toolbar-btn" id="timeScaleMonth" title="按月显示" aria-label="月视图">
+                    <span class="btn-icon icon" aria-hidden="true">🗓️</span>
+                    <span class="btn-text">月视图</span>
                 </button>
             </div>
             
@@ -219,6 +232,7 @@
                 'js/utils/date-utils.js',          // 日期处理工具
                 'js/utils/log-utils.js',           // 日志记录工具
                 'js/utils/data-utils.js',          // 数据处理工具
+                'js/utils/time-scale-utils.js',    // ⭐ 时间刻度工具（新增）
                 
                 // ==================== 第二层：甘特图核心（依赖工具函数）====================
                 'js/gantt/gantt-core.js',          // 核心类定义
@@ -255,21 +269,19 @@
                 
                 const script = document.createElement('script');
                 script.src = scripts[index] + '?t=' + timestamp;
-                script.async = false; // ⚡ 确保按顺序执行
+                script.async = false;
                 
                 script.onload = function() {
                     loadedCount++;
                     const progress = Math.round((loadedCount / totalScripts) * 100);
                     console.log(`✅ [${loadedCount}/${totalScripts}] ${scripts[index]} 加载成功 (${progress}%)`);
                     
-                    // 递归加载下一个脚本
                     loadScript(index + 1);
                 };
                 
                 script.onerror = function() {
                     console.error(`❌ 加载失败: ${scripts[index]}`);
                     alert(`模块加载失败：${scripts[index]}\n请检查文件路径或刷新页面重试`);
-                    // 即使失败也继续加载下一个（可选：改为停止加载）
                     loadScript(index + 1);
                 };
                 
@@ -286,10 +298,7 @@
                 console.log(`  总计加载: ${loadedCount}/${totalScripts} 个模块`);
                 console.log('╚═══════════════════════════════════════════════════════════╝');
                 
-                // 显示页面内容
                 document.body.classList.add('loaded');
-                
-                // 延迟验证模块完整性
                 setTimeout(checkModulesLoaded, 500);
             }
             
@@ -301,6 +310,7 @@
                     '日期工具': typeof formatDate !== 'undefined',
                     '日志工具': typeof addLog !== 'undefined',
                     '数据工具': typeof generateId !== 'undefined',
+                    '时间刻度工具': typeof TimeScale !== 'undefined',
                     'GanttChart类': typeof GanttChart !== 'undefined',
                     'gantt实例': typeof gantt !== 'undefined',
                     '冲突检测': typeof detectAllConflicts !== 'undefined'
@@ -325,14 +335,14 @@
                         console.log(`  ✅ ${module}`);
                     });
                     console.log('╠═══════════════════════════════════════════════════════════╣');
-                    console.log('  📊 甘特图就绪 - 版本: Delta6 模块化版');
+                    console.log('  📊 甘特图就绪 - 版本: Delta6 时间刻度版');
                     console.log('  🎯 模块总数: ' + totalScripts);
                     console.log('  ⚡ 加载方式: 顺序加载（按依赖关系）');
+                    console.log('  🆕 新功能: 支持日/周/月视图切换');
                     console.log('╚═══════════════════════════════════════════════════════════╝');
                 }
             }
             
-            // 开始加载第一个脚本
             console.log('╔═══════════════════════════════════════════════════════════╗');
             console.log('║  🚀 开始加载模块...                                       ║');
             console.log('╠═══════════════════════════════════════════════════════════╣');
@@ -348,7 +358,6 @@
     
     <!-- 全局错误处理 -->
     <script>
-        // 捕获全局JavaScript错误
         window.addEventListener('error', function(e) {
             console.error('╔═══════════════════════════════════════════════════════════╗');
             console.error('║  ⚠️ 全局错误                                              ║');
@@ -360,7 +369,6 @@
             console.error('╚═══════════════════════════════════════════════════════════╝');
         });
         
-        // 捕获未处理的Promise拒绝
         window.addEventListener('unhandledrejection', function(e) {
             console.error('╔═══════════════════════════════════════════════════════════╗');
             console.error('║  ⚠️ 未处理的Promise拒绝                                   ║');

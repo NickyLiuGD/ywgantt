@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 应用控制按钮模块                                                ▓▓
 // ▓▓ 路径: js/app/app-controls.js                                   ▓▓
-// ▓▓ 版本: Gamma8                                                   ▓▓
+// ▓▓ 版本: Delta6 - 添加时间刻度切换                                ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -107,6 +107,72 @@
         clearHighlightsBtn.onclick = () => gantt.clearConflictHighlights();
     }
 
+    // ⭐ 时间刻度切换
+    const timeScaleDayBtn = document.getElementById('timeScaleDay');
+    const timeScaleWeekBtn = document.getElementById('timeScaleWeek');
+    const timeScaleMonthBtn = document.getElementById('timeScaleMonth');
+
+    if (timeScaleDayBtn) {
+        timeScaleDayBtn.onclick = () => {
+            gantt.options.timeScale = 'day';
+            gantt.options.cellWidth = getRecommendedCellWidth('day');
+            gantt.calculateDateRange();
+            gantt.render();
+            addLog('✅ 已切换到日视图');
+            updateTimeScaleButtons('day');
+        };
+    }
+
+    if (timeScaleWeekBtn) {
+        timeScaleWeekBtn.onclick = () => {
+            gantt.options.timeScale = 'week';
+            gantt.options.cellWidth = getRecommendedCellWidth('week');
+            gantt.calculateDateRange();
+            gantt.render();
+            addLog('✅ 已切换到周视图');
+            updateTimeScaleButtons('week');
+        };
+    }
+
+    if (timeScaleMonthBtn) {
+        timeScaleMonthBtn.onclick = () => {
+            gantt.options.timeScale = 'month';
+            gantt.options.cellWidth = getRecommendedCellWidth('month');
+            gantt.calculateDateRange();
+            gantt.render();
+            addLog('✅ 已切换到月视图');
+            updateTimeScaleButtons('month');
+        };
+    }
+
+    /**
+     * 更新时间刻度按钮的激活状态
+     * @param {string} activeScale - 当前激活的刻度
+     */
+    function updateTimeScaleButtons(activeScale) {
+        const buttons = {
+            'day': timeScaleDayBtn,
+            'week': timeScaleWeekBtn,
+            'month': timeScaleMonthBtn
+        };
+        
+        Object.keys(buttons).forEach(scale => {
+            const btn = buttons[scale];
+            if (btn) {
+                if (scale === activeScale) {
+                    btn.classList.add('active');
+                    btn.style.background = 'rgba(102, 126, 234, 0.2)';
+                } else {
+                    btn.classList.remove('active');
+                    btn.style.background = '';
+                }
+            }
+        });
+    }
+
+    // 初始化按钮状态
+    updateTimeScaleButtons('day');
+
     // 工具栏悬停展开
     const toolbarCollapsed = document.getElementById('toolbarCollapsed');
     const toolbarExpanded = document.getElementById('floatingToolbarExpanded');
@@ -144,6 +210,6 @@
         });
     }
 
-    console.log('✅ app-controls.js loaded successfully');
+    console.log('✅ app-controls.js loaded successfully (Delta6 - 时间刻度切换)');
 
 })();
