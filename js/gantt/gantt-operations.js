@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图任务操作模块                                              ▓▓
 // ▓▓ 路径: js/gantt/gantt-operations.js                             ▓▓
-// ▓▓ 版本: Gamma11 - 修复版（恢复依赖关系显示）                     ▓▓
+// ▓▓ 版本: Delta6 - 完整版（包含选择/取消选择）                     ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -74,11 +74,28 @@
     };
 
     /**
-     * 更新选择状态（已废弃，功能整合到selectTask中）
-     * @deprecated 使用 selectTask 替代
+     * 取消选择（完整版 - 清除所有高亮）
      */
-    GanttChart.prototype.updateSelectionState = function(taskId) {
-        console.warn('updateSelectionState is deprecated, use selectTask instead');
+    GanttChart.prototype.deselect = function() {
+        if (!this.selectedTask) return;
+
+        this.selectedTask = null;
+        
+        // ⭐ 清除所有选中和依赖高亮
+        this.container.querySelectorAll('.selected, .dep-highlight').forEach(el => {
+            el.classList.remove('selected', 'dep-highlight');
+        });
+        
+        // ⭐ 清除依赖箭头高亮
+        this.container.querySelectorAll('.dep-highlight-arrow').forEach(path => {
+            path.classList.remove('dep-highlight-arrow');
+        });
+        
+        // 移除编辑表单
+        const form = this.container.querySelector('.inline-task-form');
+        if (form) form.remove();
+        
+        addLog('✅ 已取消选择');
     };
 
     /**
@@ -289,6 +306,6 @@
         }
     };
 
-    console.log('✅ gantt-operations.js loaded successfully (修复版 - 恢复依赖关系显示)');
+    console.log('✅ gantt-operations.js loaded successfully (Delta6 - 完整版)');
 
 })();

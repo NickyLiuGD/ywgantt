@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图事件绑定模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-binding.js                        ▓▓
-// ▓▓ 版本: Gamma8 - 修复版（恢复依赖关系显示）                      ▓▓
+// ▓▓ 版本: Delta6 - 完整版（包含所有事件处理）                      ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -11,8 +11,9 @@
      * 绑定所有事件
      */
     GanttChart.prototype.attachEvents = function() {
-        // 左侧任务名称事件
+        // ==================== 左侧任务名称事件 ====================
         this.container.querySelectorAll('.gantt-task-name').forEach(el => {
+            // 单击：选中任务并打开编辑表单
             el.onclick = (e) => {
                 if (el.classList.contains('editing')) return;
                 const taskId = el.dataset.taskId;
@@ -23,6 +24,7 @@
                 this.showInlineTaskForm(task);
             };
 
+            // 双击：编辑任务名称
             el.ondblclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -30,8 +32,9 @@
             };
         });
 
-        // 右侧任务名称标签事件
+        // ==================== 右侧任务名称标签事件 ====================
         this.container.querySelectorAll('.gantt-bar-label-external').forEach(label => {
+            // 单击：选中任务并打开编辑表单
             label.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -44,6 +47,7 @@
                 this.showInlineTaskForm(task);
             };
 
+            // 双击：编辑任务名称
             label.ondblclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -53,10 +57,11 @@
             };
         });
 
-        // 甘特图任务条事件
+        // ==================== 甘特图任务条事件 ====================
         this.container.querySelectorAll('.gantt-bar').forEach(bar => {
             const taskId = bar.dataset.taskId;
 
+            // 单击：切换依赖（仅在表单打开时）
             bar.onclick = (e) => {
                 if (e.target.classList.contains('gantt-bar-handle')) return;
 
@@ -76,14 +81,18 @@
                 }
             };
 
+            // 鼠标按下：开始拖拽或调整大小
             bar.onmousedown = (e) => {
                 const target = e.target;
+                
+                // 如果点击的是调整手柄
                 if (target.classList.contains('gantt-bar-handle')) {
                     if (!this.options.enableResize) return;
                     const isRight = target.classList.contains('right');
                     const task = this.tasks.find(t => t.id === taskId);
                     this.startResize(e, task, bar, isRight);
                 } else {
+                    // 点击任务条主体，开始拖拽
                     if (!this.options.enableEdit) return;
                     const task = this.tasks.find(t => t.id === taskId);
                     this.startDrag(e, task, bar);
@@ -92,6 +101,7 @@
                 e.stopPropagation();
             };
 
+            // 双击：编辑任务名称
             bar.ondblclick = (e) => {
                 if (e.target.classList.contains('gantt-bar-handle')) return;
                 e.preventDefault();
@@ -101,17 +111,18 @@
             };
         });
 
-        // 点击时间轴空白处取消选择
+        // ==================== 点击时间轴空白处取消选择 ====================
         const timelineWrapper = this.container.querySelector('.gantt-timeline-wrapper');
         if (timelineWrapper) {
             timelineWrapper.addEventListener('click', (e) => {
+                // 如果点击的不是任务条、手柄、表单或标签，则取消选择
                 if (!e.target.closest('.gantt-bar, .gantt-bar-handle, .inline-task-form, .gantt-bar-label-external')) {
                     this.deselect();
                 }
             });
         }
 
-        // 全局鼠标事件
+        // ==================== 全局鼠标事件（拖拽和调整大小）====================
         if (!this._mouseMoveHandler) {
             this._mouseMoveHandler = (e) => this.onMouseMove(e);
         }
@@ -126,30 +137,73 @@
     };
 
     /**
-     * 取消选择（完整版 - 清除所有高亮）
+     * 编辑任务名称（内联编辑）
+     * @param {HTMLElement} element - 任务名称元素
      */
-    GanttChart.prototype.deselect = function() {
-        if (!this.selectedTask) return;
+    GanttChart.prototype.editTaskName = function(element) {
+        if (element.classList.contains('editing')) return;
+        
+        const taskId = element.dataset.taskId;
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return;
+        
+        const originalName = task.name;
 
-        this.selectedTask = null;
+        // 创建输入框
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = originalName;
+        input.style.cssText = 'border:1px solid #007bff;border-radius:4px;padding:4px 8px;font-size:0.9rem;width:100%;outline:none;';
+
+        // 替换元素内容
+        element.innerHTML = '';
+        element.appendChild(input);
+        element.classList.add('editing');
         
-        // ⭐ 清除所有选中和依赖高亮
-        this.container.querySelectorAll('.selected, .dep-highlight').forEach(el => {
-            el.classList.remove('selected', 'dep-highlight');
-        });
+        // 聚焦并选中文本
+        setTimeout(() => { 
+            input.focus(); 
+            input.select(); 
+        }, 10);
+
+        // 保存编辑
+        const saveEdit = () => {
+            const newName = input.value.trim();
+            if (newName && newName !== originalName) {
+                task.name = newName;
+                addLog(`任务名称从 "${originalName}" 改为 "${newName}"`);
+            }
+            
+            // 恢复显示
+            element.textContent = task.name;
+            element.classList.remove('editing');
+            
+            // 更新外部标签
+            const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${taskId}"]`);
+            if (externalLabel) {
+                externalLabel.textContent = `${task.name} (${task.progress || 0}%)`;
+            }
+        };
+
+        // 失焦时保存
+        input.onblur = () => setTimeout(saveEdit, 100);
         
-        // ⭐ 清除依赖箭头高亮
-        this.container.querySelectorAll('.dep-highlight-arrow').forEach(path => {
-            path.classList.remove('dep-highlight-arrow');
-        });
+        // 键盘事件
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveEdit();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                element.textContent = originalName;
+                element.classList.remove('editing');
+            }
+        };
         
-        // 移除编辑表单
-        const form = this.container.querySelector('.inline-task-form');
-        if (form) form.remove();
-        
-        addLog('✅ 已取消选择');
+        // 阻止点击冒泡
+        input.onclick = (e) => e.stopPropagation();
     };
 
-    console.log('✅ gantt-events-binding.js loaded successfully (修复版 - 恢复依赖关系显示)');
+    console.log('✅ gantt-events-binding.js loaded successfully (Delta6 - 完整版)');
 
 })();
