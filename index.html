@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测">
     <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图">
-    <title>在线甘特图Delta6</title>
+    <title>在线甘特图Zeta</title>
     
     <!-- Preconnect to CDN for faster loading -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -70,7 +70,7 @@
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Delta6</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Zeta</h1>
         </div>
         
         <!-- 展开的浮动工具栏 - 毛玻璃效果 -->
@@ -186,9 +186,6 @@
             </div>
         </aside>
         
-        <!-- ❌ 删除：独立的任务表单容器 -->
-        <!-- <div class="task-form-minimal" id="taskFormContainer"></div> -->
-        
         <!-- 日志区域(可折叠) -->
         <section class="log-panel hidden" id="logPanel" aria-label="操作日志">
             <div class="log-header" id="logHeader" role="button" tabindex="0" aria-expanded="true" aria-controls="logArea">
@@ -207,84 +204,169 @@
         <div id="pertContainer" style="display: none; height: 600px;" role="region" aria-label="PERT网络图"></div>
     </div>
     
-    <!-- JavaScript 动态加载 -->
+    <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+         JavaScript 模块化动态加载（按依赖顺序）
+         ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
     <script>
         (function() {
             'use strict';
             
             const timestamp = Date.now();
+            
+            // ⭐ 模块化加载顺序（严格按依赖关系）
             const scripts = [
-                'js/utils.js',
-                'js/gantt-chart.js',
-                'js/gantt-events.js',
-                'js/gantt-conflicts.js',
-                'js/app.js'
+                // ==================== 第一层：工具函数（无依赖）====================
+                'js/utils/date-utils.js',          // 日期处理工具
+                'js/utils/log-utils.js',           // 日志记录工具
+                'js/utils/data-utils.js',          // 数据处理工具
+                
+                // ==================== 第二层：甘特图核心（依赖工具函数）====================
+                'js/gantt/gantt-core.js',          // 核心类定义
+                'js/gantt/gantt-render.js',        // 渲染逻辑
+                'js/gantt/gantt-dependencies.js',  // 依赖关系渲染
+                'js/gantt/gantt-operations.js',    // 任务操作
+                
+                // ==================== 第三层：事件处理（依赖核心类）====================
+                'js/events/gantt-events-binding.js', // 事件绑定
+                'js/events/gantt-events-drag.js',    // 拖拽操作
+                'js/events/gantt-events-form.js',    // 编辑表单
+                
+                // ==================== 第四层：冲突检测（依赖核心类和工具函数）====================
+                'js/gantt-conflicts.js',           // 冲突检测与修复
+                
+                // ==================== 第五层：应用初始化（依赖所有模块）====================
+                'js/app/app-init.js',              // 应用初始化
+                'js/app/app-controls.js',          // 控制按钮
+                'js/app/app-settings.js'           // 设置面板与视图切换
             ];
             
             let loadedCount = 0;
+            const totalScripts = scripts.length;
             
+            /**
+             * 递归加载脚本
+             * @param {number} index - 当前加载的脚本索引
+             */
             function loadScript(index) {
-                if (index >= scripts.length) {
+                if (index >= totalScripts) {
                     onAllScriptsLoaded();
                     return;
                 }
                 
                 const script = document.createElement('script');
                 script.src = scripts[index] + '?t=' + timestamp;
-                script.async = false;
+                script.async = false; // ⚡ 确保按顺序执行
                 
                 script.onload = function() {
                     loadedCount++;
+                    const progress = Math.round((loadedCount / totalScripts) * 100);
+                    console.log(`✅ [${loadedCount}/${totalScripts}] ${scripts[index]} 加载成功 (${progress}%)`);
+                    
+                    // 递归加载下一个脚本
                     loadScript(index + 1);
                 };
                 
                 script.onerror = function() {
-                    console.error('Failed to load script:', scripts[index]);
+                    console.error(`❌ 加载失败: ${scripts[index]}`);
+                    alert(`模块加载失败：${scripts[index]}\n请检查文件路径或刷新页面重试`);
+                    // 即使失败也继续加载下一个（可选：改为停止加载）
                     loadScript(index + 1);
                 };
                 
                 document.body.appendChild(script);
             }
             
+            /**
+             * 所有脚本加载完成后的回调
+             */
             function onAllScriptsLoaded() {
+                console.log('╔═══════════════════════════════════════════════════════════╗');
+                console.log('║  🎉 所有模块加载完成！                                    ║');
+                console.log('╠═══════════════════════════════════════════════════════════╣');
+                console.log(`  总计加载: ${loadedCount}/${totalScripts} 个模块`);
+                console.log('╚═══════════════════════════════════════════════════════════╝');
+                
+                // 显示页面内容
                 document.body.classList.add('loaded');
+                
+                // 延迟验证模块完整性
                 setTimeout(checkModulesLoaded, 500);
             }
             
+            /**
+             * 验证关键模块是否正确加载
+             */
             function checkModulesLoaded() {
                 const checks = {
+                    '日期工具': typeof formatDate !== 'undefined',
+                    '日志工具': typeof addLog !== 'undefined',
+                    '数据工具': typeof generateId !== 'undefined',
                     'GanttChart类': typeof GanttChart !== 'undefined',
                     'gantt实例': typeof gantt !== 'undefined',
-                    '工具函数': typeof formatDate !== 'undefined',
                     '冲突检测': typeof detectAllConflicts !== 'undefined'
                 };
                 
                 const failed = Object.keys(checks).filter(key => !checks[key]);
                 
                 if (failed.length > 0) {
-                    console.error('加载失败的模块:', failed);
-                    alert('部分模块加载失败: ' + failed.join(', ') + '\n请刷新页面重试');
+                    console.error('╔═══════════════════════════════════════════════════════════╗');
+                    console.error('║  ❌ 模块验证失败                                          ║');
+                    console.error('╠═══════════════════════════════════════════════════════════╣');
+                    failed.forEach(module => {
+                        console.error(`  ❌ ${module} 未正确加载`);
+                    });
+                    console.error('╚═══════════════════════════════════════════════════════════╝');
+                    alert('部分模块加载失败:\n' + failed.join('\n') + '\n\n请刷新页面重试');
                 } else {
-                    console.log('✅ 所有模块加载成功!');
-                    console.log('📊 甘特图就绪 - 版本: Gamma8-优化版');
+                    console.log('╔═══════════════════════════════════════════════════════════╗');
+                    console.log('║  ✅ 模块验证通过                                          ║');
+                    console.log('╠═══════════════════════════════════════════════════════════╣');
+                    Object.keys(checks).forEach(module => {
+                        console.log(`  ✅ ${module}`);
+                    });
+                    console.log('╠═══════════════════════════════════════════════════════════╣');
+                    console.log('  📊 甘特图就绪 - 版本: Delta6 模块化版');
+                    console.log('  🎯 模块总数: ' + totalScripts);
+                    console.log('  ⚡ 加载方式: 顺序加载（按依赖关系）');
+                    console.log('╚═══════════════════════════════════════════════════════════╝');
                 }
             }
+            
+            // 开始加载第一个脚本
+            console.log('╔═══════════════════════════════════════════════════════════╗');
+            console.log('║  🚀 开始加载模块...                                       ║');
+            console.log('╠═══════════════════════════════════════════════════════════╣');
+            console.log(`  总模块数: ${totalScripts}`);
+            console.log('╚═══════════════════════════════════════════════════════════╝');
             
             loadScript(0);
         })();
     </script>
     
-    <!-- Bootstrap JS -->
+    <!-- Bootstrap JS (defer loading) -->
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js" integrity="sha512-X/YkDZyjTf4wyc2Vy16YGCPHwAY8rZJY+POgokZjQB2mhIRFJCckEGc6YyX9eNsPfn0PzThEuNs+uaomE5CO6A==" crossorigin="anonymous"></script>
     
-    <!-- 错误处理 -->
+    <!-- 全局错误处理 -->
     <script>
+        // 捕获全局JavaScript错误
         window.addEventListener('error', function(e) {
-            console.error('Global error:', e.message, e.filename, e.lineno, e.colno);
+            console.error('╔═══════════════════════════════════════════════════════════╗');
+            console.error('║  ⚠️ 全局错误                                              ║');
+            console.error('╠═══════════════════════════════════════════════════════════╣');
+            console.error('  消息:', e.message);
+            console.error('  文件:', e.filename);
+            console.error('  行号:', e.lineno);
+            console.error('  列号:', e.colno);
+            console.error('╚═══════════════════════════════════════════════════════════╝');
         });
         
+        // 捕获未处理的Promise拒绝
         window.addEventListener('unhandledrejection', function(e) {
-            console.error('Unhandled promise rejection:', e.reason);
+            console.error('╔═══════════════════════════════════════════════════════════╗');
+            console.error('║  ⚠️ 未处理的Promise拒绝                                   ║');
+            console.error('╠═══════════════════════════════════════════════════════════╣');
+            console.error('  原因:', e.reason);
+            console.error('╚═══════════════════════════════════════════════════════════╝');
         });
     </script>
 </body>
