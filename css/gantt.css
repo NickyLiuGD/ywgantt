@@ -1436,3 +1436,62 @@ input:checked + .switch-slider:before {
     border-left: 3px solid var(--warning-color);
     border-right: 3px solid var(--warning-color);
 }
+
+/* ======================
+   依赖箭头样式增强
+   ====================== */
+
+/* 默认箭头样式 */
+.gantt-dependencies path.dependency-arrow {
+    stroke: #dc3545;
+    stroke-width: 2;
+    fill: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+/* 悬停效果 */
+.gantt-dependencies path.dependency-arrow:hover {
+    stroke: #ff6b6b;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 4px rgba(220, 53, 69, 0.5));
+}
+
+/* 高亮箭头（选中任务时） */
+.gantt-dependencies path.dep-highlight-arrow {
+    stroke: #10b981 !important;
+    stroke-width: 3 !important;
+    filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6));
+    animation: arrowPulse 2s ease-in-out infinite;
+}
+
+/* 箭头脉冲动画 */
+@keyframes arrowPulse {
+    0%, 100% {
+        stroke-width: 3;
+        opacity: 1;
+    }
+    50% {
+        stroke-width: 4;
+        opacity: 0.8;
+    }
+}
+
+/* 不同时间刻度下的箭头粗细 */
+[data-scale="week"] ~ .gantt-dependencies path {
+    stroke-width: 1.5;
+}
+
+[data-scale="month"] ~ .gantt-dependencies path {
+    stroke-width: 1;
+}
+
+[data-scale="week"] ~ .gantt-dependencies path:hover,
+[data-scale="week"] ~ .gantt-dependencies path.dep-highlight-arrow {
+    stroke-width: 2.5;
+}
+
+[data-scale="month"] ~ .gantt-dependencies path:hover,
+[data-scale="month"] ~ .gantt-dependencies path.dep-highlight-arrow {
+    stroke-width: 2;
+}

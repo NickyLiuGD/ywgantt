@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Delta6 - 支持时间刻度缩放                                ▓▓
+// ▓▓ 版本: Delta6 - 修复周/月视图任务条位置                         ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -100,13 +100,9 @@
             if (isWeekendDay) classes.push('weekend');
             if (isTodayDay) classes.push('today');
             
-            // 根据时间刻度计算宽度
-            let cellWidth;
-            if (scale === 'day') {
-                cellWidth = this.options.cellWidth;
-            } else {
-                cellWidth = this.options.cellWidth * dateObj.span;
-            }
+            // ⭐ 关键修复：根据时间刻度计算单元格宽度
+            // cellWidth 是"每天的宽度"，span 是"天数"
+            const cellWidth = this.options.cellWidth * dateObj.span;
             
             // 根据时间刻度显示不同内容
             let content = '';
@@ -137,6 +133,8 @@
                 <div class="${classes.join(' ')}" 
                      style="width: ${cellWidth}px; min-width: ${cellWidth}px;"
                      data-scale="${scale}"
+                     data-start="${formatDate(dateObj.startDate)}"
+                     data-end="${formatDate(dateObj.endDate)}"
                      role="columnheader"
                      aria-label="${formatDate(date)}">
                     ${content}
@@ -155,7 +153,7 @@
     };
 
     /**
-     * 渲染单个任务行（支持不同时间刻度）
+     * 渲染单个任务行（修复版 - 正确计算任务条位置）
      * @param {Object} task - 任务对象
      * @param {Array<Object>} dates - 日期对象数组
      * @returns {string} HTML字符串
@@ -173,18 +171,13 @@
         const progress = Math.min(Math.max(task.progress || 0, 0), 100);
         const isSelected = this.selectedTask === task.id;
         
-        // ⭐ 根据时间刻度计算位置
-        let left, width;
-        if (scale === 'day') {
-            const startOffset = daysBetween(this.startDate, start);
-            const duration = daysBetween(start, end) + 1;
-            left = startOffset * this.options.cellWidth;
-            width = Math.max(duration * this.options.cellWidth, 60);
-        } else {
-            const position = calculateTaskPosition(task, this.startDate, scale, this.options.cellWidth);
-            left = position.left;
-            width = position.width;
-        }
+        // ⭐ 关键修复：统一使用天数计算位置
+        // cellWidth 是"每天的像素宽度"
+        const startDays = daysBetween(this.startDate, start);
+        const durationDays = daysBetween(start, end) + 1;
+        
+        const left = startDays * this.options.cellWidth;
+        const width = Math.max(durationDays * this.options.cellWidth, 30);
 
         return `
             <div class="gantt-row" role="row" aria-label="任务行: ${this.escapeHtml(task.name)}">
@@ -212,7 +205,7 @@
     };
 
     /**
-     * 渲染单元格（支持不同时间刻度）
+     * 渲染单元格（修复版 - 正确计算单元格宽度）
      * @param {Array<Object>} dates - 日期对象数组
      * @returns {string} HTML字符串
      */
@@ -228,13 +221,8 @@
             if (isWeekendDay) classes.push('weekend');
             if (isTodayDay) classes.push('today');
             
-            // 根据时间刻度计算宽度
-            let cellWidth;
-            if (scale === 'day') {
-                cellWidth = this.options.cellWidth;
-            } else {
-                cellWidth = this.options.cellWidth * dateObj.span;
-            }
+            // ⭐ 关键修复：单元格宽度 = 每天宽度 × 天数
+            const cellWidth = this.options.cellWidth * dateObj.span;
             
             return `
                 <div class="${classes.join(' ')}" 
@@ -284,6 +272,6 @@
         }, { passive: true });
     };
 
-    console.log('✅ gantt-render.js loaded successfully (Delta6 - 支持时间刻度)');
+    console.log('✅ gantt-render.js loaded successfully (Delta6 - 修复周/月视图)');
 
 })();

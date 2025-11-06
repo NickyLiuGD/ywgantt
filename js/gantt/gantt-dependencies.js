@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图依赖关系模块                                              ▓▓
 // ▓▓ 路径: js/gantt/gantt-dependencies.js                           ▓▓
-// ▓▓ 版本: Delta6 - 修复箭头方向（前置→后继）                       ▓▓
+// ▓▓ 版本: Delta6 - 修复箭头位置计算                                ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -20,13 +20,9 @@
         }
 
         const scale = this.options.timeScale || 'day';
-        let totalWidth;
         
-        if (scale === 'day') {
-            totalWidth = dates.length * this.options.cellWidth;
-        } else {
-            totalWidth = dates.reduce((sum, dateObj) => sum + (this.options.cellWidth * dateObj.span), 0);
-        }
+        // ⭐ 计算SVG总宽度（使用工具函数）
+        const totalWidth = calculateTotalWidth(dates, this.options.cellWidth);
 
         depSVG.style.width = `${totalWidth}px`;
         depSVG.style.height = `${this.tasks.length * ROW_HEIGHT}px`;
@@ -49,7 +45,7 @@
     };
 
     /**
-     * 生成依赖路径（修复版 - 正确的箭头方向）
+     * 生成依赖路径（修复版 - 正确的箭头方向和位置）
      * @returns {string} SVG路径HTML字符串
      */
     GanttChart.prototype.generateDependencyPaths = function() {
@@ -71,43 +67,26 @@
                 
                 const depIndex = this.tasks.findIndex(t => t.id === depId);
                 
-                // ⭐ 计算前置任务（依赖任务）的位置
-                let depPosition, taskPosition;
+                // ⭐ 统一使用天数计算位置（与任务条计算保持一致）
+                const depStartDays = daysBetween(this.startDate, new Date(depTask.start));
+                const depDurationDays = daysBetween(depTask.start, depTask.end) + 1;
+                const taskStartDays = daysBetween(this.startDate, new Date(task.start));
                 
-                if (scale === 'day') {
-                    // 日视图：直接计算
-                    const depStartOffset = daysBetween(this.startDate, depTask.start);
-                    const depDuration = daysBetween(depTask.start, depTask.end) + 1;
-                    const taskStartOffset = daysBetween(this.startDate, task.start);
-                    const taskDuration = daysBetween(task.start, task.end) + 1;
-                    
-                    depPosition = {
-                        left: depStartOffset * this.options.cellWidth,
-                        width: depDuration * this.options.cellWidth
-                    };
-                    taskPosition = {
-                        left: taskStartOffset * this.options.cellWidth,
-                        width: taskDuration * this.options.cellWidth
-                    };
-                } else {
-                    // 周/月视图：使用计算函数
-                    depPosition = calculateTaskPosition(depTask, this.startDate, scale, this.options.cellWidth);
-                    taskPosition = calculateTaskPosition(task, this.startDate, scale, this.options.cellWidth);
-                }
+                // ⭐ 前置任务的右侧位置
+                const x1 = (depStartDays + depDurationDays) * this.options.cellWidth;
+                const y1 = depIndex * h + h / 2;
                 
-                // ⭐ 关键修复：箭头起点是前置任务的右侧，终点是后继任务的左侧
-                const x1 = depPosition.left + depPosition.width;  // 前置任务右侧
-                const y1 = depIndex * h + h / 2;                   // 前置任务中心Y
-                const x2 = taskPosition.left;                      // 后继任务左侧
-                const y2 = taskIndex * h + h / 2;                  // 后继任务中心Y
+                // ⭐ 后继任务的左侧位置
+                const x2 = taskStartDays * this.options.cellWidth;
+                const y2 = taskIndex * h + h / 2;
                 
                 // 计算垂直距离（行数差）
                 const rowDiff = Math.abs(taskIndex - depIndex);
                 
                 // 生成路径坐标
                 let coords;
-                const w = this.options.cellWidth;
-                const gap = 10; // 箭头与任务条的间隙
+                const w = this.options.cellWidth * 7; // 基准宽度（约一周）
+                const gap = 5; // 箭头与任务条的间隙
                 
                 if (depIndex < taskIndex) {
                     // ⭐ 前置任务在上方（向下的箭头）
@@ -122,8 +101,8 @@
                         ];
                     } else {
                         // 情况2：后继任务在前置任务左侧（回折）
-                        const bendOut = w / 2;
-                        const bendDown = h / 4;
+                        const bendOut = Math.min(w / 4, 30);
+                        const bendDown = h / 3;
                         coords = [
                             {x: x1, y: y1},                    // 起点
                             {x: x1 + bendOut, y: y1},          // 向右弯出
@@ -146,8 +125,8 @@
                         ];
                     } else {
                         // 情况2：后继任务在前置任务左侧
-                        const bendOut = w / 2;
-                        const bendUp = h / 4;
+                        const bendOut = Math.min(w / 4, 30);
+                        const bendUp = h / 3;
                         coords = [
                             {x: x1, y: y1},                    // 起点
                             {x: x1 + bendOut, y: y1},          // 向右弯出
@@ -167,15 +146,14 @@
                         ];
                     } else {
                         // 情况2：后继任务在左侧（弧形回折）
-                        const bendHeight = h / 3;
-                        const midX = (x1 + x2) / 2;
+                        const bendHeight = h / 2;
+                        const bendOut = Math.min(w / 6, 20);
                         coords = [
                             {x: x1, y: y1},                    // 起点
-                            {x: x1 + w / 4, y: y1},            // 向右
-                            {x: x1 + w / 4, y: y1 - bendHeight}, // 向上弯
-                            {x: midX, y: y1 - bendHeight},     // 弧顶
-                            {x: x2 - w / 4, y: y2 - bendHeight}, // 向左
-                            {x: x2 - w / 4, y: y2},            // 向下
+                            {x: x1 + bendOut, y: y1},          // 向右
+                            {x: x1 + bendOut, y: y1 - bendHeight}, // 向上弯
+                            {x: x2 - bendOut, y: y2 - bendHeight}, // 弧顶向左
+                            {x: x2 - bendOut, y: y2},          // 向下
                             {x: x2 - gap, y: y2}               // 到达
                         ];
                     }
@@ -187,7 +165,8 @@
                 // ⭐ 数据属性：from是前置任务，to是后继任务
                 paths.push(`<path data-from="${depId}" data-to="${task.id}" d="${dPath}" 
                                   stroke="#dc3545" fill="none" stroke-width="2" 
-                                  marker-end="url(#arrow)" />`);
+                                  marker-end="url(#arrow)" 
+                                  class="dependency-arrow" />`);
             });
         });
 
@@ -232,6 +211,6 @@
         return deps;
     };
 
-    console.log('✅ gantt-dependencies.js loaded successfully (Delta6 - 箭头方向修复版)');
+    console.log('✅ gantt-dependencies.js loaded successfully (Delta6 - 箭头位置修复版)');
 
 })();

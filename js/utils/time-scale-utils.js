@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 时间轴缩放工具模块                                              ▓▓
 // ▓▓ 路径: js/utils/time-scale-utils.js                             ▓▓
-// ▓▓ 版本: Delta6                                                   ▓▓
+// ▓▓ 版本: Delta6 - 修复周/月视图任务条位置计算                     ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -24,7 +24,7 @@
     function getWeekStart(date) {
         const d = new Date(date);
         const day = d.getDay();
-        const diff = day === 0 ? -6 : 1 - day; // 周日算上周
+        const diff = day === 0 ? -6 : 1 - day;
         d.setDate(d.getDate() + diff);
         d.setHours(0, 0, 0, 0);
         return d;
@@ -130,7 +130,9 @@
                         date: new Date(current),
                         label: formatDate(current),
                         type: 'day',
-                        span: 1
+                        span: 1,
+                        startDate: new Date(current),
+                        endDate: new Date(current)
                     });
                     current = addDays(current, 1);
                 }
@@ -148,8 +150,8 @@
                         label: formatWeekLabel(current),
                         type: 'week',
                         span: span,
-                        weekStart: new Date(current),
-                        weekEnd: new Date(weekEnd)
+                        startDate: new Date(current),
+                        endDate: new Date(weekEnd)
                     });
                     
                     current = addDays(weekEnd, 1);
@@ -168,8 +170,8 @@
                         label: formatMonthLabel(current),
                         type: 'month',
                         span: span,
-                        monthStart: new Date(current),
-                        monthEnd: new Date(monthEnd)
+                        startDate: new Date(current),
+                        endDate: new Date(monthEnd)
                     });
                     
                     current.setMonth(current.getMonth() + 1);
@@ -182,66 +184,63 @@
     }
 
     /**
-     * 根据时间刻度获取推荐的单元格宽度
+     * 根据时间刻度获取推荐的单元格宽度（每天的宽度）
      * @param {string} scale - 时间刻度
-     * @returns {number} 推荐的单元格宽度（像素）
+     * @returns {number} 推荐的每天宽度（像素）
      */
     function getRecommendedCellWidth(scale) {
         switch (scale) {
             case TimeScale.DAY:
-                return 50;
+                return 50;  // 每天50px
             case TimeScale.WEEK:
-                return 80;
+                return 12;  // 每天12px（一周84px）
             case TimeScale.MONTH:
-                return 100;
+                return 4;   // 每天4px（一月约120px）
             default:
                 return 50;
         }
     }
 
     /**
-     * 计算任务在指定刻度下的位置和宽度
+     * 计算任务在指定刻度下的位置和宽度（修复版）
      * @param {Object} task - 任务对象
      * @param {Date} timelineStart - 时间轴开始日期
      * @param {string} scale - 时间刻度
-     * @param {number} cellWidth - 单元格宽度
+     * @param {number} cellWidth - 每天的宽度（像素）
      * @returns {Object} {left, width} 位置和宽度（像素）
      */
     function calculateTaskPosition(task, timelineStart, scale, cellWidth) {
         const taskStart = new Date(task.start);
         const taskEnd = new Date(task.end);
         
-        let startOffset, endOffset;
+        // ⭐ 关键：所有刻度下都按天数计算像素位置
+        // cellWidth 在不同刻度下代表"每天的像素宽度"
         
-        switch (scale) {
-            case TimeScale.DAY:
-                startOffset = daysBetween(timelineStart, taskStart);
-                endOffset = daysBetween(timelineStart, taskEnd) + 1;
-                break;
-                
-            case TimeScale.WEEK:
-                const weekStart = getWeekStart(timelineStart);
-                startOffset = Math.floor(daysBetween(weekStart, taskStart) / 7);
-                endOffset = Math.ceil(daysBetween(weekStart, taskEnd) / 7);
-                break;
-                
-            case TimeScale.MONTH:
-                const monthStart = getMonthStart(timelineStart);
-                startOffset = (taskStart.getFullYear() - monthStart.getFullYear()) * 12 
-                            + (taskStart.getMonth() - monthStart.getMonth());
-                endOffset = (taskEnd.getFullYear() - monthStart.getFullYear()) * 12 
-                          + (taskEnd.getMonth() - monthStart.getMonth()) + 1;
-                break;
-                
-            default:
-                startOffset = daysBetween(timelineStart, taskStart);
-                endOffset = daysBetween(timelineStart, taskEnd) + 1;
-        }
+        // 计算任务开始日期距离时间轴起点的天数
+        const startDays = daysBetween(timelineStart, taskStart);
+        // 计算任务的工期（天数）
+        const durationDays = daysBetween(taskStart, taskEnd) + 1;
         
-        const left = startOffset * cellWidth;
-        const width = Math.max((endOffset - startOffset) * cellWidth, 60);
+        // ⭐ 位置 = 天数 × 每天宽度
+        const left = startDays * cellWidth;
+        const width = Math.max(durationDays * cellWidth, 30); // 最小宽度30px
         
         return { left, width };
+    }
+
+    /**
+     * 根据时间刻度和日期数组计算总宽度
+     * @param {Array<Object>} dates - 日期对象数组
+     * @param {number} cellWidth - 每天的宽度
+     * @returns {number} 总宽度（像素）
+     */
+    function calculateTotalWidth(dates, cellWidth) {
+        if (!dates || dates.length === 0) return 0;
+        
+        // 计算总天数
+        const totalDays = dates.reduce((sum, dateObj) => sum + dateObj.span, 0);
+        
+        return totalDays * cellWidth;
     }
 
     // 导出到全局
@@ -256,7 +255,8 @@
     global.generateDatesByScale = generateDatesByScale;
     global.getRecommendedCellWidth = getRecommendedCellWidth;
     global.calculateTaskPosition = calculateTaskPosition;
+    global.calculateTotalWidth = calculateTotalWidth;
 
-    console.log('✅ time-scale-utils.js loaded successfully');
+    console.log('✅ time-scale-utils.js loaded successfully (Delta6 - 修复版)');
 
 })(typeof window !== 'undefined' ? window : this);
