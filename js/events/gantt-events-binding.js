@@ -81,6 +81,41 @@
                 }
             };
 
+        // ==================== 左侧起始时间标签事件 ====================
+        this.container.querySelectorAll('.gantt-bar-label-start').forEach(label => {
+            // 单击：选中任务并打开编辑表单
+            label.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const taskId = label.dataset.taskId;
+                const task = this.tasks.find(t => t.id === taskId);
+                if (!task) return;
+
+                this.selectTask(taskId);
+                this.showInlineTaskForm(task);
+            };
+
+            // 双击：快速修改开始日期
+            label.ondblclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const taskId = label.dataset.taskId;
+                const task = this.tasks.find(t => t.id === taskId);
+                if (!task) return;
+                
+                const newDate = prompt('修改开始日期 (YYYY-MM-DD):', task.start);
+                if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+                    const duration = daysBetween(task.start, task.end);
+                    task.start = newDate;
+                    task.end = formatDate(addDays(new Date(newDate), duration));
+                    this.calculateDateRange();
+                    this.render();
+                    addLog(`✅ 已修改任务"${task.name}"的开始日期为 ${newDate}`);
+                }
+            };
+        });
+
             // 鼠标按下：开始拖拽或调整大小
             bar.onmousedown = (e) => {
                 const target = e.target;

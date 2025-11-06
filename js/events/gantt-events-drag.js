@@ -41,7 +41,7 @@
     };
 
     /**
-     * 鼠标移动处理
+     * 鼠标移动处理（添加左侧标签更新）
      */
     GanttChart.prototype.onMouseMove = function(e) {
         if (!this.dragState) return;
@@ -57,10 +57,34 @@
             const offset = daysBetween(this.startDate, newStart);
             this.dragState.bar.style.left = offset * this.options.cellWidth + 'px';
             
+            // ⭐ 更新右侧任务名称标签
             const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${this.dragState.task.id}"]`);
             if (externalLabel) {
                 const barWidth = parseFloat(this.dragState.bar.style.width) || this.dragState.bar.offsetWidth;
                 externalLabel.style.left = (offset * this.options.cellWidth + barWidth + 8) + 'px';
+            }
+            
+            // ⭐ 更新左侧起始时间标签
+            const startLabel = this.container.querySelector(`.gantt-bar-label-start[data-task-id="${this.dragState.task.id}"]`);
+            if (startLabel) {
+                startLabel.style.right = `calc(100% - ${offset * this.options.cellWidth}px + 8px)`;
+                
+                // 更新标签文本
+                const scale = this.options.timeScale || 'day';
+                let startTimeLabel = '';
+                switch (scale) {
+                    case 'day':
+                        startTimeLabel = formatDate(newStart);
+                        break;
+                    case 'week':
+                        const weekNum = getWeekNumber(newStart);
+                        startTimeLabel = `第${weekNum}周`;
+                        break;
+                    case 'month':
+                        startTimeLabel = `${newStart.getMonth() + 1}月${newStart.getDate()}日`;
+                        break;
+                }
+                startLabel.textContent = startTimeLabel;
             }
             
             const form = this.container.querySelector('.inline-task-form');
@@ -95,9 +119,32 @@
                     this.dragState.bar.style.left = offset * this.options.cellWidth + 'px';
                     this.dragState.bar.style.width = w + 'px';
                     
+                    // ⭐ 更新右侧标签
                     const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${this.dragState.task.id}"]`);
                     if (externalLabel) {
                         externalLabel.style.left = (offset * this.options.cellWidth + w + 8) + 'px';
+                    }
+                    
+                    // ⭐ 更新左侧时间标签
+                    const startLabel = this.container.querySelector(`.gantt-bar-label-start[data-task-id="${this.dragState.task.id}"]`);
+                    if (startLabel) {
+                        startLabel.style.right = `calc(100% - ${offset * this.options.cellWidth}px + 8px)`;
+                        
+                        const scale = this.options.timeScale || 'day';
+                        let startTimeLabel = '';
+                        switch (scale) {
+                            case 'day':
+                                startTimeLabel = formatDate(newStart);
+                                break;
+                            case 'week':
+                                const weekNum = getWeekNumber(newStart);
+                                startTimeLabel = `第${weekNum}周`;
+                                break;
+                            case 'month':
+                                startTimeLabel = `${newStart.getMonth() + 1}月${newStart.getDate()}日`;
+                                break;
+                        }
+                        startLabel.textContent = startTimeLabel;
                     }
                 }
             }
@@ -109,6 +156,7 @@
             }
         }
     };
+
 
     /**
      * 鼠标释放处理
