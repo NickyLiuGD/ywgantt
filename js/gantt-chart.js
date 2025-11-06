@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图核心类 - 渲染、数据管理、交互控制                          ▓▓
 // ▓▓ 路径: js/gantt-chart.js                                          ▓▓
-// ▓▓ 版本: Gamma10 - 完全修复居中显示                                 ▓▓
+// ▓▓ 版本: Gamma11 - 确保任务条完全居中（水平+垂直）                  ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -433,7 +433,7 @@
     };
 
     // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-    // ▓▓ 完全修复：选中任务+居中显示（终极版本）                          ▓▓
+    // ▓▓ 终极修复：选中任务完全居中（任务条在窗口正中央）                  ▓▓
     // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
     /**
@@ -455,7 +455,7 @@
         // ⚡ 使用setTimeout确保DOM完全更新后再滚动
         setTimeout(() => {
             this.scrollTaskToCenter(taskId);
-        }, 100);
+        }, 150);
         
         addLog(`📌 已选择任务 "${task.name}"`);
     };
@@ -483,7 +483,7 @@
     };
 
     /**
-     * 滚动使任务条居中显示（终极修复版 - 使用实际DOM元素位置）
+     * 滚动使任务条居中显示（终极版 - 确保任务条在窗口正中央）
      * @param {string} taskId - 任务ID
      */
     GanttChart.prototype.scrollTaskToCenter = function(taskId) {
@@ -495,31 +495,39 @@
         // ⭐ 获取关键元素
         const bar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
         const rowsContainer = this.container.querySelector('.gantt-rows-container');
-        const ganttRows = this.container.querySelector('.gantt-rows');
         
-        if (!bar || !rowsContainer || !ganttRows) {
+        if (!bar || !rowsContainer) {
             console.warn('scrollTaskToCenter: Required elements not found');
-            console.log('bar:', bar, 'rowsContainer:', rowsContainer, 'ganttRows:', ganttRows);
             return;
         }
         
         try {
-            // ⭐ 方法1：使用offsetTop和offsetLeft（相对于父容器）
-            const barOffsetTop = bar.offsetTop;
-            const barOffsetLeft = bar.offsetLeft;
-            const barWidth = bar.offsetWidth;
-            const barHeight = bar.offsetHeight;
+            // ⭐ 获取任务条的实际位置和尺寸（相对于其定位父元素）
+            const barRect = bar.getBoundingClientRect();
+            const containerRect = rowsContainer.getBoundingClientRect();
             
-            // ⭐ 获取容器的可视区域尺寸
+            // ⭐ 获取当前滚动位置
+            const currentScrollLeft = rowsContainer.scrollLeft;
+            const currentScrollTop = rowsContainer.scrollTop;
+            
+            // ⭐ 计算任务条在整个内容区域中的绝对位置
+            // 任务条左边缘 = 当前滚动位置 + 任务条相对于容器可视区的位置
+            const barAbsoluteLeft = currentScrollLeft + (barRect.left - containerRect.left);
+            const barAbsoluteTop = currentScrollTop + (barRect.top - containerRect.top);
+            
+            // ⭐ 获取任务条和容器的尺寸
+            const barWidth = barRect.width;
+            const barHeight = barRect.height;
             const containerWidth = rowsContainer.clientWidth;
             const containerHeight = rowsContainer.clientHeight;
             
-            // ⭐ 计算居中需要的滚动位置
-            // 水平居中：任务条左边距 + 任务条宽度的一半 - 容器宽度的一半
-            const targetScrollLeft = barOffsetLeft + (barWidth / 2) - (containerWidth / 2);
+            // ⭐ 计算任务条中心点在内容区域中的位置
+            const barCenterX = barAbsoluteLeft + (barWidth / 2);
+            const barCenterY = barAbsoluteTop + (barHeight / 2);
             
-            // 垂直居中：任务条顶部距离 + 任务条高度的一半 - 容器高度的一半
-            const targetScrollTop = barOffsetTop + (barHeight / 2) - (containerHeight / 2);
+            // ⭐ 计算目标滚动位置（让任务条中心点对齐到容器中心）
+            const targetScrollLeft = barCenterX - (containerWidth / 2);
+            const targetScrollTop = barCenterY - (containerHeight / 2);
             
             // ⭐ 获取最大可滚动距离
             const maxScrollLeft = rowsContainer.scrollWidth - containerWidth;
@@ -529,37 +537,79 @@
             const finalScrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScrollLeft));
             const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
             
-            // ⭐ 调试日志
-            console.log('=== 居中滚动调试信息 ===');
-            console.log('任务ID:', taskId);
-            console.log('任务条位置 (offsetTop):', barOffsetTop);
-            console.log('任务条位置 (offsetLeft):', barOffsetLeft);
-            console.log('任务条尺寸:', barWidth, 'x', barHeight);
-            console.log('容器尺寸:', containerWidth, 'x', containerHeight);
-            console.log('容器可滚动尺寸:', rowsContainer.scrollWidth, 'x', rowsContainer.scrollHeight);
-            console.log('目标滚动位置:', targetScrollLeft, ',', targetScrollTop);
-            console.log('最终滚动位置:', finalScrollLeft, ',', finalScrollTop);
-            console.log('当前滚动位置:', rowsContainer.scrollLeft, ',', rowsContainer.scrollTop);
+            // ⭐ 详细调试日志
+            console.log('╔═══════════════════════════════════════════════════════════╗');
+            console.log('║  任务条居中滚动 - 详细调试信息                            ║');
+            console.log('╠═══════════════════════════════════════════════════════════╣');
+            console.log('  任务ID:', taskId);
+            console.log('  任务名称:', this.tasks.find(t => t.id === taskId)?.name);
+            console.log('───────────────────────────────────────────────────────────');
+            console.log('  📏 任务条尺寸:');
+            console.log('    宽度:', barWidth.toFixed(2), 'px');
+            console.log('    高度:', barHeight.toFixed(2), 'px');
+            console.log('───────────────────────────────────────────────────────────');
+            console.log('  📐 容器尺寸:');
+            console.log('    可视宽度:', containerWidth.toFixed(2), 'px');
+            console.log('    可视高度:', containerHeight.toFixed(2), 'px');
+            console.log('    总宽度:', rowsContainer.scrollWidth.toFixed(2), 'px');
+            console.log('    总高度:', rowsContainer.scrollHeight.toFixed(2), 'px');
+            console.log('───────────────────────────────────────────────────────────');
+            console.log('  📍 当前滚动位置:');
+            console.log('    水平:', currentScrollLeft.toFixed(2), 'px');
+            console.log('    垂直:', currentScrollTop.toFixed(2), 'px');
+            console.log('───────────────────────────────────────────────────────────');
+            console.log('  🎯 任务条在内容中的绝对位置:');
+            console.log('    左边缘:', barAbsoluteLeft.toFixed(2), 'px');
+            console.log('    顶边缘:', barAbsoluteTop.toFixed(2), 'px');
+            console.log('    中心点X:', barCenterX.toFixed(2), 'px');
+            console.log('    中心点Y:', barCenterY.toFixed(2), 'px');
+            console.log('───────────────────────────────────────────────────────────');
+            console.log('  🎯 目标滚动位置:');
+            console.log('    水平:', targetScrollLeft.toFixed(2), 'px');
+            console.log('    垂直:', targetScrollTop.toFixed(2), 'px');
+            console.log('───────────────────────────────────────────────────────────');
+            console.log('  ✅ 最终滚动位置（限制后）:');
+            console.log('    水平:', finalScrollLeft.toFixed(2), 'px');
+            console.log('    垂直:', finalScrollTop.toFixed(2), 'px');
+            console.log('───────────────────────────────────────────────────────────');
+            console.log('  📊 滚动变化量:');
+            console.log('    水平偏移:', (finalScrollLeft - currentScrollLeft).toFixed(2), 'px');
+            console.log('    垂直偏移:', (finalScrollTop - currentScrollTop).toFixed(2), 'px');
+            console.log('╚═══════════════════════════════════════════════════════════╝');
             
-            // ⭐ 执行滚动
+            // ⭐ 执行平滑滚动
             rowsContainer.scrollTo({
                 left: finalScrollLeft,
                 top: finalScrollTop,
                 behavior: 'smooth'
             });
             
-            // ⭐ 验证滚动是否生效
+            // ⭐ 验证滚动结果
             setTimeout(() => {
                 const actualScrollLeft = rowsContainer.scrollLeft;
                 const actualScrollTop = rowsContainer.scrollTop;
-                console.log('滚动后实际位置:', actualScrollLeft, ',', actualScrollTop);
+                
+                const scrollLeftDiff = Math.abs(actualScrollLeft - finalScrollLeft);
+                const scrollTopDiff = Math.abs(actualScrollTop - finalScrollTop);
+                
+                console.log('╔═══════════════════════════════════════════════════════════╗');
+                console.log('║  滚动完成验证                                             ║');
+                console.log('╠═══════════════════════════════════════════════════════════╣');
+                console.log('  实际滚动位置:');
+                console.log('    水平:', actualScrollLeft.toFixed(2), 'px');
+                console.log('    垂直:', actualScrollTop.toFixed(2), 'px');
+                console.log('  误差:');
+                console.log('    水平误差:', scrollLeftDiff.toFixed(2), 'px');
+                console.log('    垂直误差:', scrollTopDiff.toFixed(2), 'px');
+                console.log('  状态:', (scrollLeftDiff < 5 && scrollTopDiff < 5) ? '✅ 居中成功' : '⚠️ 存在偏差');
+                console.log('╚═══════════════════════════════════════════════════════════╝');
                 
                 const task = this.tasks.find(t => t.id === taskId);
+                const taskIndex = this.tasks.findIndex(t => t.id === taskId);
                 if (task) {
-                    const taskIndex = this.tasks.findIndex(t => t.id === taskId);
-                    addLog(`✅ 任务 "${task.name}" 已居中 (第${taskIndex + 1}/${this.tasks.length}个)`);
+                    addLog(`✅ 任务 "${task.name}" 已居中显示 (第 ${taskIndex + 1}/${this.tasks.length} 个)`);
                 }
-            }, 400);
+            }, 500);
             
         } catch (error) {
             console.error('scrollTaskToCenter error:', error);
@@ -618,7 +668,6 @@
                 rowsContainer.style.overflowX = 'auto';
             }
             
-            console.log('updateHeight - 甘特图高度:', finalHeight, '内容高度:', contentHeight);
             addLog(`📏 甘特图高度: ${finalHeight}px, 内容高度: ${contentHeight}px`);
             
         } catch (error) {
@@ -801,6 +850,6 @@
 
     global.GanttChart = GanttChart;
 
-    console.log('✅ gantt-chart.js loaded successfully (Gamma10 - 完全修复居中)');
+    console.log('✅ gantt-chart.js loaded successfully (Gamma11 - 任务条完全居中)');
 
 })(typeof window !== 'undefined' ? window : this);
