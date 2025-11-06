@@ -36,32 +36,145 @@
         };
     }
 
-    function renderPertChart(tasks) {
-        if (!pertContainer) return;
+function renderPertChart(tasks) {
+    if (!pertContainer) return;
+    
+    pertContainer.innerHTML = '<svg id="pertSvg" width="100%" height="600"></svg>';
+    const svg = document.getElementById('pertSvg');
+    if (!svg) return;
+
+    // ⭐ 完整的 PERT 渲染逻辑
+    const nodeWidth = 120;
+    const nodeHeight = 80;
+    const horizontalGap = 150;
+    const verticalGap = 120;
+    
+    // 计算节点层级（拓扑排序）
+    const levels = calculateTaskLevels(tasks);
+    const positions = {};
+    
+    // 计算节点位置
+    levels.forEach((levelTasks, level) => {
+        levelTasks.forEach((task, index) => {
+            positions[task.id] = {
+                x: 50 + level * (nodeWidth + horizontalGap),
+                y: 50 + index * (nodeHeight + verticalGap)
+            };
+        });
+    });
+    
+    // 绘制连接线
+    tasks.forEach(task => {
+        if (!task.dependencies || task.dependencies.length === 0) return;
         
-        // 等待 AnyChart 库加载
-        if (typeof anychart === 'undefined') {
-            console.warn('AnyChart 库未加载，无法渲染 PERT 图');
-            pertContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc3545;">⚠️ PERT 图表库加载失败</div>';
-            return;
-        }
+        task.dependencies.forEach(depId => {
+            const from = positions[depId];
+            const to = positions[task.id];
+            if (!from || !to) return;
+            
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', from.x + nodeWidth);
+            line.setAttribute('y1', from.y + nodeHeight / 2);
+            line.setAttribute('x2', to.x);
+            line.setAttribute('y2', to.y + nodeHeight / 2);
+            line.setAttribute('stroke', '#dc3545');
+            line.setAttribute('stroke-width', '2');
+            line.setAttribute('marker-end', 'url(#arrowhead)');
+            svg.appendChild(line);
+        });
+    });
+    
+    // 绘制节点
+    tasks.forEach(task => {
+        const pos = positions[task.id];
+        if (!pos) return;
         
-        // 转换数据格式为 AnyChart PERT 格式
-        const pertData = tasks.map(task => ({
-            id: task.id,
-            name: task.name,
-            duration: daysBetween(task.start, task.end) + 1,
-            dependsOn: task.dependencies || []
-        }));
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
         
-        // 创建 PERT 图表
-        const chart = anychart.pert();
-        chart.data(pertData, 'asTable');
-        chart.container('pertContainer');
-        chart.draw();
+        // 节点矩形
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('width', nodeWidth);
+        rect.setAttribute('height', nodeHeight);
+        rect.setAttribute('fill', '#fff');
+        rect.setAttribute('stroke', '#667eea');
+        rect.setAttribute('stroke-width', '2');
+        rect.setAttribute('rx', '8');
+        g.appendChild(rect);
         
-        addLog('✅ PERT 图表已渲染（AnyChart）');
+        // 任务名称
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', nodeWidth / 2);
+        text.setAttribute('y', 30);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('font-size', '14');
+        text.setAttribute('font-weight', '600');
+        text.textContent = task.name;
+        g.appendChild(text);
+        
+        // 工期信息
+        const duration = daysBetween(task.start, task.end) + 1;
+        const info = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        info.setAttribute('x', nodeWidth / 2);
+        info.setAttribute('y', 50);
+        info.setAttribute('text-anchor', 'middle');
+        info.setAttribute('font-size', '12');
+        info.setAttribute('fill', '#666');
+        info.textContent = `${duration}天 | ${task.progress}%`;
+        g.appendChild(info);
+        
+        svg.appendChild(g);
+    });
+    
+    // 添加箭头标记
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    defs.innerHTML = `
+        <marker id="arrowhead" markerWidth="10" markerHeight="10" 
+                refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 10 3, 0 6" fill="#dc3545" />
+        </marker>
+    `;
+    svg.insertBefore(defs, svg.firstChild);
+    
+    addLog('✅ PERT 图表已渲染');
+}
+
+// 辅助函数：计算任务层级
+function calculateTaskLevels(tasks) {
+    const levels = [];
+    const visited = new Set();
+    const taskMap = {};
+    
+    tasks.forEach(t => taskMap[t.id] = t);
+    
+    function getLevel(taskId, currentLevel = 0) {
+        if (visited.has(taskId)) return;
+        visited.add(taskId);
+        
+        const task = taskMap[taskId];
+        if (!task) return;
+        
+        if (!levels[currentLevel]) levels[currentLevel] = [];
+        levels[currentLevel].push(task);
+        
+        // 处理依赖此任务的其他任务
+        tasks.forEach(t => {
+            if (t.dependencies && t.dependencies.includes(taskId)) {
+                getLevel(t.id, currentLevel + 1);
+            }
+        });
     }
+    
+    // 从无依赖的任务开始
+    tasks.forEach(task => {
+        if (!task.dependencies || task.dependencies.length === 0) {
+            getLevel(task.id, 0);
+        }
+    });
+    
+    return levels;
+}
+
 
 
     // 设置面板交互
