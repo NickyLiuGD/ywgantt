@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图快捷菜单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-quickmenu.js                      ▓▓
-// ▓▓ 版本: Delta6                                                   ▓▓
+// ▓▓ 版本: Delta6 - 新任务下方添加并自动打开编辑                    ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -71,13 +71,13 @@
         menu.dataset.taskId = taskId;
         
         menu.innerHTML = `
-            <button class="quick-menu-btn quick-menu-add" title="在此任务后添加" data-action="add">
+            <button class="quick-menu-btn quick-menu-add" title="在下方添加新任务" data-action="add">
                 <span class="quick-menu-icon">➕</span>
             </button>
-            <button class="quick-menu-btn quick-menu-edit" title="编辑任务" data-action="edit">
+            <button class="quick-menu-btn quick-menu-edit" title="编辑此任务" data-action="edit">
                 <span class="quick-menu-icon">✏️</span>
             </button>
-            <button class="quick-menu-btn quick-menu-delete" title="删除任务" data-action="delete">
+            <button class="quick-menu-btn quick-menu-delete" title="删除此任务" data-action="delete">
                 <span class="quick-menu-icon">🗑️</span>
             </button>
         `;
@@ -187,18 +187,30 @@
 
         switch (action) {
             case 'add':
-                // 在当前任务后添加新任务
+                // ⭐ 在当前任务下方添加新任务
+                const currentIndex = this.tasks.findIndex(t => t.id === taskId);
+                
                 const newTask = {
                     id: generateId(),
                     name: '新任务',
-                    start: formatDate(addDays(new Date(task.end), 1)),
-                    end: formatDate(addDays(new Date(task.end), 4)),
+                    start: formatDate(addDays(new Date(task.end), 1)), // 在当前任务结束后的次日开始
+                    end: formatDate(addDays(new Date(task.end), 4)),   // 默认3天工期
                     progress: 0,
                     dependencies: [taskId] // 自动依赖当前任务
                 };
-                this.addTask(newTask);
-                this.selectTask(newTask.id);
-                addLog(`✅ 已在"${task.name}"后添加新任务`);
+                
+                // ⭐ 插入到当前任务的下一个位置
+                this.tasks.splice(currentIndex + 1, 0, newTask);
+                
+                this.calculateDateRange();
+                this.render();
+                
+                // ⭐ 选中新任务并自动打开编辑表单
+                setTimeout(() => {
+                    this.selectTask(newTask.id);
+                    this.showInlineTaskForm(newTask);
+                    addLog(`✅ 已在"${task.name}"下方添加新任务并打开编辑界面`);
+                }, 100);
                 break;
 
             case 'edit':
@@ -209,8 +221,8 @@
                 break;
 
             case 'delete':
-                // 删除任务
-                if (confirm(`确定删除任务 "${task.name}"?`)) {
+                // 删除任务（带确认）
+                if (confirm(`确定删除任务 "${task.name}"?\n\n注意：其他依赖此任务的任务将失去该依赖关系。`)) {
                     this.deleteTask(taskId);
                     addLog(`✅ 已删除任务 "${task.name}"`);
                 }
@@ -218,6 +230,35 @@
         }
     };
 
-    console.log('✅ gantt-events-quickmenu.js loaded successfully');
+    /**
+     * 在指定位置插入任务（新增方法）
+     * @param {Object} task - 任务对象
+     * @param {number} index - 插入位置索引
+     */
+    GanttChart.prototype.insertTaskAt = function(task, index) {
+        if (!task || typeof task !== 'object') {
+            console.error('Invalid task object');
+            return;
+        }
+
+        // 确保任务有必要的属性
+        if (!task.id) task.id = generateId();
+        if (!task.name) task.name = '新任务';
+        if (!task.start) task.start = formatDate(new Date());
+        if (!task.end) task.end = formatDate(addDays(new Date(), 3));
+        if (typeof task.progress !== 'number') task.progress = 0;
+        if (!Array.isArray(task.dependencies)) task.dependencies = [];
+
+        // 插入到指定位置
+        const insertIndex = Math.max(0, Math.min(index, this.tasks.length));
+        this.tasks.splice(insertIndex, 0, task);
+        
+        this.calculateDateRange();
+        this.render();
+        
+        return task;
+    };
+
+    console.log('✅ gantt-events-quickmenu.js loaded successfully (Delta6 - 下方添加并自动编辑)');
 
 })();

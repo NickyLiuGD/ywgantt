@@ -1497,7 +1497,7 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   快捷操作菜单
+   快捷操作菜单（优化版）
    ====================== */
 
 .quick-menu {
@@ -1560,6 +1560,7 @@ input:checked + .switch-slider:before {
     transition: all 0.2s ease;
     position: relative;
     z-index: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
 
 /* 添加按钮 */
@@ -1568,12 +1569,13 @@ input:checked + .switch-slider:before {
 }
 
 .quick-menu-add:hover {
-    background: rgba(16, 185, 129, 0.1);
+    background: rgba(16, 185, 129, 0.15);
 }
 
 .quick-menu-add:hover .quick-menu-icon {
-    transform: scale(1.2) rotate(90deg);
-    filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6));
+    transform: scale(1.25) rotate(90deg);
+    filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
+    animation: iconBounce 0.5s ease;
 }
 
 /* 编辑按钮 */
@@ -1582,12 +1584,13 @@ input:checked + .switch-slider:before {
 }
 
 .quick-menu-edit:hover {
-    background: rgba(59, 130, 246, 0.1);
+    background: rgba(59, 130, 246, 0.15);
 }
 
 .quick-menu-edit:hover .quick-menu-icon {
-    transform: scale(1.2);
-    filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.6));
+    transform: scale(1.25);
+    filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6));
+    animation: iconBounce 0.5s ease;
 }
 
 /* 删除按钮 */
@@ -1596,27 +1599,38 @@ input:checked + .switch-slider:before {
 }
 
 .quick-menu-delete:hover {
-    background: rgba(239, 68, 68, 0.1);
+    background: rgba(239, 68, 68, 0.15);
 }
 
 .quick-menu-delete:hover .quick-menu-icon {
-    transform: scale(1.2) rotate(10deg);
-    filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6));
+    transform: scale(1.25) rotate(10deg);
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6));
+    animation: iconShake 0.5s ease;
 }
 
 .quick-menu-btn:active {
     transform: scale(0.9);
 }
 
-/* 菜单出现动画 */
-@keyframes quickMenuSlideIn {
-    from {
-        opacity: 0;
-        transform: translateX(-10px) scale(0.95);
+/* 图标动画 */
+@keyframes iconBounce {
+    0%, 100% {
+        transform: scale(1.25) translateY(0);
     }
-    to {
-        opacity: 1;
-        transform: translateX(0) scale(1);
+    50% {
+        transform: scale(1.25) translateY(-3px);
+    }
+}
+
+@keyframes iconShake {
+    0%, 100% {
+        transform: scale(1.25) rotate(0deg);
+    }
+    25% {
+        transform: scale(1.25) rotate(10deg);
+    }
+    75% {
+        transform: scale(1.25) rotate(-10deg);
     }
 }
 
@@ -1626,6 +1640,19 @@ input:checked + .switch-slider:before {
     background: rgba(102, 126, 234, 0.05);
     padding-right: 8px;
     transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+/* 任务名称悬停时的边框提示 */
+.gantt-task-name:hover {
+    border-left: 3px solid rgba(102, 126, 234, 0.4);
+    padding-left: 5px;
+}
+
+/* 标签悬停时的边框提示 */
+.gantt-bar-label-external:hover {
+    border-left: 2px solid rgba(102, 126, 234, 0.4);
+    padding-left: 6px;
 }
 
 /* 移动端适配 */
@@ -1645,15 +1672,23 @@ input:checked + .switch-slider:before {
     }
 }
 
-/* 触摸设备优化 */
+/* 触摸设备优化：点击显示菜单 */
 @media (hover: none) {
-    .quick-menu {
-        /* 触摸设备上点击显示，而不是悬停 */
-        display: none;
+    .gantt-task-name,
+    .gantt-bar-label-external {
+        position: relative;
     }
     
-    .gantt-task-name.show-menu + .quick-menu,
-    .gantt-bar-label-external.show-menu + .quick-menu {
-        display: flex;
+    /* 触摸设备上添加"更多"按钮 */
+    .gantt-task-name::after,
+    .gantt-bar-label-external::after {
+        content: '⋮';
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--gray-400);
+        font-size: 1.2rem;
+        opacity: 0.6;
     }
 }
