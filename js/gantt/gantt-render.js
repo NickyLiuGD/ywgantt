@@ -62,7 +62,8 @@
         this.setupScrollSync();
         this.renderDependencies(dates);
         this.attachEvents();
-        
+        this.attachQuickMenus(); // ⭐ 新增：绑定快捷菜单
+
         this.updateHeight();
     };
 
