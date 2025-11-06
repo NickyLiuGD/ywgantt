@@ -1,16 +1,16 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图核心类 - 渲染、数据管理、交互控制                          ▓▓
 // ▓▓ 路径: js/gantt-chart.js                                          ▓▓
-// ▓▓ 版本: Gamma8 - 紧凑优化版                                        ▓▓
+// ▓▓ 版本: Gamma9 - 修复滚动与居中功能                                ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
     'use strict';
 
     // ⭐ 全局尺寸常量（紧凑模式）
-    const ROW_HEIGHT = 40;      // → 行高从60px压缩到40px
-    const HEADER_HEIGHT = 50;   // → 表头高度从60px压缩到50px
-    const DEFAULT_CELL_WIDTH = 50; // → 默认列宽从60px压缩到50px
+    const ROW_HEIGHT = 40;
+    const HEADER_HEIGHT = 50;
+    const DEFAULT_CELL_WIDTH = 50;
 
     /**
      * GanttChart 构造函数
@@ -26,7 +26,7 @@
         this.selector = selector;
         this.tasks = Array.isArray(tasks) ? tasks : [];
         this.options = Object.assign({
-            cellWidth: DEFAULT_CELL_WIDTH,  // ⭐ 使用压缩后的默认值
+            cellWidth: DEFAULT_CELL_WIDTH,
             showWeekends: true,
             enableEdit: true,
             enableResize: true,
@@ -110,7 +110,7 @@
     };
 
     /**
-     * 渲染甘特图（完整版 - 包含折叠按钮）
+     * 渲染甘特图（完整版）
      */
     GanttChart.prototype.render = function() {
         if (!this.container) {
@@ -221,7 +221,7 @@
     };
 
     /**
-     * 渲染单个任务行（修改 - 使用压缩后的行高）
+     * 渲染单个任务行
      * @param {Object} task - 任务对象
      * @param {Array<Date>} dates - 日期数组
      * @returns {string} HTML字符串
@@ -239,7 +239,7 @@
         const duration = daysBetween(start, end) + 1;
         
         const left = startOffset * this.options.cellWidth;
-        const width = Math.max(duration * this.options.cellWidth, 60); // ⭐ 最小宽度从80px压缩到60px
+        const width = Math.max(duration * this.options.cellWidth, 60);
         const progress = Math.min(Math.max(task.progress || 0, 0), 100);
 
         const isSelected = this.selectedTask === task.id;
@@ -331,7 +331,7 @@
     };
 
     /**
-     * 渲染依赖关系（修改 - 使用压缩后的行高）
+     * 渲染依赖关系
      * @param {Array<Date>} dates - 日期数组
      */
     GanttChart.prototype.renderDependencies = function(dates) {
@@ -343,7 +343,7 @@
         }
 
         depSVG.style.width = `${dates.length * this.options.cellWidth}px`;
-        depSVG.style.height = `${this.tasks.length * ROW_HEIGHT}px`; // ⭐ 使用压缩后的行高
+        depSVG.style.height = `${this.tasks.length * ROW_HEIGHT}px`;
 
         depSVG.innerHTML = `
             <defs>
@@ -363,13 +363,13 @@
     };
 
     /**
-     * 生成依赖路径（修改 - 使用压缩后的行高）
+     * 生成依赖路径
      * @returns {string} SVG路径HTML字符串
      */
     GanttChart.prototype.generateDependencyPaths = function() {
         const w = this.options.cellWidth;
-        const h = ROW_HEIGHT; // ⭐ 使用压缩后的行高
-        const radius = 8; // ⭐ 圆角从10px压缩到8px
+        const h = ROW_HEIGHT;
+        const radius = 8;
         const paths = [];
 
         this.tasks.forEach((task, taskIndex) => {
@@ -413,7 +413,7 @@
                     ];
                 } else {
                     const sign = x2 > x1 ? 1 : -1;
-                    const bend = 15; // ⭐ 弯曲从20px压缩到15px
+                    const bend = 15;
                     coords = [
                         {x: x1, y: y1},
                         {x: x1 + sign * bend, y: y1},
@@ -433,7 +433,7 @@
     };
 
     /**
-     * 选择任务（修改 - 添加居中滚动）
+     * 🔧 修复：选择任务并自动居中显示
      * @param {string} taskId - 任务ID
      */
     GanttChart.prototype.selectTask = function(taskId) {
@@ -448,10 +448,10 @@
         this.selectedTask = taskId;
         this.updateSelectionState(taskId);
         
-        // ⚠️ 关键修复：延迟执行居中滚动，确保DOM已更新
+        // 🔑 关键：延迟执行居中滚动，确保DOM已完全更新
         setTimeout(() => {
             this.scrollTaskToCenter(taskId);
-        }, 150); // ⭐ 增加延迟到150ms
+        }, 100);
         
         addLog(`📌 已选择任务 "${task.name}"`);
     };
@@ -604,40 +604,46 @@
     };
 
     // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-    // ▓▓ 修复：选中任务居中显示（完全重写）                                 ▓▓
+    // ▓▓ 🔧 修复：选中任务居中显示（完全重写，确保可靠性）             ▓▓
     // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
     /**
-     * 滚动使任务条居中显示（修复版 - 确保真正居中）
+     * 🔧 修复版：滚动使任务条居中显示
      * @param {string} taskId - 任务ID
      */
     GanttChart.prototype.scrollTaskToCenter = function(taskId) {
-        if (!taskId || !this.container) return;
+        if (!taskId || !this.container) {
+            console.warn('scrollTaskToCenter: Missing taskId or container');
+            return;
+        }
         
         const bar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
         const rowsContainer = this.container.querySelector('.gantt-rows-container');
         
         if (!bar || !rowsContainer) {
-            console.warn('scrollTaskToCenter: Elements not found');
+            console.warn('scrollTaskToCenter: Elements not found', { bar: !!bar, rowsContainer: !!rowsContainer });
             return;
         }
         
         try {
-            // ⭐ 关键：获取任务条相对于滚动容器的位置
+            // 🔑 获取容器和任务条的尺寸信息
             const containerRect = rowsContainer.getBoundingClientRect();
             const barRect = bar.getBoundingClientRect();
             
-            // ▌ 计算任务条在滚动容器内的绝对位置（包含当前滚动偏移）
-            const barLeftInContainer = barRect.left - containerRect.left + rowsContainer.scrollLeft;
-            const barTopInContainer = barRect.top - containerRect.top + rowsContainer.scrollTop;
+            // 📐 计算任务条在滚动内容中的绝对位置
+            const barLeftInScroll = bar.offsetLeft;
+            const barTopInScroll = bar.offsetParent.offsetTop;
             
-            // ⭐ 计算目标滚动位置（使任务条居中）
-            const targetScrollLeft = barLeftInContainer - (containerRect.width / 2) + (barRect.width / 2);
-            const targetScrollTop = barTopInContainer - (containerRect.height / 2) + (barRect.height / 2);
+            // 🎯 计算目标滚动位置（使任务条位于视口中心）
+            const targetScrollLeft = barLeftInScroll - (containerRect.width / 2) + (barRect.width / 2);
+            const targetScrollTop = barTopInScroll - (containerRect.height / 2) + (barRect.height / 2);
             
-            // 🔑 确保滚动值不为负数
-            const finalScrollLeft = Math.max(0, targetScrollLeft);
-            const finalScrollTop = Math.max(0, targetScrollTop);
+            // 🔒 确保滚动值在有效范围内
+            const maxScrollLeft = rowsContainer.scrollWidth - containerRect.width;
+            const maxScrollTop = rowsContainer.scrollHeight - containerRect.height;
+            
+            const finalScrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScrollLeft));
+            const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
             
             // ⚡ 平滑滚动到目标位置
             rowsContainer.scrollTo({
@@ -646,21 +652,34 @@
                 behavior: 'smooth'
             });
             
-            const taskName = this.tasks.find(t => t.id === taskId)?.name;
-            if (taskName) {
-                addLog(`✅ 任务 "${taskName}" 已居中显示`);
+            // 📝 记录日志
+            const task = this.tasks.find(t => t.id === taskId);
+            if (task) {
+                addLog(`🎯 任务 "${task.name}" 已居中显示`);
             }
+            
+            console.log('scrollTaskToCenter:', {
+                taskId,
+                taskName: task?.name,
+                barLeft: barLeftInScroll,
+                barTop: barTopInScroll,
+                targetLeft: targetScrollLeft,
+                targetTop: targetScrollTop,
+                finalLeft: finalScrollLeft,
+                finalTop: finalScrollTop
+            });
         } catch (error) {
             console.error('scrollTaskToCenter error:', error);
+            addLog('⚠️ 任务居中失败：' + error.message);
         }
     };
 
     // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-    // ▓▓ 增强：动态更新甘特图高度（更激进的空间利用）                       ▓▓
+    // ▓▓ 增强：动态更新甘特图高度                                         ▓▓
     // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
     /**
-     * 更新甘特图高度以适应窗口（增强版 - 更大化利用空间）
+     * 更新甘特图高度以适应窗口
      */
     GanttChart.prototype.updateHeight = function() {
         if (!this.container) return;
@@ -672,19 +691,19 @@
             const headerElement = document.querySelector('h1')?.parentElement;
             const logPanel = document.getElementById('logPanel');
             
-            // ⭐ 更精确的高度计算
+            // 精确计算可用高度
             const headerHeight = headerElement ? headerElement.offsetHeight : 80;
             const logHeight = logPanel ? 
                 (logPanel.classList.contains('hidden') ? 0 : 
-                 (logPanel.classList.contains('collapsed') ? 55 : 240)) : 0; // ⭐ 压缩日志高度
+                 (logPanel.classList.contains('collapsed') ? 55 : 240)) : 0;
             
-            // 🔑 更激进的空间利用：减少边距
-            const availableHeight = window.innerHeight - headerHeight - logHeight - 50; // ⭐ 从80px减少到50px
-            const finalHeight = Math.max(availableHeight, 350); // ⭐ 最小高度从400px降到350px
+            // 更激进的空间利用
+            const availableHeight = window.innerHeight - headerHeight - logHeight - 50;
+            const finalHeight = Math.max(availableHeight, 350);
             
             ganttWrapper.style.height = finalHeight + 'px';
             
-            addLog(`📏 甘特图高度: ${finalHeight}px`);
+            console.log('updateHeight:', { availableHeight, finalHeight });
         } catch (error) {
             console.error('updateHeight error:', error);
         }
@@ -744,6 +763,6 @@
 
     global.GanttChart = GanttChart;
 
-    console.log('✅ gantt-chart.js loaded successfully (紧凑优化版)');
+    console.log('✅ gantt-chart.js loaded successfully (Gamma9 - 修复版)');
 
 })(typeof window !== 'undefined' ? window : this);

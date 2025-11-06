@@ -1,7 +1,7 @@
 /**
  * 甘特图样式文件
- * 版本: Gamma8 - 紧凑优化版
- * 压缩行高/列宽 + 透明标签 + 增强自适应
+ * 版本: Gamma9 - 修复滚动问题
+ * 修复: 1. 甘特图窗口滚动功能 2. 选中任务居中显示
  */
 
 /* ======================
@@ -30,11 +30,11 @@
     --gray-700: #343a40;
     --gray-800: #212529;
     
-    /* ⭐ 紧凑尺寸（压缩） */
-    --row-height: 40px;              /* 从60px压缩到40px */
-    --header-height: 50px;           /* 从60px压缩到50px */
-    --default-cell-width: 50px;      /* 从60px压缩到50px */
-    --sidebar-width: 180px;          /* 从200px压缩到180px */
+    /* ⭐ 紧凑尺寸 */
+    --row-height: 40px;
+    --header-height: 50px;
+    --default-cell-width: 50px;
+    --sidebar-width: 180px;
     
     /* 其他尺寸 */
     --toolbar-collapsed-size: 56px;
@@ -118,20 +118,20 @@ select:focus {
     outline-offset: 2px;
 }
 
-/* ⭐ 容器自适应布局（增强 - 更激进的空间利用） */
+/* ⭐ 容器自适应布局 */
 .container-fluid {
     display: flex;
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    padding: 15px; /* ⭐ 从20px压缩到15px */
-    max-width: 100%; /* ⭐ 从1600px改为100% */
+    padding: 15px;
+    max-width: 100%;
     margin: 0 auto;
 }
 
 .container-fluid > .d-flex {
     flex-shrink: 0;
-    margin-bottom: 10px; /* ⭐ 从默认减少边距 */
+    margin-bottom: 10px;
 }
 
 /* ======================
@@ -625,10 +625,10 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   日志面板（修改 - 压缩高度）
+   日志面板
    ====================== */
 .log-panel {
-    margin-top: 10px; /* ⭐ 从16px压缩到10px */
+    margin-top: 10px;
     background: rgba(255, 255, 255, 0.95);
     border: 1px solid var(--gray-200);
     border-radius: var(--card-border-radius);
@@ -647,7 +647,7 @@ input:checked + .switch-slider:before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 14px; /* ⭐ 从12px 16px压缩 */
+    padding: 10px 14px;
     background: var(--gray-50);
     border-bottom: 1px solid var(--gray-200);
     cursor: pointer;
@@ -655,13 +655,13 @@ input:checked + .switch-slider:before {
 }
 
 .log-header span {
-    font-size: 0.85rem; /* ⭐ 从0.875rem压缩 */
+    font-size: 0.85rem;
     color: var(--gray-600);
     font-weight: 500;
 }
 
 .log-toggle {
-    width: 22px; /* ⭐ 从24px压缩 */
+    width: 22px;
     height: 22px;
     display: flex;
     align-items: center;
@@ -690,16 +690,16 @@ input:checked + .switch-slider:before {
 }
 
 .log-body {
-    max-height: 180px; /* ⭐ 从200px压缩到180px */
-    padding: 10px 14px; /* ⭐ 从12px 16px压缩 */
+    max-height: 180px;
+    padding: 10px 14px;
     overflow-y: auto;
     transition: all var(--transition-normal);
 }
 
 .log-entry {
-    padding: 5px 0; /* ⭐ 从6px压缩到5px */
+    padding: 5px 0;
     border-bottom: 1px solid var(--gray-50);
-    font-size: 0.75rem; /* ⭐ 从0.8rem压缩 */
+    font-size: 0.75rem;
     color: var(--gray-500);
 }
 
@@ -733,47 +733,46 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   甘特图容器（修改 - 增强自适应）
+   甘特图容器（🔧 关键修复：滚动功能）
    ====================== */
 .gantt-container {
     background: white;
     border-radius: 8px;
-    padding: 15px; /* ⭐ 从20px压缩到15px */
+    padding: 15px;
     box-shadow: var(--shadow-md);
-    margin-bottom: 15px; /* ⭐ 从20px压缩到15px */
+    margin-bottom: 15px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     flex: 1;
-    min-height: 0;
+    min-height: 0; /* 🔑 关键：允许flex子元素缩小 */
 }
 
+/* 🔧 修复：移除固定高度，改为flex布局自适应 */
 .gantt-wrapper {
     display: flex;
     border: 1px solid var(--gray-300);
     border-radius: 6px;
     overflow: hidden;
-    min-height: 350px; /* ⭐ 从400px降到350px */
-    max-height: calc(100vh - 150px); /* ⭐ 从200px改为150px，更激进 */
-    height: 100%; /* ⭐ 改为100%自动填充 */
+    flex: 1; /* 🔑 关键：占据剩余空间 */
+    min-height: 350px; /* 保留最小高度 */
     transition: height 0.3s ease;
-    flex: 1;
 }
 
 #pertContainer {
     background: white;
     border-radius: 8px;
-    padding: 15px; /* ⭐ 从20px压缩 */
+    padding: 15px;
     box-shadow: var(--shadow-md);
     margin-bottom: 15px;
     overflow: auto;
 }
 
 /* ======================
-   左侧任务名称列（修改 - 压缩尺寸）
+   左侧任务名称列
    ====================== */
 .gantt-sidebar {
-    width: var(--sidebar-width); /* ⭐ 180px */
+    width: var(--sidebar-width);
     min-width: var(--sidebar-width);
     border-right: 2px solid var(--gray-300);
     background: var(--gray-50);
@@ -786,7 +785,7 @@ input:checked + .switch-slider:before {
 }
 
 .gantt-sidebar.collapsed {
-    width: 35px !important; /* ⭐ 从40px压缩到35px */
+    width: 35px !important;
     min-width: 35px !important;
 }
 
@@ -799,8 +798,8 @@ input:checked + .switch-slider:before {
 .gantt-sidebar.collapsed .gantt-sidebar-header {
     writing-mode: vertical-rl;
     text-orientation: mixed;
-    font-size: 0.7rem; /* ⭐ 从0.75rem压缩 */
-    padding: 8px 4px; /* ⭐ 压缩内边距 */
+    font-size: 0.7rem;
+    padding: 8px 4px;
 }
 
 .sidebar-toggle-btn {
@@ -808,13 +807,13 @@ input:checked + .switch-slider:before {
     top: 50%;
     right: -12px;
     transform: translateY(-50%);
-    width: 22px; /* ⭐ 从24px压缩 */
-    height: 44px; /* ⭐ 从48px压缩 */
+    width: 22px;
+    height: 44px;
     background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
     border: none;
     border-radius: 0 8px 8px 0;
     color: white;
-    font-size: 0.7rem; /* ⭐ 从0.75rem压缩 */
+    font-size: 0.7rem;
     cursor: pointer;
     z-index: 10;
     transition: all var(--transition-normal);
@@ -839,17 +838,17 @@ input:checked + .switch-slider:before {
 }
 
 .gantt-sidebar-header {
-    padding: 12px 8px; /* ⭐ 从15px 10px压缩 */
+    padding: 12px 8px;
     background: var(--gray-200);
     font-weight: 600;
     border-bottom: 2px solid var(--gray-300);
-    height: var(--header-height); /* ⭐ 50px */
+    height: var(--header-height);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     transition: all var(--transition-normal);
-    font-size: 0.85rem; /* ⭐ 压缩字体 */
+    font-size: 0.85rem;
 }
 
 .gantt-sidebar-body {
@@ -859,15 +858,15 @@ input:checked + .switch-slider:before {
 }
 
 .gantt-task-name {
-    padding: 10px 8px; /* ⭐ 从15px 10px压缩 */
+    padding: 10px 8px;
     border-bottom: 1px solid var(--gray-300);
-    height: var(--row-height); /* ⭐ 40px */
+    height: var(--row-height);
     display: flex;
     align-items: center;
     cursor: pointer;
     transition: background var(--transition-fast), 
                 opacity var(--transition-normal);
-    font-size: 0.85rem; /* ⭐ 从0.9rem压缩 */
+    font-size: 0.85rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -883,7 +882,7 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   右侧时间轴区域
+   右侧时间轴区域（🔧 关键修复：启用滚动）
    ====================== */
 .gantt-timeline-wrapper {
     flex: 1;
@@ -891,6 +890,7 @@ input:checked + .switch-slider:before {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-width: 0; /* 🔑 关键：防止flex项目溢出 */
 }
 
 .gantt-timeline {
@@ -903,26 +903,28 @@ input:checked + .switch-slider:before {
     display: flex;
     background: var(--gray-200);
     border-bottom: 2px solid var(--gray-300);
-    height: var(--header-height); /* ⭐ 50px */
+    height: var(--header-height);
     flex-shrink: 0;
     overflow: hidden;
 }
 
+/* 🔧 修复：确保行容器可以滚动 */
 .gantt-rows-container {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: auto;
+    overflow-y: auto; /* 🔑 关键：启用垂直滚动 */
+    overflow-x: auto; /* 🔑 关键：启用水平滚动 */
     position: relative;
-    scroll-behavior: smooth;
+    scroll-behavior: smooth; /* ⭐ 平滑滚动效果 */
+    min-height: 0; /* 🔑 关键：允许flex子元素缩小 */
 }
 
 .gantt-date-cell {
-    width: var(--default-cell-width); /* ⭐ 50px */
+    width: var(--default-cell-width);
     min-width: var(--default-cell-width);
-    padding: 6px 3px; /* ⭐ 从8px 4px压缩 */
+    padding: 6px 3px;
     text-align: center;
     border-right: 1px solid var(--gray-300);
-    font-size: 0.7rem; /* ⭐ 从0.75rem压缩 */
+    font-size: 0.7rem;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -931,12 +933,12 @@ input:checked + .switch-slider:before {
 
 .gantt-date-day {
     font-weight: 600;
-    font-size: 0.9rem; /* ⭐ 从1rem压缩 */
-    margin-bottom: 1px; /* ⭐ 从2px压缩 */
+    font-size: 0.9rem;
+    margin-bottom: 1px;
 }
 
 .gantt-date-weekday {
-    font-size: 0.65rem; /* ⭐ 从0.7rem压缩 */
+    font-size: 0.65rem;
     color: var(--gray-500);
 }
 
@@ -958,12 +960,12 @@ input:checked + .switch-slider:before {
 .gantt-row {
     display: flex;
     border-bottom: 1px solid var(--gray-200);
-    height: var(--row-height); /* ⭐ 40px */
+    height: var(--row-height);
     position: relative;
 }
 
 .gantt-cell {
-    width: var(--default-cell-width); /* ⭐ 50px */
+    width: var(--default-cell-width);
     min-width: var(--default-cell-width);
     border-right: 1px solid #f0f0f0;
     position: relative;
@@ -978,21 +980,21 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   任务条样式（修改 - 压缩高度）
+   任务条样式
    ====================== */
 .gantt-bar {
     position: absolute;
-    height: 28px; /* ⭐ 从36px压缩到28px */
-    top: 6px; /* ⭐ 从12px压缩到6px */
+    height: 28px;
+    top: 6px;
     background: transparent;
     border: 2px solid var(--gray-300);
-    border-radius: 6px; /* ⭐ 从8px压缩 */
+    border-radius: 6px;
     cursor: move;
     display: flex;
     align-items: center;
-    padding: 0 8px; /* ⭐ 从12px压缩 */
+    padding: 0 8px;
     color: var(--gray-600);
-    font-size: 0.75rem; /* ⭐ 从0.85rem压缩 */
+    font-size: 0.75rem;
     font-weight: 500;
     box-shadow: var(--shadow-sm);
     transition: all var(--transition-fast);
@@ -1035,13 +1037,13 @@ input:checked + .switch-slider:before {
     height: 100%;
     background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
     opacity: 0.3;
-    border-radius: 4px; /* ⭐ 从6px压缩 */
+    border-radius: 4px;
     pointer-events: none;
     transition: width var(--transition-fast);
 }
 
 .gantt-bar-handle {
-    width: 6px; /* ⭐ 从8px压缩 */
+    width: 6px;
     height: 100%;
     background: var(--gray-400);
     cursor: ew-resize;
@@ -1056,7 +1058,7 @@ input:checked + .switch-slider:before {
 
 .gantt-bar-handle.left {
     left: 0;
-    border-radius: 4px 0 0 4px; /* ⭐ 从6px压缩 */
+    border-radius: 4px 0 0 4px;
 }
 
 .gantt-bar-handle.right {
@@ -1069,28 +1071,28 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   任务条外部标签样式（修改 - 完全透明化）
+   任务条外部标签样式（完全透明化）
    ====================== */
 .gantt-bar-label-external {
     position: absolute;
-    top: 6px; /* ⭐ 从12px压缩到6px */
-    height: 28px; /* ⭐ 从36px压缩到28px */
+    top: 6px;
+    height: 28px;
     display: flex;
     align-items: center;
-    padding: 0 8px; /* ⭐ 从10px压缩 */
-    color: var(--gray-700); /* ⭐ 加深颜色以提高可读性 */
-    font-size: 0.75rem; /* ⭐ 从0.85rem压缩 */
+    padding: 0 8px;
+    color: var(--gray-700);
+    font-size: 0.75rem;
     font-weight: 500;
     white-space: nowrap;
     pointer-events: auto;
     z-index: var(--z-gantt-label);
     
-    /* ⭐ 完全透明化背景 */
+    /* 完全透明化背景 */
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
     
-    /* ⭐ 添加文字阴影提高可读性 */
+    /* 添加文字阴影提高可读性 */
     text-shadow: 
         1px 1px 2px rgba(255, 255, 255, 0.9),
         -1px -1px 2px rgba(255, 255, 255, 0.9),
@@ -1103,7 +1105,7 @@ input:checked + .switch-slider:before {
 }
 
 .gantt-bar-label-external:hover {
-    color: var(--primary-color); /* ⭐ 悬停时变色 */
+    color: var(--primary-color);
     transform: translateX(2px);
     text-shadow: 
         1px 1px 3px rgba(255, 255, 255, 1),
@@ -1166,7 +1168,7 @@ input:checked + .switch-slider:before {
 .gantt-sidebar-body::-webkit-scrollbar,
 .gantt-rows-container::-webkit-scrollbar,
 .log-body::-webkit-scrollbar {
-    width: 6px; /* ⭐ 从8px压缩 */
+    width: 6px;
     height: 6px;
 }
 
@@ -1230,7 +1232,7 @@ input:checked + .switch-slider:before {
     h1 {
         margin-left: 0 !important;
         text-align: center;
-        font-size: 1.3rem; /* ⭐ 从1.5rem压缩 */
+        font-size: 1.3rem;
     }
 
     .toolbar-collapsed {
@@ -1244,7 +1246,7 @@ input:checked + .switch-slider:before {
     }
 
     .gantt-sidebar {
-        width: 100px; /* ⭐ 从120px压缩 */
+        width: 100px;
         min-width: 100px;
     }
 
@@ -1254,13 +1256,9 @@ input:checked + .switch-slider:before {
     }
 
     .sidebar-toggle-btn {
-        width: 18px; /* ⭐ 从20px压缩 */
-        height: 36px; /* ⭐ 从40px压缩 */
+        width: 18px;
+        height: 36px;
         font-size: 0.6rem;
-    }
-
-    .gantt-wrapper {
-        max-height: calc(100vh - 200px);
     }
 
     .gantt-task-name {
@@ -1332,7 +1330,6 @@ input:checked + .switch-slider:before {
         background: rgba(33, 37, 41, 0.95);
     }
     
-    /* ⭐ 深色模式下标签文字阴影调整 */
     .gantt-bar-label-external {
         color: var(--gray-200);
         text-shadow: 
