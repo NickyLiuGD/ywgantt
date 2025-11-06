@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图核心类 - 渲染、数据管理、交互控制                          ▓▓
 // ▓▓ 路径: js/gantt-chart.js                                          ▓▓
-// ▓▓ 版本: Gamma9 - 修复滚动与居中功能                                ▓▓
+// ▓▓ 版本: Gamma9 - 修复滚动+居中显示                                 ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -110,7 +110,7 @@
     };
 
     /**
-     * 渲染甘特图（完整版）
+     * 渲染甘特图（完整版 - 包含折叠按钮）
      */
     GanttChart.prototype.render = function() {
         if (!this.container) {
@@ -432,8 +432,12 @@
         return paths.join('');
     };
 
+    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+    // ▓▓ 修复：选中任务+居中显示（完全重写）                               ▓▓
+    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
     /**
-     * 🔧 修复：选择任务并自动居中显示
+     * 选中任务（修复版 - 确保居中滚动正常工作）
      * @param {string} taskId - 任务ID
      */
     GanttChart.prototype.selectTask = function(taskId) {
@@ -448,10 +452,12 @@
         this.selectedTask = taskId;
         this.updateSelectionState(taskId);
         
-        // 🔑 关键：延迟执行居中滚动，确保DOM已完全更新
-        setTimeout(() => {
-            this.scrollTaskToCenter(taskId);
-        }, 100);
+        // ⚡ 关键修复：使用 requestAnimationFrame 确保DOM完全更新后再滚动
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                this.scrollTaskToCenter(taskId);
+            });
+        });
         
         addLog(`📌 已选择任务 "${task.name}"`);
     };
@@ -476,6 +482,135 @@
         names.forEach(name => {
             name.classList.toggle('selected', name.dataset.taskId === taskId);
         });
+    };
+
+    /**
+     * 滚动使任务条居中显示（完全重写 - 修复所有问题）
+     * @param {string} taskId - 任务ID
+     */
+    GanttChart.prototype.scrollTaskToCenter = function(taskId) {
+        if (!taskId || !this.container) {
+            console.warn('scrollTaskToCenter: Invalid parameters');
+            return;
+        }
+        
+        const bar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
+        const rowsContainer = this.container.querySelector('.gantt-rows-container');
+        
+        if (!bar || !rowsContainer) {
+            console.warn('scrollTaskToCenter: Elements not found');
+            return;
+        }
+        
+        try {
+            // ⭐ 关键修复1：获取任务在任务列表中的索引
+            const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+            if (taskIndex === -1) {
+                console.warn('scrollTaskToCenter: Task index not found');
+                return;
+            }
+            
+            // ⭐ 关键修复2：计算任务条的垂直位置（基于行索引）
+            const taskRowTop = taskIndex * ROW_HEIGHT;
+            
+            // ⭐ 关键修复3：计算任务条的水平位置
+            const task = this.tasks[taskIndex];
+            const startOffset = daysBetween(this.startDate, new Date(task.start));
+            const taskBarLeft = startOffset * this.options.cellWidth;
+            const duration = daysBetween(task.start, task.end) + 1;
+            const taskBarWidth = Math.max(duration * this.options.cellWidth, 60);
+            
+            // ⭐ 关键修复4：获取可视区域尺寸
+            const containerWidth = rowsContainer.clientWidth;
+            const containerHeight = rowsContainer.clientHeight;
+            
+            // ⭐ 关键修复5：计算居中滚动位置
+            // 水平居中：任务条中心点 - 容器宽度的一半
+            const targetScrollLeft = taskBarLeft + (taskBarWidth / 2) - (containerWidth / 2);
+            
+            // 垂直居中：任务行中心点 - 容器高度的一半
+            const targetScrollTop = taskRowTop + (ROW_HEIGHT / 2) - (containerHeight / 2);
+            
+            // ⭐ 关键修复6：确保滚动值在有效范围内
+            const maxScrollLeft = rowsContainer.scrollWidth - containerWidth;
+            const maxScrollTop = rowsContainer.scrollHeight - containerHeight;
+            
+            const finalScrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScrollLeft));
+            const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
+            
+            // ⭐ 关键修复7：使用平滑滚动
+            rowsContainer.scrollTo({
+                left: finalScrollLeft,
+                top: finalScrollTop,
+                behavior: 'smooth'
+            });
+            
+            addLog(`✅ 任务 "${task.name}" 已居中显示 (位置: ${taskIndex + 1}/${this.tasks.length})`);
+            
+        } catch (error) {
+            console.error('scrollTaskToCenter error:', error);
+            addLog(`❌ 居中显示失败: ${error.message}`);
+        }
+    };
+
+    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+    // ▓▓ 增强：动态更新甘特图高度（修复版）                                ▓▓
+    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+    /**
+     * 更新甘特图高度以适应窗口（修复版 - 确保滚动正常工作）
+     */
+    GanttChart.prototype.updateHeight = function() {
+        if (!this.container) return;
+        
+        try {
+            const ganttWrapper = this.container.querySelector('.gantt-wrapper');
+            const rowsContainer = this.container.querySelector('.gantt-rows-container');
+            
+            if (!ganttWrapper || !rowsContainer) {
+                console.warn('updateHeight: Elements not found');
+                return;
+            }
+            
+            const headerElement = document.querySelector('h1')?.parentElement;
+            const logPanel = document.getElementById('logPanel');
+            
+            // ⭐ 计算可用高度
+            const headerHeight = headerElement ? headerElement.offsetHeight : 80;
+            const logHeight = logPanel ? 
+                (logPanel.classList.contains('hidden') ? 0 : 
+                 (logPanel.classList.contains('collapsed') ? 55 : 240)) : 0;
+            
+            // ⭐ 计算甘特图容器的可用高度
+            const containerPadding = 30; // container-fluid的padding
+            const ganttContainerPadding = 30; // gantt-container的padding
+            const totalPadding = containerPadding + ganttContainerPadding + 50;
+            
+            const availableHeight = window.innerHeight - headerHeight - logHeight - totalPadding;
+            const finalHeight = Math.max(availableHeight, 350);
+            
+            // ⭐ 关键修复：设置gantt-wrapper的高度
+            ganttWrapper.style.height = finalHeight + 'px';
+            ganttWrapper.style.maxHeight = finalHeight + 'px';
+            
+            // ⭐ 关键修复：确保rowsContainer可以滚动
+            // 计算内容高度
+            const contentHeight = this.tasks.length * ROW_HEIGHT;
+            
+            // 如果内容高度大于容器高度，确保overflow生效
+            if (contentHeight > finalHeight - HEADER_HEIGHT) {
+                rowsContainer.style.overflowY = 'auto';
+                rowsContainer.style.overflowX = 'auto';
+            } else {
+                rowsContainer.style.overflowY = 'hidden';
+                rowsContainer.style.overflowX = 'auto';
+            }
+            
+            addLog(`📏 甘特图高度: ${finalHeight}px, 内容高度: ${contentHeight}px`);
+            
+        } catch (error) {
+            console.error('updateHeight error:', error);
+        }
     };
 
     /**
@@ -603,116 +738,6 @@
         return text.replace(/[&<>"']/g, m => map[m]);
     };
 
-    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-    // ▓▓ 🔧 修复：选中任务居中显示（完全重写，确保可靠性）             ▓▓
-    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-
-    /**
-     * 🔧 修复版：滚动使任务条居中显示
-     * @param {string} taskId - 任务ID
-     */
-    GanttChart.prototype.scrollTaskToCenter = function(taskId) {
-        if (!taskId || !this.container) {
-            console.warn('scrollTaskToCenter: Missing taskId or container');
-            return;
-        }
-        
-        const bar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
-        const rowsContainer = this.container.querySelector('.gantt-rows-container');
-        
-        if (!bar || !rowsContainer) {
-            console.warn('scrollTaskToCenter: Elements not found', { bar: !!bar, rowsContainer: !!rowsContainer });
-            return;
-        }
-        
-        try {
-            // 🔑 获取容器和任务条的尺寸信息
-            const containerRect = rowsContainer.getBoundingClientRect();
-            const barRect = bar.getBoundingClientRect();
-            
-            // 📐 计算任务条在滚动内容中的绝对位置
-            const barLeftInScroll = bar.offsetLeft;
-            const barTopInScroll = bar.offsetParent.offsetTop;
-            
-            // 🎯 计算目标滚动位置（使任务条位于视口中心）
-            const targetScrollLeft = barLeftInScroll - (containerRect.width / 2) + (barRect.width / 2);
-            const targetScrollTop = barTopInScroll - (containerRect.height / 2) + (barRect.height / 2);
-            
-            // 🔒 确保滚动值在有效范围内
-            const maxScrollLeft = rowsContainer.scrollWidth - containerRect.width;
-            const maxScrollTop = rowsContainer.scrollHeight - containerRect.height;
-            
-            const finalScrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScrollLeft));
-            const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
-            
-            // ⚡ 平滑滚动到目标位置
-            rowsContainer.scrollTo({
-                left: finalScrollLeft,
-                top: finalScrollTop,
-                behavior: 'smooth'
-            });
-            
-            // 📝 记录日志
-            const task = this.tasks.find(t => t.id === taskId);
-            if (task) {
-                addLog(`🎯 任务 "${task.name}" 已居中显示`);
-            }
-            
-            console.log('scrollTaskToCenter:', {
-                taskId,
-                taskName: task?.name,
-                barLeft: barLeftInScroll,
-                barTop: barTopInScroll,
-                targetLeft: targetScrollLeft,
-                targetTop: targetScrollTop,
-                finalLeft: finalScrollLeft,
-                finalTop: finalScrollTop
-            });
-        } catch (error) {
-            console.error('scrollTaskToCenter error:', error);
-            addLog('⚠️ 任务居中失败：' + error.message);
-        }
-    };
-
-    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-    // ▓▓ 增强：动态更新甘特图高度                                         ▓▓
-    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-
-    /**
-     * 更新甘特图高度以适应窗口
-     */
-    GanttChart.prototype.updateHeight = function() {
-        if (!this.container) return;
-        
-        try {
-            const ganttWrapper = this.container.querySelector('.gantt-wrapper');
-            if (!ganttWrapper) return;
-            
-            const headerElement = document.querySelector('h1')?.parentElement;
-            const logPanel = document.getElementById('logPanel');
-            
-            // 精确计算可用高度
-            const headerHeight = headerElement ? headerElement.offsetHeight : 80;
-            const logHeight = logPanel ? 
-                (logPanel.classList.contains('hidden') ? 0 : 
-                 (logPanel.classList.contains('collapsed') ? 55 : 240)) : 0;
-            
-            // 更激进的空间利用
-            const availableHeight = window.innerHeight - headerHeight - logHeight - 50;
-            const finalHeight = Math.max(availableHeight, 350);
-            
-            ganttWrapper.style.height = finalHeight + 'px';
-            
-            console.log('updateHeight:', { availableHeight, finalHeight });
-        } catch (error) {
-            console.error('updateHeight error:', error);
-        }
-    };
-
-    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-    // ▓▓ 切换任务名称栏显示                                                 ▓▓
-    // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-
     /**
      * 切换任务名称栏的显示/隐藏
      * @param {boolean} show - 是否显示
@@ -763,6 +788,6 @@
 
     global.GanttChart = GanttChart;
 
-    console.log('✅ gantt-chart.js loaded successfully (Gamma9 - 修复版)');
+    console.log('✅ gantt-chart.js loaded successfully (Gamma9 - 修复滚动+居中)');
 
 })(typeof window !== 'undefined' ? window : this);
