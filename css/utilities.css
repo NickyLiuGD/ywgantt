@@ -1,0 +1,383 @@
+/**
+ * 工具类样式文件
+ * 路径: css/utilities.css
+ * 版本: Delta6
+ * 包含: 动画、辅助类、特效
+ */
+
+/* ======================
+   动画定义
+   ====================== */
+
+/* 脉冲动画 */
+@keyframes pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0;
+    }
+    50% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(2);
+        opacity: 0;
+    }
+}
+
+/* 微光动画 */
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+    }
+    100% {
+        transform: translateX(100%) translateY(100%) rotate(45deg);
+    }
+}
+
+/* 旋转动画 */
+@keyframes rotate {
+    from { 
+        transform: rotate(0deg); 
+    }
+    to { 
+        transform: rotate(360deg); 
+    }
+}
+
+/* 呼吸动画 */
+@keyframes breathe {
+    0%, 100% {
+        filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    }
+    50% {
+        filter: drop-shadow(0 0 12px currentColor) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    }
+}
+
+/* 箭头脉冲动画 */
+@keyframes arrowPulse {
+    0%, 100% {
+        stroke-width: 3;
+        opacity: 1;
+    }
+    50% {
+        stroke-width: 4;
+        opacity: 0.8;
+    }
+}
+
+/* 淡入上滑动画 */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 图标弹跳动画 */
+@keyframes iconBounce {
+    0%, 100% {
+        transform: scale(1.25) translateY(0);
+    }
+    50% {
+        transform: scale(1.25) translateY(-3px);
+    }
+}
+
+/* 图标抖动动画 */
+@keyframes iconShake {
+    0%, 100% {
+        transform: scale(1.25) rotate(0deg);
+    }
+    25% {
+        transform: scale(1.25) rotate(10deg);
+    }
+    75% {
+        transform: scale(1.25) rotate(-10deg);
+    }
+}
+
+/* 快捷菜单滑入动画 */
+@keyframes quickMenuSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+/* ======================
+   辅助类
+   ====================== */
+
+/* 隐藏类 */
+.hidden {
+    display: none !important;
+}
+
+/* 不可见但占位 */
+.invisible {
+    visibility: hidden;
+}
+
+/* 文本省略 */
+.text-ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 禁用用户选择 */
+.no-select {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* 禁用指针事件 */
+.no-pointer-events {
+    pointer-events: none;
+}
+
+/* 启用指针事件 */
+.pointer-events-auto {
+    pointer-events: auto;
+}
+
+/* 光标样式 */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.cursor-move {
+    cursor: move;
+}
+
+.cursor-grab {
+    cursor: grab;
+}
+
+.cursor-grabbing {
+    cursor: grabbing;
+}
+
+.cursor-ew-resize {
+    cursor: ew-resize;
+}
+
+/* ======================
+   渐变背景
+   ====================== */
+
+.gradient-primary {
+    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+}
+
+.gradient-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.gradient-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.gradient-info {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.gradient-warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+/* ======================
+   毛玻璃效果
+   ====================== */
+
+.glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-dark {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+/* ======================
+   阴影效果
+   ====================== */
+
+.shadow-sm {
+    box-shadow: var(--shadow-sm);
+}
+
+.shadow-md {
+    box-shadow: var(--shadow-md);
+}
+
+.shadow-lg {
+    box-shadow: var(--shadow-lg);
+}
+
+.shadow-xl {
+    box-shadow: var(--shadow-xl);
+}
+
+/* ======================
+   过渡效果
+   ====================== */
+
+.transition-fast {
+    transition: all var(--transition-fast);
+}
+
+.transition-normal {
+    transition: all var(--transition-normal);
+}
+
+.transition-slow {
+    transition: all var(--transition-slow);
+}
+
+/* ======================
+   Flexbox 辅助类
+   ====================== */
+
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flex-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.flex-start {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.flex-end {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* ======================
+   间距辅助类
+   ====================== */
+
+.gap-xs { gap: 4px; }
+.gap-sm { gap: 8px; }
+.gap-md { gap: 12px; }
+.gap-lg { gap: 16px; }
+.gap-xl { gap: 24px; }
+
+/* ======================
+   圆角辅助类
+   ====================== */
+
+.rounded-sm { border-radius: 4px; }
+.rounded-md { border-radius: 8px; }
+.rounded-lg { border-radius: 12px; }
+.rounded-xl { border-radius: 16px; }
+.rounded-full { border-radius: 9999px; }
+
+/* ======================
+   性能优化
+   ====================== */
+
+.will-change-transform {
+    will-change: transform;
+}
+
+.will-change-opacity {
+    will-change: opacity;
+}
+
+.gpu-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+
+/* ======================
+   响应式辅助类
+   ====================== */
+
+@media (max-width: 768px) {
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
+@media (min-width: 769px) {
+    .show-mobile {
+        display: none !important;
+    }
+}
+
+/* ======================
+   打印辅助类
+   ====================== */
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .print-only {
+        display: block !important;
+    }
+}
+
+@media screen {
+    .print-only {
+        display: none !important;
+    }
+}
+
+/* ======================
+   可访问性辅助类
+   ====================== */
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--primary-color);
+    color: white;
+    padding: 8px;
+    text-decoration: none;
+    z-index: 9999;
+}
+
+.skip-link:focus {
+    top: 0;
+}

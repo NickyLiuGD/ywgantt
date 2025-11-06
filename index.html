@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测、时间刻度缩放">
     <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图,时间刻度">
-    <title>在线甘特图Zeta7</title>
+    <title>在线甘特图Zeta8</title>
     
     <!-- Preconnect to CDN for faster loading -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -18,14 +18,23 @@
     <script defer src="https://cdn.anychart.com/releases/8.13.0/js/anychart-core.min.js"></script>
     <script defer src="https://cdn.anychart.com/releases/8.13.0/js/anychart-pert.min.js"></script>
     
-    <!-- 动态加载自定义样式 -->
+<!-- ⭐ 新的CSS加载顺序 -->
     <script>
         (function() {
             const timestamp = Date.now();
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'css/gantt.css?t=' + timestamp;
-            document.head.appendChild(link);
+            const cssFiles = [
+                'css/base.css',        // 1. 基础样式（变量、重置）
+                'css/utilities.css',   // 2. 工具类（动画、辅助类）
+                'css/components.css',  // 3. 通用组件
+                'css/gantt.css'        // 4. 甘特图核心
+            ];
+            
+            cssFiles.forEach(file => {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = file + '?t=' + timestamp;
+                document.head.appendChild(link);
+            });
         })();
     </script>
     
@@ -70,7 +79,7 @@
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Zeta7</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Zeta8</h1>
         </div>
         
         <!-- 展开的浮动工具栏 - 毛玻璃效果 -->
