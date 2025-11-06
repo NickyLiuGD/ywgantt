@@ -1,14 +1,14 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图任务操作模块                                              ▓▓
 // ▓▓ 路径: js/gantt/gantt-operations.js                             ▓▓
-// ▓▓ 版本: Gamma11                                                  ▓▓
+// ▓▓ 版本: Gamma11 - 修复版（恢复依赖关系显示）                     ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
     'use strict';
 
     /**
-     * 选中任务（完全修复版）
+     * 选中任务（完整版 - 包含依赖关系高亮）
      * @param {string} taskId - 任务ID
      */
     GanttChart.prototype.selectTask = function(taskId) {
@@ -20,36 +20,65 @@
             return;
         }
 
+        // 清除所有高亮和旧表单
+        this.container.querySelectorAll('.gantt-bar, .gantt-task-name, .gantt-bar-label-external').forEach(el => {
+            el.classList.remove('selected', 'dep-highlight');
+        });
+        this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
+            path.classList.remove('dep-highlight-arrow');
+        });
+        const oldForm = this.container.querySelector('.inline-task-form');
+        if (oldForm) oldForm.remove();
+
+        // 设置选中任务
         this.selectedTask = taskId;
-        this.updateSelectionState(taskId);
-        
+
+        // 高亮选中任务
+        const selectedBar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
+        if (selectedBar) selectedBar.classList.add('selected');
+
+        const selectedLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${taskId}"]`);
+        if (selectedLabel) selectedLabel.classList.add('selected');
+
+        const selectedName = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
+        if (selectedName) selectedName.classList.add('selected');
+
+        // ⭐ 获取并高亮所有依赖任务
+        const deps = this.getAllDependencies(taskId);
+        deps.forEach(depId => {
+            const bar = this.container.querySelector(`.gantt-bar[data-task-id="${depId}"]`);
+            if (bar) bar.classList.add('dep-highlight');
+            
+            const label = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${depId}"]`);
+            if (label) label.classList.add('dep-highlight');
+            
+            const name = this.container.querySelector(`.gantt-task-name[data-task-id="${depId}"]`);
+            if (name) name.classList.add('dep-highlight');
+        });
+
+        // ⭐ 高亮依赖箭头
+        this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
+            const fromId = path.dataset.from;
+            const toId = path.dataset.to;
+            if (deps.has(fromId) && (toId === taskId || deps.has(toId))) {
+                path.classList.add('dep-highlight-arrow');
+            }
+        });
+
+        // 滚动到任务中心
         setTimeout(() => {
             this.scrollTaskToCenter(taskId);
         }, 150);
         
-        addLog(`📌 已选择任务 "${task.name}"`);
+        addLog(`📌 已选择任务 "${task.name}"${deps.size > 0 ? ` (依赖${deps.size}个任务)` : ''}`);
     };
 
     /**
-     * 更新选择状态
-     * @param {string} taskId - 任务ID
+     * 更新选择状态（已废弃，功能整合到selectTask中）
+     * @deprecated 使用 selectTask 替代
      */
     GanttChart.prototype.updateSelectionState = function(taskId) {
-        const bars = this.container.querySelectorAll('.gantt-bar');
-        const labels = this.container.querySelectorAll('.gantt-bar-label-external');
-        const names = this.container.querySelectorAll('.gantt-task-name');
-        
-        bars.forEach(bar => {
-            bar.classList.toggle('selected', bar.dataset.taskId === taskId);
-        });
-        
-        labels.forEach(label => {
-            label.classList.toggle('selected', label.dataset.taskId === taskId);
-        });
-        
-        names.forEach(name => {
-            name.classList.toggle('selected', name.dataset.taskId === taskId);
-        });
+        console.warn('updateSelectionState is deprecated, use selectTask instead');
     };
 
     /**
@@ -260,6 +289,6 @@
         }
     };
 
-    console.log('✅ gantt-operations.js loaded successfully');
+    console.log('✅ gantt-operations.js loaded successfully (修复版 - 恢复依赖关系显示)');
 
 })();

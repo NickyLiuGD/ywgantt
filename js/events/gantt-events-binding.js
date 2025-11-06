@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图事件绑定模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-binding.js                        ▓▓
-// ▓▓ 版本: Gamma8                                                   ▓▓
+// ▓▓ 版本: Gamma8 - 修复版（恢复依赖关系显示）                      ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -126,24 +126,30 @@
     };
 
     /**
-     * 取消选择
+     * 取消选择（完整版 - 清除所有高亮）
      */
     GanttChart.prototype.deselect = function() {
         if (!this.selectedTask) return;
 
         this.selectedTask = null;
+        
+        // ⭐ 清除所有选中和依赖高亮
         this.container.querySelectorAll('.selected, .dep-highlight').forEach(el => {
             el.classList.remove('selected', 'dep-highlight');
         });
+        
+        // ⭐ 清除依赖箭头高亮
         this.container.querySelectorAll('.dep-highlight-arrow').forEach(path => {
             path.classList.remove('dep-highlight-arrow');
         });
+        
+        // 移除编辑表单
         const form = this.container.querySelector('.inline-task-form');
         if (form) form.remove();
         
-        addLog('已取消选择');
+        addLog('✅ 已取消选择');
     };
 
-    console.log('✅ gantt-events-binding.js loaded successfully');
+    console.log('✅ gantt-events-binding.js loaded successfully (修复版 - 恢复依赖关系显示)');
 
 })();
