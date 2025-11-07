@@ -213,6 +213,52 @@
         });
     }
 
+    // ⭐ 修改所有数据操作，添加 PERT 刷新
+
+    // 加载文件后刷新
+    const originalLoadHandler = loadDataBtn?.onclick;
+    if (loadDataBtn) {
+        loadDataBtn.onclick = () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const tasks = JSON.parse(ev.target.result);
+                        if (!Array.isArray(tasks)) {
+                            alert('文件格式错误');
+                            return;
+                        }
+                        tasks.forEach(t => {
+                            t.id = t.id || generateId();
+                            if (!t.dependencies) t.dependencies = [];
+                        });
+                        
+                        gantt.tasks = tasks;
+                        gantt.calculateDateRange();
+                        gantt.render();
+                        
+                        // ⭐ 刷新 PERT
+                        if (typeof refreshPertView === 'function') {
+                            refreshPertView();
+                        }
+                        
+                        addLog(`✅ 已加载 ${tasks.length} 个任务`);
+                    } catch (err) {
+                        alert('加载失败：' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        };
+    }
+
     console.log('✅ app-controls.js loaded successfully (Delta8 - 全貌视图)');
 
 })();
