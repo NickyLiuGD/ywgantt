@@ -1,20 +1,30 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 应用设置与视图切换模块                                          ▓▓
 // ▓▓ 路径: js/app/app-settings.js                                   ▓▓
-// ▓▓ 版本: Delta8 - 增强版（保留原有逻辑 + 新增功能）               ▓▓
+// ▓▓ 版本: Delta9 - PERT 对象化交互版                               ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
     'use strict';
 
-    // ==================== 视图切换 ====================
+    // ==================== 全局状态 ====================
     let isPertView = false;
-    let pertChart = null; // ⭐ 用于存储 PERT 实例（如果使用模块化版本）
+    let pertState = {
+        scale: 1.0,
+        offsetX: 0,
+        offsetY: 0,
+        selectedNode: null,
+        isDragging: false,
+        dragStartX: 0,
+        dragStartY: 0
+    };
     
     const toggleButton = document.getElementById('toggleView');
     const ganttContainer = document.getElementById('ganttContainer');
     const pertContainer = document.getElementById('pertContainer');
 
+    // ==================== 视图切换主函数 ====================
+    
     if (toggleButton && ganttContainer && pertContainer) {
         toggleButton.onclick = () => {
             isPertView = !isPertView;
@@ -24,55 +34,19 @@
                 ganttContainer.style.display = 'none';
                 pertContainer.style.display = 'block';
                 
-                // ⭐ 优先使用模块化 PertChart，降级使用原有渲染函数
-                if (typeof PertChart !== 'undefined') {
-                    console.log('🎨 使用模块化 PertChart');
-                    
-                    // 销毁旧实例
-                    if (pertChart) {
-                        pertChart.destroy();
-                    }
-                    
-                    try {
-                        pertChart = new PertChart('#pertContainer', gantt.tasks, {
-                            enableDrag: true,
-                            enableZoom: true,
-                            showCriticalPath: true
-                        });
-                        
-                        global.pertChart = pertChart;
-                        
-                        addLog('✅ 已切换到 PERT 视图（模块化版本）');
-                        
-                        // 自动全貌视图
-                        setTimeout(() => {
-                            if (pertChart && typeof pertChart.switchToOverviewMode === 'function') {
-                                pertChart.switchToOverviewMode();
-                            }
-                        }, 300);
-                        
-                    } catch (error) {
-                        console.error('❌ PertChart 创建失败，降级使用原有渲染:', error);
-                        renderPertChart(gantt.tasks);
-                        addLog('✅ 已切换到 PERT 视图（简化版本）');
-                    }
-                } else {
-                    console.log('🎨 使用原有 renderPertChart');
-                    renderPertChart(gantt.tasks);
-                    addLog('✅ 已切换到 PERT 视图');
-                }
+                renderPertChart(gantt.tasks);
+                addLog('✅ 已切换到 PERT 视图');
                 
             } else {
                 // 切换回甘特图视图
                 ganttContainer.style.display = 'block';
                 pertContainer.style.display = 'none';
                 
-                // 销毁 PERT 实例
-                if (pertChart) {
-                    pertChart.destroy();
-                    pertChart = null;
-                    global.pertChart = null;
-                }
+                // 清理 PERT 状态
+                pertState.selectedNode = null;
+                pertState.scale = 1.0;
+                pertState.offsetX = 0;
+                pertState.offsetY = 0;
                 
                 gantt.updateHeight();
                 addLog('✅ 已切换到甘特图视图');
@@ -85,10 +59,10 @@
         };
     }
 
-    // ==================== PERT 图表渲染函数（原有逻辑 + 增强） ====================
+    // ==================== PERT 图表渲染（对象化版本）====================
     
     /**
-     * 渲染 PERT 图表（增强版：支持全貌视图）
+     * 渲染 PERT 图表（完整对象化版本）
      * @param {Array} tasks - 任务数组
      */
     function renderPertChart(tasks) {
@@ -110,74 +84,123 @@
             return;
         }
         
-        // ⭐ 创建工具栏和SVG容器
-        pertContainer.innerHTML = `
-            <div class="pert-wrapper" style="width: 100%; height: 100%; display: flex; flex-direction: column; background: #f8f9fa; border-radius: 8px; overflow: hidden;">
-                <div class="pert-toolbar" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(255,255,255,0.95); border-bottom: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                    <button class="pert-btn" id="pertOverview" title="项目全貌" style="padding: 8px 14px; background: linear-gradient(135deg, rgba(16,185,129,0.05), rgba(6,182,212,0.05)); border: 1px dashed rgba(16,185,129,0.4); border-radius: 8px; cursor: pointer;">
-                        <span style="font-size: 1rem;">🔭</span> 全貌视图
-                    </button>
-                    <span style="margin-left: auto; font-size: 0.8rem; color: #6c757d;">
-                        任务总数: <strong style="color: #667eea;">${tasks.length}</strong>
-                    </span>
-                </div>
-                <div class="pert-canvas" id="pertCanvas" style="flex: 1; overflow: auto; background: white; position: relative;">
-                    <svg id="pertSvg" width="100%" height="600"></svg>
-                </div>
-            </div>
-        `;
+        // PERT 图配置
+        const nodeWidth = 160;
+        const nodeHeight = 100;
+        const horizontalGap = 200;
+        const verticalGap = 140;
+        const padding = 60;
         
-        const svg = document.getElementById('pertSvg');
-        if (!svg) {
-            console.error('❌ SVG 元素创建失败');
-            return;
-        }
-
-        // ⭐ PERT 图配置
-        const nodeWidth = 140;
-        const nodeHeight = 90;
-        const horizontalGap = 180;
-        const verticalGap = 120;
-        const padding = 50;
-        
-        // 计算节点层级（拓扑排序）
+        // 计算节点层级
         const levels = calculateTaskLevels(tasks);
         const positions = {};
-        
-        console.log('📊 PERT 层级:', levels.map(l => l.length));
         
         // 计算节点位置
         levels.forEach((levelTasks, level) => {
             levelTasks.forEach((task, index) => {
                 positions[task.id] = {
                     x: padding + level * (nodeWidth + horizontalGap),
-                    y: padding + index * (nodeHeight + verticalGap)
+                    y: padding + index * (nodeHeight + verticalGap),
+                    task: task
                 };
             });
         });
         
-        // ⭐ 计算实际画布尺寸
+        // 计算画布尺寸
         const canvasWidth = padding * 2 + levels.length * (nodeWidth + horizontalGap) - horizontalGap;
         const canvasHeight = padding * 2 + Math.max(...levels.map(l => l.length)) * (nodeHeight + verticalGap) - verticalGap;
         
-        svg.setAttribute('width', canvasWidth);
-        svg.setAttribute('height', canvasHeight);
+        // 创建容器结构
+        pertContainer.innerHTML = `
+            <div class="pert-wrapper" style="width: 100%; height: 100%; display: flex; flex-direction: column; background: #f8f9fa; border-radius: 8px; overflow: hidden;">
+                <!-- 工具栏 -->
+                <div class="pert-toolbar" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(255,255,255,0.95); border-bottom: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                    <button class="pert-btn" id="pertZoomIn" title="放大">
+                        <span style="font-size: 1rem;">🔍+</span>
+                    </button>
+                    <button class="pert-btn" id="pertZoomOut" title="缩小">
+                        <span style="font-size: 1rem;">🔍-</span>
+                    </button>
+                    <button class="pert-btn" id="pertReset" title="重置">
+                        <span style="font-size: 1rem;">🔄</span>
+                    </button>
+                    <button class="pert-btn pert-btn-overview" id="pertOverview" title="项目全貌">
+                        <span style="font-size: 1rem;">🔭</span> 全貌
+                    </button>
+                    <span style="margin-left: auto; font-size: 0.8rem; color: #6c757d;">
+                        缩放: <strong id="pertScaleValue" style="color: #667eea;">100%</strong> | 
+                        任务: <strong style="color: #667eea;">${tasks.length}</strong> | 
+                        层级: <strong style="color: #667eea;">${levels.length}</strong>
+                    </span>
+                </div>
+                
+                <!-- 画布 -->
+                <div class="pert-canvas" id="pertCanvas" style="flex: 1; overflow: auto; background: white; position: relative; cursor: grab;">
+                    <svg id="pertSvg" width="${canvasWidth}" height="${canvasHeight}">
+                        <defs>
+                            ${renderPertDefs()}
+                        </defs>
+                        <g id="pertContent" transform="translate(0, 0) scale(1)">
+                            ${renderPertConnections(tasks, positions, nodeWidth, nodeHeight)}
+                            ${renderPertNodes(tasks, positions, nodeWidth, nodeHeight)}
+                        </g>
+                    </svg>
+                </div>
+                
+                <!-- ⭐ 悬停提示框 -->
+                <div id="pertTooltip" style="display: none; position: absolute; background: rgba(0,0,0,0.9); color: white; padding: 12px 16px; border-radius: 8px; font-size: 0.85rem; pointer-events: none; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); backdrop-filter: blur(10px);"></div>
+            </div>
+        `;
         
-        // 添加箭头标记
-        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-        defs.innerHTML = `
-            <marker id="pert-arrowhead" markerWidth="10" markerHeight="10" 
-                    refX="8" refY="3" orient="auto">
-                <polygon points="0 0, 10 3, 0 6" fill="#dc3545" />
+        // 绑定事件
+        attachPertEvents(positions, nodeWidth, nodeHeight, canvasWidth, canvasHeight);
+        
+        addLog(`✅ PERT 图表已渲染（${tasks.length} 个任务，${levels.length} 层）`);
+    }
+
+    /**
+     * ⭐ 渲染 SVG 定义
+     */
+    function renderPertDefs() {
+        return `
+            <!-- 箭头标记 -->
+            <marker id="pert-arrow" viewBox="0 0 10 10" refX="9" refY="5" 
+                    markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc3545" />
             </marker>
+            <marker id="pert-arrow-highlight" viewBox="0 0 10 10" refX="9" refY="5" 
+                    markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981" />
+            </marker>
+            
+            <!-- 节点渐变 -->
             <linearGradient id="pert-nodeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.1" />
+                <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.15" />
                 <stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.05" />
             </linearGradient>
+            
+            <!-- 选中节点渐变 -->
+            <linearGradient id="pert-nodeGradientSelected" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:#ffc107;stop-opacity:0.3" />
+                <stop offset="100%" style="stop-color:#ff9800;stop-opacity:0.1" />
+            </linearGradient>
+            
+            <!-- 悬停节点渐变 -->
+            <linearGradient id="pert-nodeGradientHover" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.25" />
+                <stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.15" />
+            </linearGradient>
         `;
-        svg.appendChild(defs);
+    }
+
+    /**
+     * ⭐ 渲染连接线（统一样式）
+     */
+    function renderPertConnections(tasks, positions, nodeWidth, nodeHeight) {
+        const connections = [];
+        const gap = 10;
+        const hLength = 40;
         
-        // ⭐ 绘制连接线（统一样式：水平-斜线-水平）
         tasks.forEach(task => {
             if (!task.dependencies || task.dependencies.length === 0) return;
             
@@ -191,120 +214,471 @@
                 const x2 = to.x;
                 const y2 = to.y + nodeHeight / 2;
                 
-                // ⭐ 统一样式：水平-斜线-水平
-                const gap = 10;
-                const hLength = 40;
                 let pathData = '';
-                
                 if (Math.abs(y2 - y1) < 5) {
-                    // 同一水平线
                     pathData = `M ${x1} ${y1} L ${x2 - gap} ${y2}`;
                 } else {
-                    // 不同水平线
                     pathData = `M ${x1} ${y1} L ${x1 + hLength} ${y1} L ${x2 - hLength} ${y2} L ${x2 - gap} ${y2}`;
                 }
                 
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                path.setAttribute('d', pathData);
-                path.setAttribute('stroke', '#dc3545');
-                path.setAttribute('stroke-width', '2');
-                path.setAttribute('fill', 'none');
-                path.setAttribute('marker-end', 'url(#pert-arrowhead)');
-                path.setAttribute('stroke-linecap', 'round');
-                path.setAttribute('stroke-linejoin', 'round');
-                path.classList.add('pert-connection');
-                svg.appendChild(path);
+                connections.push(`
+                    <path class="pert-connection" 
+                          data-from="${depId}" 
+                          data-to="${task.id}"
+                          d="${pathData}"
+                          stroke="#dc3545" 
+                          stroke-width="2" 
+                          fill="none"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          marker-end="url(#pert-arrow)"
+                          style="transition: all 0.3s ease;" />
+                `);
             });
         });
         
-        // ⭐ 绘制节点
+        return connections.join('');
+    }
+
+    /**
+     * ⭐ 渲染节点（对象化版本）
+     */
+    function renderPertNodes(tasks, positions, nodeWidth, nodeHeight) {
+        const nodes = [];
+        
         tasks.forEach(task => {
             const pos = positions[task.id];
             if (!pos) return;
             
-            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            g.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
-            g.classList.add('pert-node');
-            g.dataset.taskId = task.id;
-            
-            // 节点矩形
-            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            rect.setAttribute('width', nodeWidth);
-            rect.setAttribute('height', nodeHeight);
-            rect.setAttribute('fill', 'url(#pert-nodeGradient)');
-            rect.setAttribute('stroke', '#667eea');
-            rect.setAttribute('stroke-width', '2');
-            rect.setAttribute('rx', '12');
-            g.appendChild(rect);
-            
-            // 任务名称
-            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            text.setAttribute('x', nodeWidth / 2);
-            text.setAttribute('y', 28);
-            text.setAttribute('text-anchor', 'middle');
-            text.setAttribute('font-size', '14');
-            text.setAttribute('font-weight', '600');
-            text.setAttribute('fill', '#333');
-            text.textContent = task.name.length > 16 ? task.name.substring(0, 14) + '...' : task.name;
-            g.appendChild(text);
-            
-            // 分隔线
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', '10');
-            line.setAttribute('y1', '40');
-            line.setAttribute('x2', nodeWidth - 10);
-            line.setAttribute('y2', '40');
-            line.setAttribute('stroke', '#e0e0e0');
-            line.setAttribute('stroke-width', '1');
-            g.appendChild(line);
-            
-            // 工期信息
             const duration = daysBetween(task.start, task.end) + 1;
-            const durationText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            durationText.setAttribute('x', nodeWidth / 2);
-            durationText.setAttribute('y', 56);
-            durationText.setAttribute('text-anchor', 'middle');
-            durationText.setAttribute('font-size', '12');
-            durationText.setAttribute('fill', '#666');
-            durationText.textContent = `工期: ${duration}天`;
-            g.appendChild(durationText);
+            const taskName = task.name.length > 18 ? task.name.substring(0, 16) + '...' : task.name;
             
-            // 进度信息
-            const progressText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            progressText.setAttribute('x', nodeWidth / 2);
-            progressText.setAttribute('y', 72);
-            progressText.setAttribute('text-anchor', 'middle');
-            progressText.setAttribute('font-size', '12');
-            progressText.setAttribute('fill', '#666');
-            progressText.textContent = `进度: ${task.progress}%`;
-            g.appendChild(progressText);
-            
-            // 日期范围
-            const dateText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            dateText.setAttribute('x', nodeWidth / 2);
-            dateText.setAttribute('y', nodeHeight + 18);
-            dateText.setAttribute('text-anchor', 'middle');
-            dateText.setAttribute('font-size', '10');
-            dateText.setAttribute('fill', '#999');
-            dateText.textContent = `${formatDate(new Date(task.start)).substring(5)} - ${formatDate(new Date(task.end)).substring(5)}`;
-            g.appendChild(dateText);
-            
-            svg.appendChild(g);
+            nodes.push(`
+                <g class="pert-node" 
+                   data-task-id="${task.id}"
+                   data-task-name="${task.name}"
+                   data-task-start="${task.start}"
+                   data-task-end="${task.end}"
+                   data-task-duration="${duration}"
+                   data-task-progress="${task.progress}"
+                   transform="translate(${pos.x}, ${pos.y})"
+                   style="cursor: pointer; transition: all 0.3s ease;">
+                    
+                    <!-- 节点背景矩形 -->
+                    <rect class="node-rect"
+                          width="${nodeWidth}" 
+                          height="${nodeHeight}" 
+                          rx="12" 
+                          ry="12"
+                          fill="url(#pert-nodeGradient)"
+                          stroke="#667eea" 
+                          stroke-width="2"
+                          style="transition: all 0.3s ease;" />
+                    
+                    <!-- 任务名称 -->
+                    <text x="${nodeWidth / 2}" 
+                          y="30" 
+                          text-anchor="middle" 
+                          font-size="15" 
+                          font-weight="600"
+                          fill="#333"
+                          style="pointer-events: none;">
+                        ${taskName}
+                    </text>
+                    
+                    <!-- 分隔线 -->
+                    <line x1="15" y1="45" x2="${nodeWidth - 15}" y2="45" 
+                          stroke="#e0e0e0" stroke-width="1" />
+                    
+                    <!-- 工期信息 -->
+                    <text x="${nodeWidth / 2}" 
+                          y="63" 
+                          text-anchor="middle" 
+                          font-size="13"
+                          fill="#666"
+                          style="pointer-events: none;">
+                        📅 工期: ${duration}天
+                    </text>
+                    
+                    <!-- 进度信息 -->
+                    <text x="${nodeWidth / 2}" 
+                          y="80" 
+                          text-anchor="middle" 
+                          font-size="13"
+                          fill="#666"
+                          style="pointer-events: none;">
+                        📊 进度: ${task.progress}%
+                    </text>
+                    
+                    <!-- 进度条 -->
+                    <rect x="15" 
+                          y="${nodeHeight - 15}" 
+                          width="${nodeWidth - 30}" 
+                          height="6" 
+                          rx="3"
+                          fill="#e0e0e0" />
+                    <rect x="15" 
+                          y="${nodeHeight - 15}" 
+                          width="${(nodeWidth - 30) * task.progress / 100}" 
+                          height="6" 
+                          rx="3"
+                          fill="#667eea" />
+                    
+                    <!-- 日期范围（节点下方） -->
+                    <text x="${nodeWidth / 2}" 
+                          y="${nodeHeight + 20}" 
+                          text-anchor="middle" 
+                          font-size="11"
+                          fill="#999"
+                          style="pointer-events: none;">
+                        ${formatDate(new Date(task.start)).substring(5)} ~ ${formatDate(new Date(task.end)).substring(5)}
+                    </text>
+                </g>
+            `);
         });
         
-        addLog(`✅ PERT 图表已渲染（${tasks.length} 个任务，${levels.length} 层）`);
+        return nodes.join('');
+    }
+
+    /**
+     * ⭐ 绑定 PERT 事件（对象化交互）
+     */
+    function attachPertEvents(positions, nodeWidth, nodeHeight, canvasWidth, canvasHeight) {
+        const svg = document.getElementById('pertSvg');
+        const canvas = document.getElementById('pertCanvas');
+        const tooltip = document.getElementById('pertTooltip');
+        const content = document.getElementById('pertContent');
         
-        // ⭐ 绑定全貌视图按钮
+        if (!svg || !canvas || !tooltip || !content) return;
+
+        // ⭐ 节点悬停事件
+        document.querySelectorAll('.pert-node').forEach(node => {
+            const taskId = node.dataset.taskId;
+            const rect = node.querySelector('.node-rect');
+            
+            // 鼠标进入节点
+            node.addEventListener('mouseenter', (e) => {
+                // 高亮节点
+                rect.setAttribute('fill', 'url(#pert-nodeGradientHover)');
+                rect.setAttribute('stroke', '#5568d3');
+                rect.setAttribute('stroke-width', '3');
+                rect.style.filter = 'drop-shadow(0 4px 12px rgba(102, 126, 234, 0.4))';
+                
+                // 高亮相关连接线
+                highlightConnections(taskId, true);
+                
+                // 显示详细信息提示框
+                showPertTooltip(e, node);
+            });
+            
+            // 鼠标在节点上移动
+            node.addEventListener('mousemove', (e) => {
+                updateTooltipPosition(e);
+            });
+            
+            // 鼠标离开节点
+            node.addEventListener('mouseleave', () => {
+                // 恢复节点样式
+                if (pertState.selectedNode !== taskId) {
+                    rect.setAttribute('fill', 'url(#pert-nodeGradient)');
+                    rect.setAttribute('stroke', '#667eea');
+                    rect.setAttribute('stroke-width', '2');
+                    rect.style.filter = '';
+                }
+                
+                // 取消高亮连接线
+                highlightConnections(taskId, false);
+                
+                // 隐藏提示框
+                tooltip.style.display = 'none';
+            });
+            
+            // ⭐ 节点点击事件
+            node.addEventListener('click', () => {
+                selectPertNode(taskId, rect);
+            });
+        });
+
+        // ⭐ 工具栏按钮事件
+        const zoomInBtn = document.getElementById('pertZoomIn');
+        const zoomOutBtn = document.getElementById('pertZoomOut');
+        const resetBtn = document.getElementById('pertReset');
+        const overviewBtn = document.getElementById('pertOverview');
+
+        if (zoomInBtn) {
+            zoomInBtn.onclick = () => zoomPert(0.2);
+        }
+
+        if (zoomOutBtn) {
+            zoomOutBtn.onclick = () => zoomPert(-0.2);
+        }
+
+        if (resetBtn) {
+            resetBtn.onclick = () => resetPertView();
+        }
+
+        if (overviewBtn) {
+            overviewBtn.onclick = () => switchPertToOverview(canvasWidth, canvasHeight);
+        }
+
+        // ⭐ 画布拖拽事件
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.pert-node')) return;
+            
+            pertState.isDragging = true;
+            pertState.dragStartX = e.clientX - pertState.offsetX;
+            pertState.dragStartY = e.clientY - pertState.offsetY;
+            canvas.style.cursor = 'grabbing';
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!pertState.isDragging) return;
+            
+            pertState.offsetX = e.clientX - pertState.dragStartX;
+            pertState.offsetY = e.clientY - pertState.dragStartY;
+            
+            updatePertTransform();
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            pertState.isDragging = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            pertState.isDragging = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        // ⭐ 鼠标滚轮缩放
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            zoomPert(delta);
+        }, { passive: false });
+
+        // 添加工具栏按钮样式
+        document.querySelectorAll('.pert-btn').forEach(btn => {
+            btn.style.cssText = `
+                padding: 8px 14px;
+                background: white;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                font-size: 0.85rem;
+                font-weight: 500;
+                color: #495057;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            `;
+        });
+
         const overviewBtn = document.getElementById('pertOverview');
         if (overviewBtn) {
-            overviewBtn.onclick = () => {
-                switchPertToOverview(svg, canvasWidth, canvasHeight);
-            };
+            overviewBtn.style.cssText += `
+                background: linear-gradient(135deg, rgba(16,185,129,0.05), rgba(6,182,212,0.05));
+                border: 1px dashed rgba(16,185,129,0.4);
+            `;
         }
     }
 
     /**
-     * ⭐ 辅助函数：计算任务层级（拓扑排序）
+     * ⭐ 显示悬停提示框
+     */
+    function showPertTooltip(e, node) {
+        const tooltip = document.getElementById('pertTooltip');
+        if (!tooltip) return;
+        
+        const taskName = node.dataset.taskName;
+        const taskStart = node.dataset.taskStart;
+        const taskEnd = node.dataset.taskEnd;
+        const taskDuration = node.dataset.taskDuration;
+        const taskProgress = node.dataset.taskProgress;
+        
+        tooltip.innerHTML = `
+            <div style="font-weight: 600; margin-bottom: 8px; font-size: 0.95rem; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 6px;">
+                ${taskName}
+            </div>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 0.8rem;">
+                <span style="color: #aaa;">开始：</span><span>${taskStart}</span>
+                <span style="color: #aaa;">结束：</span><span>${taskEnd}</span>
+                <span style="color: #aaa;">工期：</span><span>${taskDuration} 天</span>
+                <span style="color: #aaa;">进度：</span><span style="color: #10b981; font-weight: 600;">${taskProgress}%</span>
+            </div>
+        `;
+        
+        tooltip.style.display = 'block';
+        updateTooltipPosition(e);
+    }
+
+    /**
+     * ⭐ 更新提示框位置
+     */
+    function updateTooltipPosition(e) {
+        const tooltip = document.getElementById('pertTooltip');
+        if (!tooltip) return;
+        
+        const canvas = document.getElementById('pertCanvas');
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        let x = e.clientX - canvasRect.left + 15;
+        let y = e.clientY - canvasRect.top + 15;
+        
+        // 防止超出边界
+        const tooltipRect = tooltip.getBoundingClientRect();
+        if (x + tooltipRect.width > canvasRect.width) {
+            x = e.clientX - canvasRect.left - tooltipRect.width - 15;
+        }
+        if (y + tooltipRect.height > canvasRect.height) {
+            y = e.clientY - canvasRect.top - tooltipRect.height - 15;
+        }
+        
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+    }
+
+    /**
+     * ⭐ 选中节点
+     */
+    function selectPertNode(taskId, rect) {
+        // 取消之前的选中
+        document.querySelectorAll('.pert-node .node-rect').forEach(r => {
+            if (r !== rect) {
+                r.setAttribute('fill', 'url(#pert-nodeGradient)');
+                r.setAttribute('stroke', '#667eea');
+                r.setAttribute('stroke-width', '2');
+                r.style.filter = '';
+            }
+        });
+        
+        // 选中当前节点
+        pertState.selectedNode = taskId;
+        rect.setAttribute('fill', 'url(#pert-nodeGradientSelected)');
+        rect.setAttribute('stroke', '#ffc107');
+        rect.setAttribute('stroke-width', '3');
+        rect.style.filter = 'drop-shadow(0 6px 16px rgba(255, 193, 7, 0.5))';
+        
+        const task = gantt.tasks.find(t => t.id === taskId);
+        if (task) {
+            addLog(`📌 已选中 PERT 节点: ${task.name}`);
+        }
+    }
+
+    /**
+     * ⭐ 高亮相关连接线
+     */
+    function highlightConnections(taskId, highlight) {
+        document.querySelectorAll('.pert-connection').forEach(conn => {
+            const from = conn.dataset.from;
+            const to = conn.dataset.to;
+            
+            if (from === taskId || to === taskId) {
+                if (highlight) {
+                    conn.setAttribute('stroke', '#10b981');
+                    conn.setAttribute('stroke-width', '3');
+                    conn.setAttribute('marker-end', 'url(#pert-arrow-highlight)');
+                    conn.style.filter = 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.6))';
+                } else {
+                    conn.setAttribute('stroke', '#dc3545');
+                    conn.setAttribute('stroke-width', '2');
+                    conn.setAttribute('marker-end', 'url(#pert-arrow)');
+                    conn.style.filter = '';
+                }
+            }
+        });
+    }
+
+    /**
+     * ⭐ 缩放 PERT 图
+     */
+    function zoomPert(delta) {
+        pertState.scale = Math.max(0.3, Math.min(2.0, pertState.scale + delta));
+        updatePertTransform();
+        updateScaleDisplay();
+        addLog(`🔍 缩放: ${Math.round(pertState.scale * 100)}%`);
+    }
+
+    /**
+     * ⭐ 重置 PERT 视图
+     */
+    function resetPertView() {
+        pertState.scale = 1.0;
+        pertState.offsetX = 0;
+        pertState.offsetY = 0;
+        updatePertTransform();
+        updateScaleDisplay();
+        addLog('🔄 已重置 PERT 视图');
+    }
+
+    /**
+     * ⭐ 更新变换
+     */
+    function updatePertTransform() {
+        const content = document.getElementById('pertContent');
+        if (content) {
+            content.setAttribute('transform', 
+                `translate(${pertState.offsetX}, ${pertState.offsetY}) scale(${pertState.scale})`);
+        }
+    }
+
+    /**
+     * ⭐ 更新缩放显示
+     */
+    function updateScaleDisplay() {
+        const scaleValue = document.getElementById('pertScaleValue');
+        if (scaleValue) {
+            scaleValue.textContent = Math.round(pertState.scale * 100) + '%';
+        }
+    }
+
+    /**
+     * ⭐ 切换到 PERT 全貌视图
+     */
+    function switchPertToOverview(contentWidth, contentHeight) {
+        const canvas = document.getElementById('pertCanvas');
+        const svg = document.getElementById('pertSvg');
+        if (!canvas || !svg) return;
+        
+        const containerWidth = canvas.clientWidth;
+        const containerHeight = canvas.clientHeight;
+        
+        // 预留边距
+        const marginH = 60;
+        const marginV = 80;
+        
+        // 计算缩放比例
+        const scaleX = (containerWidth - marginH * 2) / contentWidth;
+        const scaleY = (containerHeight - marginV * 2) / contentHeight;
+        pertState.scale = Math.min(scaleX, scaleY, 1.0);
+        
+        // 计算居中偏移
+        const scaledWidth = contentWidth * pertState.scale;
+        const scaledHeight = contentHeight * pertState.scale;
+        pertState.offsetX = (containerWidth - scaledWidth) / 2;
+        pertState.offsetY = (containerHeight - scaledHeight) / 2;
+        
+        // 调整 SVG 尺寸
+        svg.setAttribute('width', containerWidth);
+        svg.setAttribute('height', containerHeight);
+        
+        // 应用变换
+        updatePertTransform();
+        updateScaleDisplay();
+        
+        addLog(`╔═══════════════════════════════════════════════════════════╗`);
+        addLog(`║  🔭 已切换到 PERT 全貌视图                                ║`);
+        addLog(`╠═══════════════════════════════════════════════════════════╣`);
+        addLog(`  📐 内容尺寸: ${contentWidth} × ${contentHeight} px`);
+        addLog(`  🖥️ 容器尺寸: ${containerWidth} × ${containerHeight} px`);
+        addLog(`  🔍 缩放比例: ${Math.round(pertState.scale * 100)}%`);
+        addLog(`  📍 偏移位置: (${Math.round(pertState.offsetX)}, ${Math.round(pertState.offsetY)})`);
+        addLog(`╚═══════════════════════════════════════════════════════════╝`);
+    }
+
+    /**
+     * 辅助函数：计算任务层级（拓扑排序）
      */
     function calculateTaskLevels(tasks) {
         const levels = [];
@@ -323,7 +697,6 @@
             if (!levels[currentLevel]) levels[currentLevel] = [];
             levels[currentLevel].push(task);
             
-            // 处理依赖此任务的其他任务
             tasks.forEach(t => {
                 if (t.dependencies && t.dependencies.includes(taskId)) {
                     getLevel(t.id, currentLevel + 1);
@@ -331,7 +704,6 @@
             });
         }
         
-        // 从无依赖的任务开始
         tasks.forEach(task => {
             if (!task.dependencies || task.dependencies.length === 0) {
                 getLevel(task.id, 0);
@@ -341,62 +713,9 @@
         return levels;
     }
 
-    /**
-     * ⭐ 新增：PERT 图全貌视图
-     */
-    function switchPertToOverview(svg, contentWidth, contentHeight) {
-        const canvas = document.getElementById('pertCanvas');
-        if (!canvas) return;
-        
-        const containerWidth = canvas.clientWidth;
-        const containerHeight = canvas.clientHeight;
-        
-        // 预留边距
-        const marginH = 40;
-        const marginV = 60;
-        
-        // 计算缩放比例
-        const scaleX = (containerWidth - marginH * 2) / contentWidth;
-        const scaleY = (containerHeight - marginV * 2) / contentHeight;
-        const scale = Math.min(scaleX, scaleY, 1.0); // 最大不超过 100%
-        
-        // 计算居中偏移
-        const scaledWidth = contentWidth * scale;
-        const scaledHeight = contentHeight * scale;
-        const offsetX = (containerWidth - scaledWidth) / 2;
-        const offsetY = (containerHeight - scaledHeight) / 2;
-        
-        // 应用缩放和偏移
-        svg.setAttribute('width', containerWidth);
-        svg.setAttribute('height', containerHeight);
-        
-        const content = svg.querySelector('g') || svg;
-        if (content.tagName === 'g') {
-            content.setAttribute('transform', `translate(${offsetX}, ${offsetY}) scale(${scale})`);
-        } else {
-            // 如果没有 g 元素，创建一个
-            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            g.setAttribute('transform', `translate(${offsetX}, ${offsetY}) scale(${scale})`);
-            while (svg.firstChild && svg.firstChild !== svg.querySelector('defs')) {
-                g.appendChild(svg.firstChild);
-            }
-            svg.appendChild(g);
-        }
-        
-        addLog(`╔═══════════════════════════════════════════════════════════╗`);
-        addLog(`║  🔭 已切换到 PERT 全貌视图                                ║`);
-        addLog(`╠═══════════════════════════════════════════════════════════╣`);
-        addLog(`  📊 任务总数: ${tasks.length} 个`);
-        addLog(`  📐 内容尺寸: ${contentWidth} × ${contentHeight} px`);
-        addLog(`  🖥️ 容器尺寸: ${containerWidth} × ${containerHeight} px`);
-        addLog(`  🔍 缩放比例: ${Math.round(scale * 100)}%`);
-        addLog(`  📍 偏移位置: (${Math.round(offsetX)}, ${Math.round(offsetY)})`);
-        addLog(`╚═══════════════════════════════════════════════════════════╝`);
-    }
-
     // 导出全局变量
     global.isPertView = isPertView;
-    global.pertChart = pertChart;
+    global.pertState = pertState;
 
     // ==================== 设置面板交互 ====================
     
@@ -533,6 +852,6 @@
         };
     }
 
-    console.log('✅ app-settings.js loaded successfully (Delta8 - 增强版)');
+    console.log('✅ app-settings.js loaded successfully (Delta9 - PERT对象化版)');
 
 })(typeof window !== 'undefined' ? window : this);
