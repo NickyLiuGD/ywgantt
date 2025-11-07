@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测、时间刻度缩放、PERT视图">
     <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图,时间刻度,项目全貌">
-    <title>在线甘特图Alpha2</title>
+    <title>在线甘特图Alpha3</title>
     
     <!-- Preconnect to CDN -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -23,7 +23,6 @@
                 'css/components.css',        // 3. 通用组件
                 'css/gantt-layout.css',      // 4. 甘特图布局
                 'css/gantt-interactive.css', // 5. 甘特图交互
-                'css/pert.css'               // 6. PERT 图
             ];
             
             cssFiles.forEach(file => {
@@ -77,7 +76,7 @@
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Alpha2</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Alpha3</h1>
         </div>
         
         <!-- 展开的浮动工具栏 -->
@@ -232,39 +231,40 @@
             
             const timestamp = Date.now();
             
+            // ⭐ 精简后的模块列表（从 23 个减少到 17 个）
             const scripts = [
-                // ==================== 第一层：工具函数 ====================
+                // ==================== 第一层：工具函数（4个）====================
                 'js/utils/date-utils.js',
                 'js/utils/log-utils.js',
                 'js/utils/data-utils.js',
                 'js/utils/time-scale-utils.js',
                 
-                // ==================== 第二层：甘特图核心 ====================
+                // ==================== 第二层：甘特图核心（4个）====================
                 'js/gantt/gantt-core.js',
                 'js/gantt/gantt-render.js',
                 'js/gantt/gantt-dependencies.js',
                 'js/gantt/gantt-operations.js',
                 
-                // ==================== 第三层：事件处理 ====================
+                // ==================== 第三层：事件处理（4个）====================
                 'js/events/gantt-events-binding.js',
                 'js/events/gantt-events-drag.js',
                 'js/events/gantt-events-form.js',
                 'js/events/gantt-events-quickmenu.js',
                 
-                // ==================== 第四层：冲突检测 ====================
+                // ==================== 第四层：冲突检测（1个）====================
                 'js/gantt-conflicts.js',
                 
-                // ==================== 第五层：PERT 模块 ====================
-                'js/pert/pert-core.js',
-                'js/pert/pert-layout.js',
-                'js/pert/pert-render.js',
-                'js/pert/pert-events.js',
-                'js/pert/pert-overview.js',
+                // ❌ 删除：PERT 模块（5个文件已整合到 app-settings.js）
+                // 'js/pert/pert-core.js',
+                // 'js/pert/pert-layout.js',
+                // 'js/pert/pert-render.js',
+                // 'js/pert/pert-events.js',
+                // 'js/pert/pert-overview.js',
                 
-                // ==================== 第六层：应用初始化 ====================
+                // ==================== 第五层：应用初始化（3个）====================
                 'js/app/app-init.js',
                 'js/app/app-controls.js',
-                'js/app/app-settings.js'
+                'js/app/app-settings.js'  // ⭐ 包含完整 PERT 功能
             ];
             
             let loadedCount = 0;
@@ -289,7 +289,7 @@
                 
                 script.onerror = function() {
                     console.error(`❌ 加载失败: ${scripts[index]}`);
-                    alert(`模块加载失败：${scripts[index]}\n请检查文件路径`);
+                    alert(`模块加载失败：${scripts[index]}`);
                     loadScript(index + 1);
                 };
                 
@@ -301,7 +301,8 @@
                 console.log('║  🎉 所有模块加载完成！                                    ║');
                 console.log('╠═══════════════════════════════════════════════════════════╣');
                 console.log(`  总计: ${loadedCount}/${totalScripts} 个模块`);
-                console.log('  版本: Delta8 - PERT模块化版');
+                console.log('  版本: Delta8 - 精简优化版');
+                console.log('  优化: 减少 6 个文件（PERT模块整合）');
                 console.log('╚═══════════════════════════════════════════════════════════╝');
                 
                 document.body.classList.add('loaded');
@@ -315,7 +316,6 @@
                     '数据工具': typeof generateId !== 'undefined',
                     '时间刻度': typeof TimeScale !== 'undefined',
                     'GanttChart': typeof GanttChart !== 'undefined',
-                    'PertChart': typeof PertChart !== 'undefined',
                     'gantt实例': typeof gantt !== 'undefined',
                     '冲突检测': typeof detectAllConflicts !== 'undefined'
                 };
