@@ -77,6 +77,11 @@
                         gantt.tasks = tasks;
                         gantt.calculateDateRange();
                         gantt.render();
+
+                        if (typeof refreshPertViewIfActive === 'function') {
+                            refreshPertViewIfActive();
+                        }
+                        
                         addLog(`✅ 已从 ${file.name} 加载 ${tasks.length} 个任务`);
                     } catch (err) {
                         console.error('Load error:', err);
