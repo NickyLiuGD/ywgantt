@@ -1,0 +1,185 @@
+/**
+ * PERT 视图专属样式
+ * 路径: css/pert-styles.css
+ * 版本: Epsilon2
+ * 包含: 手柄样式、临时连线、交互效果
+ */
+
+/* ======================
+   PERT 手柄样式
+   ====================== */
+
+.pert-handle {
+    transition: all 0.3s ease;
+}
+
+.pert-handle .handle-circle {
+    transition: all 0.3s ease;
+}
+
+.pert-handle .handle-icon {
+    transition: all 0.3s ease;
+}
+
+.pert-handle .handle-glow {
+    transition: all 0.3s ease;
+}
+
+.pert-handle .handle-label {
+    transition: all 0.3s ease;
+}
+
+/* 手柄悬停效果 */
+.pert-handle:hover .handle-circle {
+    stroke: #5568d3;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.6));
+}
+
+.pert-handle:hover .handle-icon {
+    fill: #5568d3;
+    transform: scale(1.2);
+}
+
+.pert-handle:hover .handle-glow {
+    opacity: 1 !important;
+    fill: rgba(102, 126, 234, 0.3);
+}
+
+.pert-handle:hover .handle-label {
+    opacity: 1 !important;
+}
+
+/* 左侧手柄特殊样式 */
+.pert-handle-left:hover .handle-circle {
+    transform: translateX(-2px);
+}
+
+/* 右侧手柄特殊样式 */
+.pert-handle-right:hover .handle-circle {
+    transform: translateX(2px);
+}
+
+/* 拖拽中的手柄 */
+.pert-handle.linking .handle-circle {
+    fill: #06b6d4;
+    stroke: #06b6d4;
+    stroke-width: 3;
+    r: 10;
+    animation: handlePulse 1s ease-in-out infinite;
+}
+
+.pert-handle.linking .handle-icon {
+    fill: white;
+}
+
+/* 可放置目标的手柄 */
+.pert-handle.can-drop .handle-circle {
+    fill: #10b981;
+    stroke: #10b981;
+    stroke-width: 3;
+    r: 10;
+    animation: handleGlow 0.8s ease-in-out infinite;
+}
+
+.pert-handle.can-drop .handle-icon {
+    fill: white;
+}
+
+/* 手柄脉冲动画 */
+@keyframes handlePulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+/* 手柄发光动画 */
+@keyframes handleGlow {
+    0%, 100% {
+        filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6));
+    }
+    50% {
+        filter: drop-shadow(0 0 12px rgba(16, 185, 129, 1));
+    }
+}
+
+/* ======================
+   临时连线样式
+   ====================== */
+
+#pertTempLine {
+    stroke: #06b6d4;
+    stroke-width: 3;
+    stroke-dasharray: 5, 5;
+    animation: dashMove 0.5s linear infinite;
+    filter: drop-shadow(0 0 4px rgba(6, 182, 212, 0.6));
+}
+
+@keyframes dashMove {
+    from {
+        stroke-dashoffset: 0;
+    }
+    to {
+        stroke-dashoffset: 10;
+    }
+}
+
+/* ======================
+   PERT 节点拖拽状态
+   ====================== */
+
+.pert-node.linking-source .node-rect {
+    stroke: #06b6d4 !important;
+    stroke-width: 3 !important;
+    filter: drop-shadow(0 0 12px rgba(6, 182, 212, 0.6));
+}
+
+.pert-node.linking-target .node-rect {
+    stroke: #10b981 !important;
+    stroke-width: 3 !important;
+    animation: targetPulse 1s ease-in-out infinite;
+}
+
+@keyframes targetPulse {
+    0%, 100% {
+        filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
+    }
+    50% {
+        filter: drop-shadow(0 0 16px rgba(16, 185, 129, 1));
+    }
+}
+
+/* ======================
+   响应式
+   ====================== */
+
+@media (max-width: 768px) {
+    .pert-handle .handle-circle {
+        r: 6;
+    }
+    
+    .pert-handle .handle-icon {
+        font-size: 8px;
+    }
+    
+    .pert-handle .handle-label {
+        font-size: 9px;
+    }
+}
+
+/* ======================
+   打印样式
+   ====================== */
+
+@media print {
+    .pert-handle {
+        display: none !important;
+    }
+    
+    #pertTempLine {
+        display: none !important;
+    }
+}

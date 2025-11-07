@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ PERT 网络图完整实现                                             ▓▓
 // ▓▓ 路径: js/pert-chart.js                                         ▓▓
-// ▓▓ 版本: Epsilon1 - 从 app-settings.js 独立                       ▓▓
+// ▓▓ 版本: Epsilon2 - 添加可拖拽手柄建立依赖关系                    ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -17,7 +17,12 @@
         isDragging: false,
         dragStartX: 0,
         dragStartY: 0,
-        hoveredNode: null
+        hoveredNode: null,
+        // ⭐ 新增：依赖连线拖拽状态
+        isLinkingDependency: false,
+        linkingFromTaskId: null,
+        linkingFromHandle: null, // 'left' 或 'right'
+        tempLineElement: null
     };
 
     // ==================== PERT 配置 ====================
@@ -29,15 +34,16 @@
         verticalGap: 140,
         padding: 60,
         minScale: 0.3,
-        maxScale: 2.0
+        maxScale: 2.0,
+        // ⭐ 手柄配置
+        handleSize: 16,
+        handleColor: '#667eea',
+        handleHoverColor: '#5568d3',
+        handleActiveColor: '#10b981'
     };
 
     // ==================== 主渲染函数 ====================
     
-    /**
-     * 渲染 PERT 网络图
-     * @param {Array} tasks - 任务数组
-     */
     function renderPertChart(tasks) {
         const pertContainer = document.getElementById('pertContainer');
         
@@ -72,11 +78,6 @@
 
     // ==================== 布局算法 ====================
     
-    /**
-     * 计算任务层级（拓扑排序）
-     * @param {Array} tasks - 任务数组
-     * @returns {Array<Array>} 层级数组
-     */
     function calculateTaskLevels(tasks) {
         const levels = [];
         const visited = new Set();
@@ -128,11 +129,6 @@
         return levels;
     }
 
-    /**
-     * 计算节点位置
-     * @param {Array<Array>} levels - 层级数组
-     * @returns {Object} 位置映射
-     */
     function calculateNodePositions(levels) {
         const positions = {};
         
@@ -151,11 +147,6 @@
         return positions;
     }
 
-    /**
-     * 计算画布大小
-     * @param {Array<Array>} levels - 层级数组
-     * @returns {Object} {width, height}
-     */
     function calculateCanvasSize(levels) {
         const width = pertConfig.padding * 2 + levels.length * (pertConfig.nodeWidth + pertConfig.horizontalGap) - pertConfig.horizontalGap;
         const maxTasksInLevel = Math.max(...levels.map(l => l.length));
@@ -166,12 +157,6 @@
 
     // ==================== HTML 创建 ====================
     
-    /**
-     * 创建 PERT HTML 结构
-     * @param {Array} tasks - 任务数组
-     * @param {Array<Array>} levels - 层级数组
-     * @param {Object} canvasSize - 画布大小
-     */
     function createPertHTML(tasks, levels, canvasSize) {
         const pertContainer = document.getElementById('pertContainer');
         
@@ -209,7 +194,7 @@
                 </div>
                 <div id="pertTooltip" style="display: none; position: absolute; background: linear-gradient(135deg, rgba(0,0,0,0.95), rgba(33,37,41,0.95)); color: white; padding: 14px 18px; border-radius: 10px; font-size: 0.85rem; pointer-events: none; z-index: 2000; box-shadow: 0 8px 24px rgba(0,0,0,0.4); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); max-width: 320px;"></div>
                 <div style="position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 8px 16px; border-radius: 20px; font-size: 0.75rem; pointer-events: none; opacity: 0.8;">
-                    💡 提示：悬停节点查看详情 | 拖拽画布移动 | 滚轮缩放
+                    💡 提示：拖拽节点手柄建立依赖关系 | 悬停查看详情 | 滚轮缩放
                 </div>
             </div>
         `;
@@ -217,12 +202,6 @@
 
     // ==================== SVG 绘制 ====================
     
-    /**
-     * 绘制 PERT 图形
-     * @param {Array} tasks - 任务数组
-     * @param {Object} positions - 位置映射
-     * @param {Object} canvasSize - 画布大小
-     */
     function drawPertGraph(tasks, positions, canvasSize) {
         const svgContainer = document.getElementById('pertSvgContainer');
         if (!svgContainer) {
@@ -247,6 +226,9 @@
             <marker id="pert-arrow-selected" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto">
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffc107" />
             </marker>
+            <marker id="pert-arrow-temp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#06b6d4" />
+            </marker>
             <linearGradient id="pert-nodeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.15" />
                 <stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.05" />
@@ -270,6 +252,13 @@
                     <feMergeNode in="SourceGraphic"/>
                 </feMerge>
             </filter>
+            <filter id="pert-handleGlow">
+                <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
         `;
         svg.appendChild(defs);
         
@@ -283,12 +272,6 @@
         drawNodes(tasks, positions, content);
     }
 
-    /**
-     * 绘制连接线
-     * @param {Array} tasks - 任务数组
-     * @param {Object} positions - 位置映射
-     * @param {SVGElement} content - SVG 内容组
-     */
     function drawConnections(tasks, positions, content) {
         const gap = 10;
         const hLength = 50;
@@ -332,12 +315,6 @@
         });
     }
 
-    /**
-     * 绘制节点
-     * @param {Array} tasks - 任务数组
-     * @param {Object} positions - 位置映射
-     * @param {SVGElement} content - SVG 内容组
-     */
     function drawNodes(tasks, positions, content) {
         tasks.forEach(task => {
             const pos = positions[task.id];
@@ -358,6 +335,7 @@
             g.style.cursor = 'pointer';
             g.style.transition = 'all 0.3s ease';
             
+            // 节点矩形
             const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             rect.setAttribute('class', 'node-rect');
             rect.setAttribute('width', pertConfig.nodeWidth);
@@ -370,6 +348,15 @@
             rect.style.filter = 'url(#pert-nodeShadow)';
             g.appendChild(rect);
             
+            // ⭐ 左侧手柄（接收依赖 - 被其他任务依赖）
+            const leftHandle = createHandle('left', pertConfig.nodeHeight / 2, task.id);
+            g.appendChild(leftHandle);
+            
+            // ⭐ 右侧手柄（创建依赖 - 依赖其他任务）
+            const rightHandle = createHandle('right', pertConfig.nodeHeight / 2, task.id);
+            g.appendChild(rightHandle);
+            
+            // 任务名称
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             text.setAttribute('x', pertConfig.nodeWidth / 2);
             text.setAttribute('y', '32');
@@ -380,6 +367,7 @@
             text.textContent = taskName;
             g.appendChild(text);
             
+            // 分隔线
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', '20');
             line.setAttribute('y1', '48');
@@ -389,6 +377,7 @@
             line.setAttribute('stroke-width', '1.5');
             g.appendChild(line);
             
+            // 工期
             const durationText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             durationText.setAttribute('x', pertConfig.nodeWidth / 2);
             durationText.setAttribute('y', '66');
@@ -399,6 +388,7 @@
             durationText.textContent = `📅 ${duration}天`;
             g.appendChild(durationText);
             
+            // 进度百分比
             const progressText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             progressText.setAttribute('x', pertConfig.nodeWidth / 2);
             progressText.setAttribute('y', '83');
@@ -409,6 +399,7 @@
             progressText.textContent = `${task.progress}%`;
             g.appendChild(progressText);
             
+            // 进度条背景
             const progressBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             progressBg.setAttribute('x', '20');
             progressBg.setAttribute('y', pertConfig.nodeHeight - 18);
@@ -418,6 +409,7 @@
             progressBg.setAttribute('fill', '#e9ecef');
             g.appendChild(progressBg);
             
+            // 进度条
             const progressBar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             progressBar.setAttribute('x', '20');
             progressBar.setAttribute('y', pertConfig.nodeHeight - 18);
@@ -428,6 +420,7 @@
             progressBar.style.transition = 'width 0.3s ease';
             g.appendChild(progressBar);
             
+            // 日期范围
             const dateText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             dateText.setAttribute('x', pertConfig.nodeWidth / 2);
             dateText.setAttribute('y', pertConfig.nodeHeight + 22);
@@ -444,18 +437,365 @@
         });
     }
 
-    // ==================== 事件处理 ====================
+    // ⭐ ==================== 创建拖拽手柄 ====================
     
     /**
-     * 绑定 PERT 事件
-     * @param {Object} canvasSize - 画布大小
+     * 创建手柄（左侧或右侧）
+     * @param {string} side - 'left' 或 'right'
+     * @param {number} centerY - 中心 Y 坐标
+     * @param {string} taskId - 任务 ID
+     * @returns {SVGElement} 手柄组
      */
+    function createHandle(side, centerY, taskId) {
+        const handleGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        handleGroup.setAttribute('class', `pert-handle pert-handle-${side}`);
+        handleGroup.setAttribute('data-task-id', taskId);
+        handleGroup.setAttribute('data-handle-side', side);
+        handleGroup.style.cursor = 'crosshair';
+        
+        const x = side === 'left' ? 0 : pertConfig.nodeWidth;
+        const size = pertConfig.handleSize;
+        
+        // 外圈（发光效果）
+        const outerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        outerCircle.setAttribute('cx', x);
+        outerCircle.setAttribute('cy', centerY);
+        outerCircle.setAttribute('r', size / 2 + 2);
+        outerCircle.setAttribute('fill', 'rgba(102, 126, 234, 0.2)');
+        outerCircle.setAttribute('class', 'handle-glow');
+        outerCircle.style.opacity = '0';
+        outerCircle.style.transition = 'all 0.3s ease';
+        handleGroup.appendChild(outerCircle);
+        
+        // 主圆圈
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', x);
+        circle.setAttribute('cy', centerY);
+        circle.setAttribute('r', size / 2);
+        circle.setAttribute('fill', 'white');
+        circle.setAttribute('stroke', pertConfig.handleColor);
+        circle.setAttribute('stroke-width', '2');
+        circle.setAttribute('class', 'handle-circle');
+        circle.style.transition = 'all 0.3s ease';
+        circle.style.filter = 'url(#pert-handleGlow)';
+        handleGroup.appendChild(circle);
+        
+        // 图标
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        icon.setAttribute('x', x);
+        icon.setAttribute('y', centerY);
+        icon.setAttribute('text-anchor', 'middle');
+        icon.setAttribute('dominant-baseline', 'central');
+        icon.setAttribute('font-size', '10');
+        icon.setAttribute('fill', pertConfig.handleColor);
+        icon.setAttribute('font-weight', '700');
+        icon.setAttribute('class', 'handle-icon');
+        icon.textContent = side === 'left' ? '◀' : '▶';
+        icon.style.pointerEvents = 'none';
+        icon.style.transition = 'all 0.3s ease';
+        handleGroup.appendChild(icon);
+        
+        // 提示文字（初始隐藏）
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', side === 'left' ? x - 25 : x + 25);
+        label.setAttribute('y', centerY);
+        label.setAttribute('text-anchor', side === 'left' ? 'end' : 'start');
+        label.setAttribute('dominant-baseline', 'central');
+        label.setAttribute('font-size', '11');
+        label.setAttribute('fill', '#667eea');
+        label.setAttribute('font-weight', '600');
+        label.setAttribute('class', 'handle-label');
+        label.textContent = side === 'left' ? '被依赖' : '依赖';
+        label.style.opacity = '0';
+        label.style.pointerEvents = 'none';
+        label.style.transition = 'all 0.3s ease';
+        handleGroup.appendChild(label);
+        
+        return handleGroup;
+    }
+
+    // ⭐ ==================== 手柄交互事件 ====================
+    
+    /**
+     * 绑定手柄事件
+     */
+    function attachHandleEvents() {
+        const handles = document.querySelectorAll('.pert-handle');
+        
+        handles.forEach(handle => {
+            const taskId = handle.dataset.taskId;
+            const side = handle.dataset.handleSide;
+            const circle = handle.querySelector('.handle-circle');
+            const icon = handle.querySelector('.handle-icon');
+            const glow = handle.querySelector('.handle-glow');
+            const label = handle.querySelector('.handle-label');
+            
+            // 鼠标进入手柄
+            handle.addEventListener('mouseenter', (e) => {
+                if (pertState.isLinkingDependency) {
+                    // 拖拽中：高亮可放置的目标
+                    if (canDropOnHandle(pertState.linkingFromTaskId, pertState.linkingFromHandle, taskId, side)) {
+                        circle.setAttribute('fill', pertConfig.handleActiveColor);
+                        circle.setAttribute('stroke', pertConfig.handleActiveColor);
+                        circle.setAttribute('r', pertConfig.handleSize / 2 + 2);
+                        icon.setAttribute('fill', 'white');
+                        glow.style.opacity = '1';
+                        glow.setAttribute('fill', 'rgba(16, 185, 129, 0.4)');
+                    }
+                } else {
+                    // 正常悬停
+                    circle.setAttribute('stroke', pertConfig.handleHoverColor);
+                    circle.setAttribute('stroke-width', '3');
+                    icon.setAttribute('fill', pertConfig.handleHoverColor);
+                    glow.style.opacity = '1';
+                    label.style.opacity = '1';
+                }
+            });
+            
+            // 鼠标离开手柄
+            handle.addEventListener('mouseleave', () => {
+                if (!pertState.isLinkingDependency) {
+                    circle.setAttribute('fill', 'white');
+                    circle.setAttribute('stroke', pertConfig.handleColor);
+                    circle.setAttribute('stroke-width', '2');
+                    circle.setAttribute('r', pertConfig.handleSize / 2);
+                    icon.setAttribute('fill', pertConfig.handleColor);
+                    glow.style.opacity = '0';
+                    label.style.opacity = '0';
+                }
+            });
+            
+            // 鼠标按下：开始拖拽连线
+            handle.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                startLinkingDependency(taskId, side, e);
+            });
+        });
+    }
+
+    /**
+     * 开始拖拽依赖连线
+     */
+    function startLinkingDependency(fromTaskId, fromHandle, e) {
+        pertState.isLinkingDependency = true;
+        pertState.linkingFromTaskId = fromTaskId;
+        pertState.linkingFromHandle = fromHandle;
+        
+        const canvas = document.getElementById('pertCanvas');
+        if (canvas) {
+            canvas.style.cursor = 'crosshair';
+        }
+        
+        // 创建临时连线
+        createTempLine(fromTaskId, fromHandle);
+        
+        const task = gantt.tasks.find(t => t.id === fromTaskId);
+        addLog(`🔗 开始创建依赖关系：从 "${task.name}" 的${fromHandle === 'left' ? '左侧' : '右侧'}手柄`);
+    }
+
+    /**
+     * 创建临时连线
+     */
+    function createTempLine(fromTaskId, fromHandle) {
+        const svg = document.getElementById('pertSvg');
+        if (!svg) return;
+        
+        const fromNode = document.querySelector(`.pert-node[data-task-id="${fromTaskId}"]`);
+        if (!fromNode) return;
+        
+        const transform = fromNode.getAttribute('transform');
+        const match = transform.match(/translate\(([^,]+),\s*([^)]+)\)/);
+        if (!match) return;
+        
+        const nodeX = parseFloat(match[1]);
+        const nodeY = parseFloat(match[2]);
+        
+        const startX = fromHandle === 'left' ? nodeX : nodeX + pertConfig.nodeWidth;
+        const startY = nodeY + pertConfig.nodeHeight / 2;
+        
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('id', 'pertTempLine');
+        line.setAttribute('x1', startX);
+        line.setAttribute('y1', startY);
+        line.setAttribute('x2', startX);
+        line.setAttribute('y2', startY);
+        line.setAttribute('stroke', '#06b6d4');
+        line.setAttribute('stroke-width', '3');
+        line.setAttribute('stroke-dasharray', '5,5');
+        line.setAttribute('marker-end', 'url(#pert-arrow-temp)');
+        line.style.pointerEvents = 'none';
+        
+        svg.appendChild(line);
+        pertState.tempLineElement = line;
+    }
+
+    /**
+     * 更新临时连线位置
+     */
+    function updateTempLine(e) {
+        if (!pertState.tempLineElement) return;
+        
+        const canvas = document.getElementById('pertCanvas');
+        const svg = document.getElementById('pertSvg');
+        const content = document.getElementById('pertContent');
+        
+        if (!canvas || !svg || !content) return;
+        
+        const canvasRect = canvas.getBoundingClientRect();
+        const svgRect = svg.getBoundingClientRect();
+        
+        // 计算鼠标在 SVG 中的坐标（考虑缩放和偏移）
+        const mouseX = (e.clientX - svgRect.left - pertState.offsetX) / pertState.scale;
+        const mouseY = (e.clientY - svgRect.top - pertState.offsetY) / pertState.scale;
+        
+        pertState.tempLineElement.setAttribute('x2', mouseX);
+        pertState.tempLineElement.setAttribute('y2', mouseY);
+    }
+
+    /**
+     * 判断是否可以在目标手柄上放置
+     */
+    function canDropOnHandle(fromTaskId, fromHandle, toTaskId, toHandle) {
+        // 不能连接到自己
+        if (fromTaskId === toTaskId) return false;
+        
+        // 右侧手柄只能连到其他节点的左侧手柄
+        if (fromHandle === 'right' && toHandle === 'left') {
+            // 检查是否会形成循环依赖
+            const toTask = gantt.tasks.find(t => t.id === toTaskId);
+            if (toTask && toTask.dependencies && toTask.dependencies.includes(fromTaskId)) {
+                return false; // 已存在反向依赖
+            }
+            return true;
+        }
+        
+        // 左侧手柄只能连到其他节点的右侧手柄
+        if (fromHandle === 'left' && toHandle === 'right') {
+            const fromTask = gantt.tasks.find(t => t.id === fromTaskId);
+            if (fromTask && fromTask.dependencies && fromTask.dependencies.includes(toTaskId)) {
+                return false; // 已存在反向依赖
+            }
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * 完成依赖连线
+     */
+    function finishLinkingDependency(toTaskId, toHandle) {
+        if (!pertState.isLinkingDependency) return;
+        
+        const fromTaskId = pertState.linkingFromTaskId;
+        const fromHandle = pertState.linkingFromHandle;
+        
+        // 验证连接有效性
+        if (!canDropOnHandle(fromTaskId, fromHandle, toTaskId, toHandle)) {
+            cancelLinkingDependency();
+            addLog('❌ 无法建立此依赖关系');
+            return;
+        }
+        
+        // 建立依赖关系
+        let sourceTaskId, targetTaskId;
+        
+        if (fromHandle === 'right' && toHandle === 'left') {
+            // 右手柄 → 左手柄：fromTask 依赖 toTask
+            sourceTaskId = fromTaskId;
+            targetTaskId = toTaskId;
+        } else if (fromHandle === 'left' && toHandle === 'right') {
+            // 左手柄 ← 右手柄：toTask 依赖 fromTask
+            sourceTaskId = toTaskId;
+            targetTaskId = fromTaskId;
+        } else {
+            cancelLinkingDependency();
+            return;
+        }
+        
+        const sourceTask = gantt.tasks.find(t => t.id === sourceTaskId);
+        const targetTask = gantt.tasks.find(t => t.id === targetTaskId);
+        
+        if (!sourceTask || !targetTask) {
+            cancelLinkingDependency();
+            return;
+        }
+        
+        // 添加依赖
+        if (!sourceTask.dependencies) {
+            sourceTask.dependencies = [];
+        }
+        
+        if (sourceTask.dependencies.includes(targetTaskId)) {
+            addLog(`⚠️ 任务 "${sourceTask.name}" 已依赖 "${targetTask.name}"`);
+        } else {
+            sourceTask.dependencies.push(targetTaskId);
+            addLog(`✅ 已建立依赖：${sourceTask.name} → ${targetTask.name}`);
+            
+            // 重新渲染 PERT 图
+            renderPertChart(gantt.tasks);
+            
+            // 如果在甘特图视图，也需要刷新
+            if (typeof getCurrentView === 'function' && getCurrentView() === 'pert') {
+                // 仅刷新 PERT
+            } else {
+                // 同时刷新甘特图
+                if (gantt && typeof gantt.render === 'function') {
+                    gantt.calculateDateRange();
+                    gantt.render();
+                }
+            }
+        }
+        
+        cancelLinkingDependency();
+    }
+
+    /**
+     * 取消依赖连线
+     */
+    function cancelLinkingDependency() {
+        if (pertState.tempLineElement && pertState.tempLineElement.parentElement) {
+            pertState.tempLineElement.parentElement.removeChild(pertState.tempLineElement);
+        }
+        
+        pertState.isLinkingDependency = false;
+        pertState.linkingFromTaskId = null;
+        pertState.linkingFromHandle = null;
+        pertState.tempLineElement = null;
+        
+        const canvas = document.getElementById('pertCanvas');
+        if (canvas) {
+            canvas.style.cursor = 'grab';
+        }
+        
+        // 重置所有手柄样式
+        document.querySelectorAll('.pert-handle .handle-circle').forEach(circle => {
+            circle.setAttribute('fill', 'white');
+            circle.setAttribute('stroke', pertConfig.handleColor);
+            circle.setAttribute('stroke-width', '2');
+            circle.setAttribute('r', pertConfig.handleSize / 2);
+        });
+        
+        document.querySelectorAll('.pert-handle .handle-icon').forEach(icon => {
+            icon.setAttribute('fill', pertConfig.handleColor);
+        });
+        
+        document.querySelectorAll('.pert-handle .handle-glow').forEach(glow => {
+            glow.style.opacity = '0';
+        });
+    }
+
+    // ==================== 事件处理 ====================
+    
     function attachPertEvents(canvasSize) {
         const tooltip = document.getElementById('pertTooltip');
         const canvas = document.getElementById('pertCanvas');
         const nodes = document.querySelectorAll('.pert-node');
         
         if (!tooltip || !canvas) return;
+        
+        // ⭐ 绑定手柄事件
+        attachHandleEvents();
         
         // 节点事件
         nodes.forEach(node => {
@@ -465,43 +805,55 @@
             node.addEventListener('mouseenter', (e) => {
                 pertState.hoveredNode = taskId;
                 
-                if (pertState.selectedNode !== taskId) {
+                if (pertState.selectedNode !== taskId && !pertState.isLinkingDependency) {
                     rect.setAttribute('fill', 'url(#pert-nodeGradientHover)');
                     rect.setAttribute('stroke', '#5568d3');
                     rect.setAttribute('stroke-width', '3');
                     rect.style.transform = 'scale(1.02)';
                 }
                 
-                highlightConnections(taskId, 'hover');
-                showPertTooltip(e, node, canvas);
+                if (!pertState.isLinkingDependency) {
+                    highlightConnections(taskId, 'hover');
+                    showPertTooltip(e, node, canvas);
+                }
             });
             
             node.addEventListener('mousemove', (e) => {
-                updateTooltipPosition(e, canvas);
+                if (!pertState.isLinkingDependency) {
+                    updateTooltipPosition(e, canvas);
+                }
             });
             
             node.addEventListener('mouseleave', () => {
                 pertState.hoveredNode = null;
                 
-                if (pertState.selectedNode !== taskId) {
+                if (pertState.selectedNode !== taskId && !pertState.isLinkingDependency) {
                     rect.setAttribute('fill', 'url(#pert-nodeGradient)');
                     rect.setAttribute('stroke', '#667eea');
                     rect.setAttribute('stroke-width', '2');
                     rect.style.transform = '';
                 }
                 
-                if (pertState.selectedNode) {
-                    highlightConnections(pertState.selectedNode, 'selected');
-                } else {
-                    highlightConnections(taskId, 'none');
+                if (!pertState.isLinkingDependency) {
+                    if (pertState.selectedNode) {
+                        highlightConnections(pertState.selectedNode, 'selected');
+                    } else {
+                        highlightConnections(taskId, 'none');
+                    }
+                    
+                    tooltip.style.display = 'none';
                 }
-                
-                tooltip.style.display = 'none';
             });
             
             node.addEventListener('click', (e) => {
+                // 如果点击的是手柄，不触发节点选择
+                if (e.target.closest('.pert-handle')) return;
+                
                 e.stopPropagation();
-                selectPertNode(taskId, rect);
+                
+                if (!pertState.isLinkingDependency) {
+                    selectPertNode(taskId, rect);
+                }
             });
         });
 
@@ -516,24 +868,41 @@
         if (resetBtn) resetBtn.onclick = () => resetPertView();
         if (overviewBtn) overviewBtn.onclick = () => switchPertToOverview(canvasSize.width, canvasSize.height);
 
-        // 画布拖拽
+        // ⭐ 画布拖拽（排除手柄拖拽）
         canvas.addEventListener('mousedown', (e) => {
-            if (e.target.closest('.pert-node')) return;
+            if (e.target.closest('.pert-node') || e.target.closest('.pert-handle')) return;
+            
             pertState.isDragging = true;
             pertState.dragStartX = e.clientX - pertState.offsetX;
             pertState.dragStartY = e.clientY - pertState.offsetY;
             canvas.style.cursor = 'grabbing';
         });
 
+        // ⭐ 鼠标移动（更新临时连线或拖拽画布）
         canvas.addEventListener('mousemove', (e) => {
-            if (!pertState.isDragging) return;
-            pertState.offsetX = e.clientX - pertState.dragStartX;
-            pertState.offsetY = e.clientY - pertState.dragStartY;
-            updatePertTransform();
+            if (pertState.isLinkingDependency) {
+                updateTempLine(e);
+            } else if (pertState.isDragging) {
+                pertState.offsetX = e.clientX - pertState.dragStartX;
+                pertState.offsetY = e.clientY - pertState.dragStartY;
+                updatePertTransform();
+            }
         });
 
-        canvas.addEventListener('mouseup', () => {
-            if (pertState.isDragging) {
+        // ⭐ 鼠标释放（完成连线或停止拖拽）
+        canvas.addEventListener('mouseup', (e) => {
+            if (pertState.isLinkingDependency) {
+                // 检查是否释放在手柄上
+                const targetHandle = e.target.closest('.pert-handle');
+                if (targetHandle) {
+                    const toTaskId = targetHandle.dataset.taskId;
+                    const toHandle = targetHandle.dataset.handleSide;
+                    finishLinkingDependency(toTaskId, toHandle);
+                } else {
+                    cancelLinkingDependency();
+                    addLog('❌ 已取消依赖连线');
+                }
+            } else if (pertState.isDragging) {
                 pertState.isDragging = false;
                 canvas.style.cursor = 'grab';
             }
@@ -555,8 +924,16 @@
 
         // 点击空白取消选择
         canvas.addEventListener('click', (e) => {
-            if (!e.target.closest('.pert-node')) {
+            if (!e.target.closest('.pert-node') && !pertState.isLinkingDependency) {
                 deselectPertNode();
+            }
+        });
+        
+        // ESC 键取消连线
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && pertState.isLinkingDependency) {
+                cancelLinkingDependency();
+                addLog('❌ 已取消依赖连线 (ESC)');
             }
         });
         
@@ -575,9 +952,6 @@
 
     // ==================== 交互功能 ====================
     
-    /**
-     * 显示节点提示信息
-     */
     function showPertTooltip(e, node, canvas) {
         const tooltip = document.getElementById('pertTooltip');
         if (!tooltip) return;
@@ -606,15 +980,15 @@
                 ${depCount > 0 ? `<span style="color: #adb5bd;">⬅️ 前置：</span><span style="color: #dc3545; font-weight: 500;">${depCount} 个任务</span>` : ''}
                 ${dependentCount > 0 ? `<span style="color: #adb5bd;">➡️ 后继：</span><span style="color: #10b981; font-weight: 500;">${dependentCount} 个任务</span>` : ''}
             </div>
+            <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.75rem; color: #adb5bd;">
+                💡 拖拽手柄建立依赖关系
+            </div>
         `;
         
         tooltip.style.display = 'block';
         updateTooltipPosition(e, canvas);
     }
 
-    /**
-     * 更新提示位置
-     */
     function updateTooltipPosition(e, canvas) {
         const tooltip = document.getElementById('pertTooltip');
         if (!tooltip) return;
@@ -639,9 +1013,6 @@
         tooltip.style.top = y + 'px';
     }
 
-    /**
-     * 选中节点
-     */
     function selectPertNode(taskId, rect) {
         document.querySelectorAll('.pert-node .node-rect').forEach(r => {
             if (r !== rect) {
@@ -666,9 +1037,6 @@
         }
     }
 
-    /**
-     * 取消选中节点
-     */
     function deselectPertNode() {
         if (!pertState.selectedNode) return;
         
@@ -685,9 +1053,6 @@
         addLog('✅ 已取消选中');
     }
 
-    /**
-     * 高亮连接线
-     */
     function highlightConnections(taskId, mode) {
         document.querySelectorAll('.pert-connection').forEach(conn => {
             const from = conn.dataset.from;
@@ -717,9 +1082,6 @@
         });
     }
 
-    /**
-     * 缩放 PERT 图
-     */
     function zoomPert(delta) {
         const oldScale = pertState.scale;
         pertState.scale = Math.max(pertConfig.minScale, Math.min(pertConfig.maxScale, pertState.scale + delta));
@@ -731,9 +1093,6 @@
         }
     }
 
-    /**
-     * 重置 PERT 视图
-     */
     function resetPertView() {
         pertState.scale = 1.0;
         pertState.offsetX = 0;
@@ -752,9 +1111,6 @@
         addLog('🔄 已重置 PERT 视图 (100%)');
     }
 
-    /**
-     * 更新 PERT 变换
-     */
     function updatePertTransform() {
         const content = document.getElementById('pertContent');
         if (content) {
@@ -763,9 +1119,6 @@
         }
     }
 
-    /**
-     * 更新缩放显示
-     */
     function updateScaleDisplay() {
         const scaleValue = document.getElementById('pertScaleValue');
         if (scaleValue) {
@@ -773,9 +1126,6 @@
         }
     }
 
-    /**
-     * 切换到 PERT 全貌视图
-     */
     function switchPertToOverview(contentWidth, contentHeight) {
         const canvas = document.getElementById('pertCanvas');
         const svg = document.getElementById('pertSvg');
@@ -827,8 +1177,12 @@
         pertState.dragStartX = 0;
         pertState.dragStartY = 0;
         pertState.hoveredNode = null;
+        pertState.isLinkingDependency = false;
+        pertState.linkingFromTaskId = null;
+        pertState.linkingFromHandle = null;
+        pertState.tempLineElement = null;
     };
 
-    console.log('✅ pert-chart.js loaded successfully (Epsilon1 - 独立模块)');
+    console.log('✅ pert-chart.js loaded successfully (Epsilon2 - 可拖拽手柄)');
 
 })(typeof window !== 'undefined' ? window : this);
