@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图核心类定义                                                ▓▓
 // ▓▓ 路径: js/gantt/gantt-core.js                                   ▓▓
-// ▓▓ 版本: Delta8 - 支持项目全貌视图                                ▓▓
+// ▓▓ 版本: Delta8 - 支持项目全貌视图（包容左侧标签）                ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -13,9 +13,6 @@
 
     /**
      * GanttChart 构造函数
-     * @param {string} selector - 容器选择器
-     * @param {Array} tasks - 任务数组
-     * @param {Object} options - 配置选项
      */
     function GanttChart(selector, tasks, options) {
         if (!selector) {
@@ -31,8 +28,8 @@
             enableResize: true,
             showDependencies: true,
             showTaskNames: true,
-            timeScale: 'day', // day/week/month/overview
-            isOverviewMode: false // ⭐ 新增：是否为全貌视图模式
+            timeScale: 'day',
+            isOverviewMode: false
         }, options || {});
 
         this.selectedTask = null;
@@ -87,8 +84,7 @@
     };
 
     /**
-     * 生成日期数组（支持不同时间刻度）
-     * @returns {Array<Object>} 日期对象数组
+     * 生成日期数组
      */
     GanttChart.prototype.generateDates = function() {
         const scale = this.options.timeScale || 'day';
@@ -106,7 +102,6 @@
 
     /**
      * ⭐ 切换到项目全貌视图（修复版 - 包容左侧时间标签）
-     * 自动调整时间轴宽度以适应浏览器窗口
      */
     GanttChart.prototype.switchToOverviewMode = function() {
         if (this.tasks.length === 0) {
@@ -114,7 +109,7 @@
             return;
         }
 
-        // 1. 计算项目的实际日期范围
+        // 1. 计算项目实际日期范围
         let minDate = new Date(this.tasks[0].start);
         let maxDate = new Date(this.tasks[0].end);
         
@@ -128,36 +123,33 @@
         // 2. 计算项目总天数
         const projectDays = daysBetween(minDate, maxDate) + 1;
         
-        // 3. 获取可用宽度
+        // 3. 获取容器宽度
         const container = this.container.querySelector('.gantt-rows-container');
         if (!container) {
             addLog('❌ 无法获取容器宽度');
             return;
         }
         
-        // 获取容器宽度
         const containerWidth = container.clientWidth;
         
-        // ⭐ 4. 预留空间（包括左侧时间标签的额外空间）
-        const leftTimeLabelWidth = 100;  // ⭐ 左侧时间标签宽度（双层）
-        const leftLabelMargin = 20;      // ⭐ 左侧标签与任务条的间距
-        const rightLabelSpace = 150;     // 右侧任务名称标签预留空间
-        const scrollbarSpace = 20;       // 滚动条空间
+        // ⭐ 4. 预留空间（包括左侧时间标签）
+        const leftTimeLabelWidth = 100;
+        const leftLabelMargin = 20;
+        const rightLabelSpace = 150;
+        const scrollbarSpace = 20;
         
-        // ⭐ 总预留空间 = 左侧时间标签 + 左侧间距 + 右侧标签 + 滚动条
         const totalReservedSpace = leftTimeLabelWidth + leftLabelMargin + rightLabelSpace + scrollbarSpace;
         const availableWidth = containerWidth - totalReservedSpace;
         
-        // 5. 计算最优的 cellWidth（每天的像素宽度）
+        // 5. 计算最优 cellWidth
         let optimalCellWidth = Math.floor(availableWidth / projectDays);
         
-        // 6. 限制 cellWidth 的范围
-        const minCellWidth = 2;   // 最小 2px/天
-        const maxCellWidth = 50;  // 最大 50px/天
-        
+        // 6. 限制范围
+        const minCellWidth = 2;
+        const maxCellWidth = 50;
         optimalCellWidth = Math.max(minCellWidth, Math.min(optimalCellWidth, maxCellWidth));
         
-        // 7. 根据 cellWidth 选择合适的时间刻度
+        // 7. 选择时间刻度
         let scale = 'week';
         if (optimalCellWidth >= 30) {
             scale = 'day';
@@ -170,18 +162,15 @@
         this.options.cellWidth = optimalCellWidth;
         this.options.isOverviewMode = true;
         
-        // ⭐ 9. 重新计算日期范围（向左扩展，包容左侧时间标签）
-        // 计算左侧标签需要的额外天数
+        // ⭐ 9. 向左扩展日期范围（包容左侧标签）
         const leftLabelDays = Math.ceil((leftTimeLabelWidth + leftLabelMargin) / optimalCellWidth);
-        
-        // 向左扩展日期范围
         this.startDate = addDays(minDate, -leftLabelDays);
         this.endDate = new Date(maxDate);
         
         // 10. 重新渲染
         this.render();
         
-        // 11. 滚动到最左侧，确保左侧标签完全可见
+        // 11. 滚动到最左侧
         setTimeout(() => {
             const rowsContainer = this.container.querySelector('.gantt-rows-container');
             if (rowsContainer) {
@@ -189,7 +178,7 @@
             }
         }, 100);
         
-        // 12. 记录详细日志
+        // 12. 详细日志
         const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
         addLog(`╔═══════════════════════════════════════════════════════════╗`);
         addLog(`║  🔭 已切换到项目全貌视图                                  ║`);
@@ -200,14 +189,14 @@
         addLog(`  📏 时间刻度: ${scaleNames[scale]}视图 (${optimalCellWidth}px/天)`);
         addLog(`  📐 可用宽度: ${availableWidth}px`);
         addLog(`  🖥️ 容器宽度: ${containerWidth}px`);
-        addLog(`  ◀️ 左侧预留: ${leftTimeLabelWidth + leftLabelMargin}px (标签${leftTimeLabelWidth}px + 间距${leftLabelMargin}px)`);
+        addLog(`  ◀️ 左侧预留: ${leftTimeLabelWidth + leftLabelMargin}px`);
         addLog(`  ▶️ 右侧预留: ${rightLabelSpace}px`);
         addLog(`  📍 左扩展: ${leftLabelDays} 天`);
         addLog(`╚═══════════════════════════════════════════════════════════╝`);
     };
 
     /**
-     * ⭐ 退出全貌视图，恢复正常视图
+     * 退出全貌视图
      */
     GanttChart.prototype.exitOverviewMode = function() {
         this.options.isOverviewMode = false;
@@ -219,21 +208,7 @@
     };
 
     /**
-     * ⭐ 退出全貌视图，恢复正常视图
-     */
-    GanttChart.prototype.exitOverviewMode = function() {
-        this.options.isOverviewMode = false;
-        this.calculateDateRange();
-        this.options.timeScale = 'day';
-        this.options.cellWidth = getRecommendedCellWidth('day');
-        this.render();
-        addLog('✅ 已退出全貌视图');
-    };
-
-    /**
-     * HTML 转义工具函数
-     * @param {string} text - 要转义的文本
-     * @returns {string} 转义后的文本
+     * HTML 转义
      */
     GanttChart.prototype.escapeHtml = function(text) {
         if (typeof text !== 'string') return '';
@@ -276,6 +251,6 @@
     global.ROW_HEIGHT = ROW_HEIGHT;
     global.HEADER_HEIGHT = HEADER_HEIGHT;
 
-    console.log('✅ gantt-core.js loaded successfully (Delta8 - 支持全貌视图)');
+    console.log('✅ gantt-core.js loaded successfully (Delta8 - 全貌视图修复版)');
 
 })(typeof window !== 'undefined' ? window : this);

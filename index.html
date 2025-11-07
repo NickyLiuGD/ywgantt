@@ -3,31 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测、时间刻度缩放">
-    <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图,时间刻度">
-    <title>在线甘特图Alpha1</title>
+    <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测、时间刻度缩放、PERT视图">
+    <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图,时间刻度,项目全貌">
+    <title>在线甘特图Alpha2</title>
     
-    <!-- Preconnect to CDN for faster loading -->
+    <!-- Preconnect to CDN -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-    <link rel="preconnect" href="https://cdn.anychart.com" crossorigin>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" integrity="sha512-b2QcS5SsA8tZodcDtGRELiGv5SaKSk1vDHDaQRda0htPYWZ6046lr3kJ5bAAQdpV2mmA/4v0wQF9MyU6/pDIAg==" crossorigin="anonymous">
     
-    <!-- AnyChart for PERT (defer loading) -->
-    <script defer src="https://cdn.anychart.com/releases/8.13.0/js/anychart-core.min.js"></script>
-    <script defer src="https://cdn.anychart.com/releases/8.13.0/js/anychart-pert.min.js"></script>
-    
-<!-- ⭐ 新的CSS加载顺序 -->
+    <!-- ⭐ CSS 动态加载 -->
     <script>
         (function() {
             const timestamp = Date.now();
             const cssFiles = [
-                'css/base.css',        // 1. 基础样式（变量、重置）
-                'css/utilities.css',   // 2. 工具类（动画、辅助类）
-                'css/components.css',  // 3. 通用组件
-                'css/gantt-layout.css',       // 4. 甘特图布局 ⭐ 新增
-                'css/gantt-interactive.css'   // 5. 甘特图交互 ⭐ 新增
+                'css/base.css',              // 1. 基础变量
+                'css/utilities.css',         // 2. 工具类
+                'css/components.css',        // 3. 通用组件
+                'css/gantt-layout.css',      // 4. 甘特图布局
+                'css/gantt-interactive.css', // 5. 甘特图交互
+                'css/pert.css'               // 6. PERT 图
             ];
             
             cssFiles.forEach(file => {
@@ -38,6 +34,7 @@
             });
         })();
     </script>
+
     
     <style>
         /* 图标字体样式 */
@@ -46,7 +43,7 @@
             font-size: inherit;
         }
         
-        /* 页面加载时的优化 */
+        /* 页面加载优化 */
         body {
             opacity: 0;
             transition: opacity 0.3s ease-in;
@@ -74,78 +71,77 @@
     <div class="container-fluid">
         <!-- 标题 + 折叠工具按钮 -->
         <div class="d-flex align-items-center mb-4 position-relative">
-            <!-- 折叠工具按钮 - 圆形渐变 -->
+            <!-- 折叠工具按钮 -->
             <div class="toolbar-collapsed" id="toolbarCollapsed" title="工具" role="button" aria-label="打开工具栏" tabindex="0">
                 <span class="toolbar-icon" aria-hidden="true">⚙️</span>
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Alpha1</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Alpha2</h1>
         </div>
         
-        <!-- 展开的浮动工具栏 - 毛玻璃效果 -->
+        <!-- 展开的浮动工具栏 -->
         <div class="floating-toolbar-expanded" id="floatingToolbarExpanded" role="toolbar" aria-label="主工具栏">
             <div class="toolbar-section">
-                <button class="toolbar-btn" id="addTask" title="添加新任务" aria-label="添加任务">
-                    <span class="btn-icon icon" aria-hidden="true">➕</span>
+                <button class="toolbar-btn" id="addTask" title="添加新任务">
+                    <span class="btn-icon icon">➕</span>
                     <span class="btn-text">添加任务</span>
                 </button>
-                <button class="toolbar-btn" id="deleteTask" title="删除选中任务" aria-label="删除任务">
-                    <span class="btn-icon icon" aria-hidden="true">🗑️</span>
+                <button class="toolbar-btn" id="deleteTask" title="删除选中任务">
+                    <span class="btn-icon icon">🗑️</span>
                     <span class="btn-text">删除任务</span>
                 </button>
-                <button class="toolbar-btn" id="saveData" title="导出Json文件" aria-label="导出文件">
-                    <span class="btn-icon icon" aria-hidden="true">💾</span>
+                <button class="toolbar-btn" id="saveData" title="导出Json文件">
+                    <span class="btn-icon icon">💾</span>
                     <span class="btn-text">导出文件</span>
                 </button>
-                <button class="toolbar-btn" id="loadData" title="加载Json文件" aria-label="加载文件">
-                    <span class="btn-icon icon" aria-hidden="true">📂</span>
+                <button class="toolbar-btn" id="loadData" title="加载Json文件">
+                    <span class="btn-icon icon">📂</span>
                     <span class="btn-text">加载文件</span>
                 </button>
             </div>
             
-            <div class="toolbar-divider" role="separator" aria-hidden="true"></div>
+            <div class="toolbar-divider" role="separator"></div>
             
             <div class="toolbar-section">
-                <button class="toolbar-btn" id="checkConflicts" title="检测时间冲突" aria-label="检测冲突">
-                    <span class="btn-icon icon" aria-hidden="true">🔍</span>
+                <button class="toolbar-btn" id="checkConflicts" title="检测时间冲突">
+                    <span class="btn-icon icon">🔍</span>
                     <span class="btn-text">检测冲突</span>
                 </button>
-                <button class="toolbar-btn" id="autoFixConflicts" title="自动修复冲突" aria-label="自动修复">
-                    <span class="btn-icon icon" aria-hidden="true">🔧</span>
+                <button class="toolbar-btn" id="autoFixConflicts" title="自动修复冲突">
+                    <span class="btn-icon icon">🔧</span>
                     <span class="btn-text">自动修复</span>
                 </button>
-                <button class="toolbar-btn" id="clearHighlights" title="清除高亮" aria-label="清除高亮">
-                    <span class="btn-icon icon" aria-hidden="true">🧹</span>
+                <button class="toolbar-btn" id="clearHighlights" title="清除高亮">
+                    <span class="btn-icon icon">🧹</span>
                     <span class="btn-text">清除高亮</span>
                 </button>
             </div>
             
-            <div class="toolbar-divider" role="separator" aria-hidden="true"></div>
+            <div class="toolbar-divider" role="separator"></div>
             
             <div class="toolbar-section">
-                <button class="toolbar-btn" id="toggleView" title="切换视图" aria-label="切换PERT视图">
-                    <span class="btn-icon icon" aria-hidden="true">🔄</span>
+                <button class="toolbar-btn" id="toggleView" title="切换PERT视图">
+                    <span class="btn-icon icon">🔄</span>
                     <span class="btn-text">PERT视图</span>
                 </button>
-                <!-- ⭐ 新增时间刻度按钮 -->
-                <button class="toolbar-btn active" id="timeScaleDay" title="按天显示" aria-label="日视图">
-                    <span class="btn-icon icon" aria-hidden="true">📅</span>
+                <button class="toolbar-btn active" id="timeScaleDay" title="按天显示">
+                    <span class="btn-icon icon">📅</span>
                     <span class="btn-text">日视图</span>
                 </button>
-                <button class="toolbar-btn" id="timeScaleWeek" title="按周显示" aria-label="周视图">
-                    <span class="btn-icon icon" aria-hidden="true">📆</span>
+                <button class="toolbar-btn" id="timeScaleWeek" title="按周显示">
+                    <span class="btn-icon icon">📆</span>
                     <span class="btn-text">周视图</span>
                 </button>
-                <button class="toolbar-btn" id="timeScaleMonth" title="按月显示" aria-label="月视图">
-                    <span class="btn-icon icon" aria-hidden="true">🗓️</span>
+                <button class="toolbar-btn" id="timeScaleMonth" title="按月显示">
+                    <span class="btn-icon icon">🗓️</span>
                     <span class="btn-text">月视图</span>
                 </button>
             </div>
             
-            <!-- 设置按钮 - 独立齿轮图标 -->
-            <button class="toolbar-btn settings-trigger" id="settingsTrigger" title="设置" aria-label="打开设置">
-                <span class="btn-icon icon" aria-hidden="true">⚙️</span>
+            <!-- 设置按钮 -->
+            <button class="toolbar-btn settings-trigger" id="settingsTrigger" title="设置">
+                <span class="btn-icon icon">⚙️</span>
                 <span class="btn-text">设置</span>
             </button>
         </div>
@@ -160,62 +156,62 @@
                 <div class="setting-item">
                     <span class="setting-text">拖拽移动任务</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="enableEdit" checked aria-label="启用拖拽移动">
+                        <input type="checkbox" id="enableEdit" checked>
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">拖拽调整时长</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="enableResize" checked aria-label="启用调整时长">
+                        <input type="checkbox" id="enableResize" checked>
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">显示周末</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="showWeekends" checked aria-label="显示周末">
+                        <input type="checkbox" id="showWeekends" checked>
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">显示依赖箭头</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="showDependencies" checked aria-label="显示依赖箭头">
+                        <input type="checkbox" id="showDependencies" checked>
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">显示任务名称栏</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="showTaskNames" checked aria-label="显示任务名称栏">
+                        <input type="checkbox" id="showTaskNames" checked>
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">显示操作日志</span>
                     <label class="switch-label">
-                        <input type="checkbox" id="showLogPanel" aria-label="显示操作日志">
+                        <input type="checkbox" id="showLogPanel">
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="setting-item slider-item">
                     <label for="cellWidth" class="setting-text">时间轴密度</label>
                     <div class="slider-container">
-                        <input type="range" class="custom-slider" id="cellWidth" min="40" max="100" value="60" step="10" aria-label="时间轴密度" aria-valuemin="40" aria-valuemax="100" aria-valuenow="60">
-                        <span class="slider-value" id="cellWidthValue" aria-live="polite">60px</span>
+                        <input type="range" class="custom-slider" id="cellWidth" min="40" max="80" value="50" step="10">
+                        <span class="slider-value" id="cellWidthValue">50px</span>
                     </div>
                 </div>
             </div>
         </aside>
         
-        <!-- 日志区域(可折叠) -->
+        <!-- 日志区域 -->
         <section class="log-panel hidden" id="logPanel" aria-label="操作日志">
-            <div class="log-header" id="logHeader" role="button" tabindex="0" aria-expanded="true" aria-controls="logArea">
+            <div class="log-header" id="logHeader" role="button" tabindex="0">
                 <span>操作日志</span>
-                <button class="log-toggle" id="logToggle" aria-label="折叠日志">−</button>
+                <button class="log-toggle" id="logToggle">−</button>
             </div>
-            <div class="log-body" id="logArea" role="log" aria-live="polite" aria-atomic="false"></div>
+            <div class="log-body" id="logArea" role="log" aria-live="polite"></div>
         </section>
         
         <!-- 甘特图显示区域 -->
@@ -228,7 +224,7 @@
     </div>
     
     <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-         JavaScript 模块化动态加载（按依赖顺序）
+         JavaScript 模块化动态加载
          ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
     <script>
         (function() {
@@ -236,42 +232,44 @@
             
             const timestamp = Date.now();
             
-            // ⭐ 模块化加载顺序（严格按依赖关系）
             const scripts = [
-                // ==================== 第一层：工具函数（无依赖）====================
-                'js/utils/date-utils.js',          // 日期处理工具
-                'js/utils/log-utils.js',           // 日志记录工具
-                'js/utils/data-utils.js',          // 数据处理工具
-                'js/utils/time-scale-utils.js',    // ⭐ 时间刻度工具（新增）
+                // ==================== 第一层：工具函数 ====================
+                'js/utils/date-utils.js',
+                'js/utils/log-utils.js',
+                'js/utils/data-utils.js',
+                'js/utils/time-scale-utils.js',
                 
-                // ==================== 第二层：甘特图核心（依赖工具函数）====================
-                'js/gantt/gantt-core.js',          // 核心类定义
-                'js/gantt/gantt-render.js',        // 渲染逻辑
-                'js/gantt/gantt-dependencies.js',  // 依赖关系渲染
-                'js/gantt/gantt-operations.js',    // 任务操作
+                // ==================== 第二层：甘特图核心 ====================
+                'js/gantt/gantt-core.js',
+                'js/gantt/gantt-render.js',
+                'js/gantt/gantt-dependencies.js',
+                'js/gantt/gantt-operations.js',
                 
-                // ==================== 第三层：事件处理（依赖核心类）====================
-                'js/events/gantt-events-binding.js', // 事件绑定
-                'js/events/gantt-events-drag.js',    // 拖拽操作
-                'js/events/gantt-events-form.js',    // 编辑表单
-                'js/events/gantt-events-quickmenu.js',  // ⭐ 新增 快捷菜单
+                // ==================== 第三层：事件处理 ====================
+                'js/events/gantt-events-binding.js',
+                'js/events/gantt-events-drag.js',
+                'js/events/gantt-events-form.js',
+                'js/events/gantt-events-quickmenu.js',
                 
-                // ==================== 第四层：冲突检测（依赖核心类和工具函数）====================
-                'js/gantt-conflicts.js',           // 冲突检测与修复
+                // ==================== 第四层：冲突检测 ====================
+                'js/gantt-conflicts.js',
                 
-                // ==================== 第五层：应用初始化（依赖所有模块）====================
-                'js/app/app-init.js',              // 应用初始化
-                'js/app/app-controls.js',          // 控制按钮
-                'js/app/app-settings.js'           // 设置面板与视图切换
+                // ==================== 第五层：PERT 模块 ====================
+                'js/pert/pert-core.js',
+                'js/pert/pert-layout.js',
+                'js/pert/pert-render.js',
+                'js/pert/pert-events.js',
+                'js/pert/pert-overview.js',
+                
+                // ==================== 第六层：应用初始化 ====================
+                'js/app/app-init.js',
+                'js/app/app-controls.js',
+                'js/app/app-settings.js'
             ];
             
             let loadedCount = 0;
             const totalScripts = scripts.length;
             
-            /**
-             * 递归加载脚本
-             * @param {number} index - 当前加载的脚本索引
-             */
             function loadScript(index) {
                 if (index >= totalScripts) {
                     onAllScriptsLoaded();
@@ -285,44 +283,39 @@
                 script.onload = function() {
                     loadedCount++;
                     const progress = Math.round((loadedCount / totalScripts) * 100);
-                    console.log(`✅ [${loadedCount}/${totalScripts}] ${scripts[index]} 加载成功 (${progress}%)`);
-                    
+                    console.log(`✅ [${loadedCount}/${totalScripts}] ${scripts[index]} (${progress}%)`);
                     loadScript(index + 1);
                 };
                 
                 script.onerror = function() {
                     console.error(`❌ 加载失败: ${scripts[index]}`);
-                    alert(`模块加载失败：${scripts[index]}\n请检查文件路径或刷新页面重试`);
+                    alert(`模块加载失败：${scripts[index]}\n请检查文件路径`);
                     loadScript(index + 1);
                 };
                 
                 document.body.appendChild(script);
             }
             
-            /**
-             * 所有脚本加载完成后的回调
-             */
             function onAllScriptsLoaded() {
                 console.log('╔═══════════════════════════════════════════════════════════╗');
                 console.log('║  🎉 所有模块加载完成！                                    ║');
                 console.log('╠═══════════════════════════════════════════════════════════╣');
-                console.log(`  总计加载: ${loadedCount}/${totalScripts} 个模块`);
+                console.log(`  总计: ${loadedCount}/${totalScripts} 个模块`);
+                console.log('  版本: Delta8 - PERT模块化版');
                 console.log('╚═══════════════════════════════════════════════════════════╝');
                 
                 document.body.classList.add('loaded');
                 setTimeout(checkModulesLoaded, 500);
             }
             
-            /**
-             * 验证关键模块是否正确加载
-             */
             function checkModulesLoaded() {
                 const checks = {
                     '日期工具': typeof formatDate !== 'undefined',
                     '日志工具': typeof addLog !== 'undefined',
                     '数据工具': typeof generateId !== 'undefined',
-                    '时间刻度工具': typeof TimeScale !== 'undefined',
-                    'GanttChart类': typeof GanttChart !== 'undefined',
+                    '时间刻度': typeof TimeScale !== 'undefined',
+                    'GanttChart': typeof GanttChart !== 'undefined',
+                    'PertChart': typeof PertChart !== 'undefined',
                     'gantt实例': typeof gantt !== 'undefined',
                     '冲突检测': typeof detectAllConflicts !== 'undefined'
                 };
@@ -330,62 +323,28 @@
                 const failed = Object.keys(checks).filter(key => !checks[key]);
                 
                 if (failed.length > 0) {
-                    console.error('╔═══════════════════════════════════════════════════════════╗');
-                    console.error('║  ❌ 模块验证失败                                          ║');
-                    console.error('╠═══════════════════════════════════════════════════════════╣');
-                    failed.forEach(module => {
-                        console.error(`  ❌ ${module} 未正确加载`);
-                    });
-                    console.error('╚═══════════════════════════════════════════════════════════╝');
-                    alert('部分模块加载失败:\n' + failed.join('\n') + '\n\n请刷新页面重试');
+                    console.error('❌ 模块验证失败:', failed.join(', '));
+                    alert('部分模块加载失败:\n' + failed.join('\n'));
                 } else {
-                    console.log('╔═══════════════════════════════════════════════════════════╗');
-                    console.log('║  ✅ 模块验证通过                                          ║');
-                    console.log('╠═══════════════════════════════════════════════════════════╣');
-                    Object.keys(checks).forEach(module => {
-                        console.log(`  ✅ ${module}`);
-                    });
-                    console.log('╠═══════════════════════════════════════════════════════════╣');
-                    console.log('  📊 甘特图就绪 - 版本: Delta6 时间刻度版');
-                    console.log('  🎯 模块总数: ' + totalScripts);
-                    console.log('  ⚡ 加载方式: 顺序加载（按依赖关系）');
-                    console.log('  🆕 新功能: 支持日/周/月视图切换');
-                    console.log('╚═══════════════════════════════════════════════════════════╝');
+                    console.log('✅ 所有模块验证通过');
                 }
             }
-            
-            console.log('╔═══════════════════════════════════════════════════════════╗');
-            console.log('║  🚀 开始加载模块...                                       ║');
-            console.log('╠═══════════════════════════════════════════════════════════╣');
-            console.log(`  总模块数: ${totalScripts}`);
-            console.log('╚═══════════════════════════════════════════════════════════╝');
             
             loadScript(0);
         })();
     </script>
     
-    <!-- Bootstrap JS (defer loading) -->
+    <!-- Bootstrap JS -->
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js" integrity="sha512-X/YkDZyjTf4wyc2Vy16YGCPHwAY8rZJY+POgokZjQB2mhIRFJCckEGc6YyX9eNsPfn0PzThEuNs+uaomE5CO6A==" crossorigin="anonymous"></script>
     
     <!-- 全局错误处理 -->
     <script>
         window.addEventListener('error', function(e) {
-            console.error('╔═══════════════════════════════════════════════════════════╗');
-            console.error('║  ⚠️ 全局错误                                              ║');
-            console.error('╠═══════════════════════════════════════════════════════════╣');
-            console.error('  消息:', e.message);
-            console.error('  文件:', e.filename);
-            console.error('  行号:', e.lineno);
-            console.error('  列号:', e.colno);
-            console.error('╚═══════════════════════════════════════════════════════════╝');
+            console.error('⚠️ 全局错误:', e.message, e.filename, e.lineno);
         });
         
         window.addEventListener('unhandledrejection', function(e) {
-            console.error('╔═══════════════════════════════════════════════════════════╗');
-            console.error('║  ⚠️ 未处理的Promise拒绝                                   ║');
-            console.error('╠═══════════════════════════════════════════════════════════╣');
-            console.error('  原因:', e.reason);
-            console.error('╚═══════════════════════════════════════════════════════════╝');
+            console.error('⚠️ 未处理的Promise拒绝:', e.reason);
         });
     </script>
 </body>

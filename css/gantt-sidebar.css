@@ -1,0 +1,167 @@
+/**
+ * 甘特图侧边栏样式
+ * 路径: css/gantt-sidebar.css
+ * 版本: Delta8
+ * 包含: 任务名称列、折叠按钮、滚动区域
+ */
+
+/* ======================
+   左侧任务名称列
+   ====================== */
+.gantt-sidebar {
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    border-right: 2px solid var(--gray-300);
+    background: var(--gray-50);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+                min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gantt-sidebar.collapsed {
+    width: 35px !important;
+    min-width: 35px !important;
+}
+
+.gantt-sidebar.collapsed .gantt-task-name {
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.gantt-sidebar.collapsed .gantt-sidebar-header {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 0.7rem;
+    padding: 8px 4px;
+}
+
+/* 侧边栏表头 */
+.gantt-sidebar-header {
+    padding: 12px 8px;
+    background: var(--gray-200);
+    font-weight: 600;
+    border-bottom: 2px solid var(--gray-300);
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all var(--transition-normal);
+    font-size: 0.85rem;
+}
+
+/* 侧边栏滚动区域 */
+.gantt-sidebar-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* 任务名称项 */
+.gantt-task-name {
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--gray-300);
+    height: var(--row-height);
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background var(--transition-fast), 
+                opacity var(--transition-normal);
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gantt-task-name:hover {
+    background: rgba(102, 126, 234, 0.05);
+    padding-right: 8px;
+    border-left: 3px solid rgba(102, 126, 234, 0.4);
+    padding-left: 5px;
+}
+
+.gantt-task-name.selected {
+    background: #cfe2ff;
+    font-weight: 600;
+}
+
+.gantt-task-name.dep-highlight {
+    background: rgba(16, 185, 129, 0.1);
+    border-left: 3px solid var(--success-color);
+}
+
+/* 折叠/展开按钮 */
+.sidebar-toggle-btn {
+    position: absolute;
+    top: 50%;
+    right: -12px;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 44px;
+    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+    border: none;
+    border-radius: 0 8px 8px 0;
+    color: white;
+    font-size: 0.7rem;
+    cursor: pointer;
+    z-index: 10;
+    transition: all var(--transition-normal);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-toggle-btn:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #6a3d8f 100%);
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 2px 0 12px rgba(102, 126, 234, 0.4);
+}
+
+.sidebar-toggle-icon {
+    transition: transform var(--transition-normal);
+}
+
+.gantt-sidebar.collapsed .sidebar-toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .gantt-sidebar {
+        width: 100px;
+        min-width: 100px;
+    }
+
+    .gantt-sidebar.collapsed {
+        width: 30px !important;
+        min-width: 30px !important;
+    }
+
+    .sidebar-toggle-btn {
+        width: 18px;
+        height: 36px;
+        font-size: 0.6rem;
+    }
+
+    .gantt-task-name {
+        font-size: 0.75rem;
+        padding: 8px 6px;
+    }
+}
+
+/* 打印样式 */
+@media print {
+    .gantt-sidebar.collapsed {
+        width: var(--sidebar-width) !important;
+        min-width: var(--sidebar-width) !important;
+    }
+
+    .sidebar-toggle-btn {
+        display: none !important;
+    }
+}
