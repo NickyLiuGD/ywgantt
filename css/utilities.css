@@ -1,9 +1,30 @@
 /**
  * 工具类样式文件
  * 路径: css/utilities.css
- * 版本: Delta6
- * 包含: 动画、辅助类、特效
+ * 版本: Epsilon4
+ * 包含: 动画、辅助类、特效、颜色变量
  */
+
+/* ======================
+   颜色变量扩展
+   ====================== */
+
+:root {
+    /* 里程碑颜色 */
+    --milestone-color: #ffc107;
+    --milestone-gradient-start: #ffc107;
+    --milestone-gradient-end: #ff9800;
+    
+    /* 汇总任务颜色 */
+    --summary-color: #667eea;
+    --summary-gradient-start: #667eea;
+    --summary-gradient-end: #764ba2;
+    
+    /* 优先级颜色 */
+    --priority-high-color: #dc3545;
+    --priority-medium-color: #667eea;
+    --priority-low-color: #6c757d;
+}
 
 /* ======================
    动画定义
@@ -113,6 +134,38 @@
     }
 }
 
+/* ⭐ 里程碑脉冲动画 */
+@keyframes milestonePulse {
+    0%, 100% {
+        box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3),
+                    0 4px 16px rgba(255, 193, 7, 0.6);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(255, 193, 7, 0.2),
+                    0 6px 24px rgba(255, 193, 7, 0.8);
+    }
+}
+
+/* ⭐ 图标漂浮动画 */
+@keyframes iconFloat {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+}
+
+/* ⭐ WBS 徽章闪烁 */
+@keyframes wbsBlink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
 /* ======================
    辅助类
    ====================== */
@@ -195,6 +248,16 @@
 
 .gradient-warning {
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+/* ⭐ 里程碑渐变 */
+.gradient-milestone {
+    background: linear-gradient(135deg, var(--milestone-gradient-start) 0%, var(--milestone-gradient-end) 100%);
+}
+
+/* ⭐ 汇总任务渐变 */
+.gradient-summary {
+    background: linear-gradient(135deg, var(--summary-gradient-start) 0%, var(--summary-gradient-end) 100%);
 }
 
 /* ======================

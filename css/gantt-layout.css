@@ -1,8 +1,8 @@
 /**
  * 甘特图布局样式
  * 路径: css/gantt-layout.css
- * 版本: Delta8
- * 包含: 容器、侧边栏、时间轴、行列布局
+ * 版本: Epsilon4
+ * 包含: 容器、侧边栏、时间轴、行列布局、层级样式
  */
 
 /* ======================
@@ -94,6 +94,7 @@
     overflow-x: hidden;
 }
 
+/* ⭐ 任务名称基础样式 */
 .gantt-task-name {
     padding: 10px 8px;
     border-bottom: 1px solid var(--gray-300);
@@ -107,6 +108,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    position: relative;
 }
 
 .gantt-task-name:hover {
@@ -124,6 +126,111 @@
 .gantt-task-name.dep-highlight {
     background: rgba(16, 185, 129, 0.1);
     border-left: 3px solid var(--success-color);
+}
+
+/* ⭐ 层级缩进样式 */
+.gantt-task-name[data-outline-level="1"] {
+    font-weight: 600;
+    font-size: 0.9rem;
+    background: linear-gradient(to right, rgba(102, 126, 234, 0.05) 0%, transparent 50%);
+}
+
+.gantt-task-name[data-outline-level="2"] {
+    padding-left: 28px;
+    font-size: 0.85rem;
+}
+
+.gantt-task-name[data-outline-level="2"]::before {
+    content: '├─';
+    position: absolute;
+    left: 10px;
+    color: #dee2e6;
+    font-weight: normal;
+}
+
+.gantt-task-name[data-outline-level="3"] {
+    padding-left: 52px;
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.gantt-task-name[data-outline-level="3"]::before {
+    content: '│ ├─';
+    position: absolute;
+    left: 10px;
+    color: #dee2e6;
+    font-weight: normal;
+}
+
+.gantt-task-name[data-outline-level="4"] {
+    padding-left: 76px;
+    font-size: 0.75rem;
+    color: #adb5bd;
+}
+
+.gantt-task-name[data-outline-level="4"]::before {
+    content: '│ │ ├─';
+    position: absolute;
+    left: 10px;
+    color: #dee2e6;
+    font-weight: normal;
+}
+
+/* ⭐ 汇总任务名称特殊样式 */
+.gantt-task-name.summary-task {
+    background: linear-gradient(to right, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+    border-left: 3px solid #667eea;
+    font-weight: 600;
+}
+
+.gantt-task-name.summary-task:hover {
+    background: linear-gradient(to right, rgba(102, 126, 234, 0.15) 0%, transparent 70%);
+    border-left-width: 4px;
+}
+
+/* ⭐ 里程碑任务名称特殊样式 */
+.gantt-task-name.milestone-task {
+    background: linear-gradient(to right, rgba(255, 193, 7, 0.1) 0%, transparent 70%);
+    border-left: 3px solid #ffc107;
+    font-weight: 600;
+}
+
+.gantt-task-name.milestone-task:hover {
+    background: linear-gradient(to right, rgba(255, 193, 7, 0.15) 0%, transparent 70%);
+    border-left-width: 4px;
+}
+
+/* ⭐ WBS 徽章 */
+.gantt-task-name .wbs-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(102, 126, 234, 0.15);
+    color: #667eea;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-right: 4px;
+    font-family: 'Courier New', monospace;
+}
+
+.gantt-task-name.milestone-task .wbs-badge {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ff9800;
+}
+
+.gantt-task-name.summary-task .wbs-badge {
+    background: rgba(102, 126, 234, 0.25);
+    color: #5568d3;
+}
+
+/* ⭐ 任务名称内容 */
+.task-name-content {
+    display: inline-block;
+    transition: all 0.2s ease;
+}
+
+.gantt-task-name:hover .task-name-content {
+    transform: translateX(2px);
 }
 
 /* 侧边栏折叠按钮 */
@@ -180,7 +287,6 @@
     height: 100%;
 }
 
-/* 时间轴表头包装器 */
 .gantt-timeline-header-wrapper {
     position: relative;
     height: var(--header-height);
@@ -201,7 +307,6 @@
     background: rgba(102, 126, 234, 0.05);
 }
 
-/* 悬停提示 */
 .gantt-timeline-header-wrapper::after {
     content: '悬停切换视图 ↓';
     position: absolute;
@@ -220,7 +325,6 @@
     opacity: 1;
 }
 
-/* 行容器 */
 .gantt-rows-container {
     flex: 1;
     overflow-y: auto;
@@ -240,6 +344,12 @@
     border-bottom: 1px solid var(--gray-200);
     height: var(--row-height);
     position: relative;
+}
+
+/* ⭐ 汇总任务行样式 */
+.gantt-row-summary {
+    background: linear-gradient(to right, rgba(102, 126, 234, 0.03) 0%, transparent 100%);
+    border-bottom: 2px solid rgba(102, 126, 234, 0.2);
 }
 
 /* ======================
@@ -269,7 +379,6 @@
     color: var(--gray-500);
 }
 
-/* 周视图样式 */
 .gantt-date-week {
     font-weight: 600;
     font-size: 0.85rem;
@@ -282,7 +391,6 @@
     color: var(--gray-500);
 }
 
-/* 月视图样式 */
 .gantt-date-year {
     font-size: 0.75rem;
     color: var(--gray-500);
@@ -295,7 +403,6 @@
     color: var(--gray-700);
 }
 
-/* 特殊日期样式 */
 .gantt-date-cell.weekend {
     background: var(--gray-100);
 }
@@ -306,7 +413,6 @@
     border-right: 2px solid var(--warning-color);
 }
 
-/* 不同刻度下的单元格样式 */
 .gantt-date-cell[data-scale="week"],
 .gantt-cell[data-scale="week"] {
     border-right: 2px solid var(--gray-400);
@@ -324,7 +430,6 @@
     border-right: 3px solid var(--warning-color);
 }
 
-/* 单元格 */
 .gantt-cell {
     width: var(--default-cell-width);
     min-width: var(--default-cell-width);
@@ -363,6 +468,18 @@
     .gantt-task-name {
         font-size: 0.75rem;
         padding: 8px 6px;
+    }
+    
+    .gantt-task-name[data-outline-level="2"] {
+        padding-left: 20px;
+    }
+    
+    .gantt-task-name[data-outline-level="3"] {
+        padding-left: 36px;
+    }
+    
+    .gantt-task-name[data-outline-level="4"] {
+        padding-left: 52px;
     }
 
     .gantt-date-cell {
@@ -408,5 +525,11 @@
 
     .gantt-rows-container {
         overflow: visible;
+    }
+    
+    .gantt-task-name[data-outline-level="2"]::before,
+    .gantt-task-name[data-outline-level="3"]::before,
+    .gantt-task-name[data-outline-level="4"]::before {
+        color: #999;
     }
 }

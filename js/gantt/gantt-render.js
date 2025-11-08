@@ -178,87 +178,142 @@
         }).join('');
     };
 
-    /**
-     * 渲染所有任务行
-     * @param {Array<Object>} dates - 日期对象数组
-     * @returns {string} HTML字符串
-     */
-    GanttChart.prototype.renderTaskRows = function(dates) {
-        return this.tasks.map(task => this.renderRow(task, dates)).join('');
-    };
-
-    /**
-     * 渲染单个任务行（统一日期格式 + 双层时间标签）
-     * @param {Object} task - 任务对象
-     * @param {Array<Object>} dates - 日期对象数组
-     * @returns {string} HTML字符串
-     */
-    GanttChart.prototype.renderRow = function(task, dates) {
-        const start = new Date(task.start);
-        const end = new Date(task.end || task.start);
-        
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-            console.warn(`Invalid date for task: ${task.name}`);
-            return '';
+/**
+ * 渲染任务名称列表（支持层级和折叠）
+ */
+GanttChart.prototype.renderTaskNames = function() {
+    return this.tasks.map(task => {
+        // ⭐ 跳过折叠的子任务
+        if (task.parentId) {
+            const parent = this.tasks.find(t => t.id === task.parentId);
+            if (parent && parent.isCollapsed) {
+                return '';
+            }
         }
-        
-        const scale = this.options.timeScale || 'day';
-        const progress = Math.min(Math.max(task.progress || 0, 0), 100);
-        const isSelected = this.selectedTask === task.id;
-        
-        const startDays = daysBetween(this.startDate, start);
-        const durationDays = daysBetween(start, end) + 1;
-        
-        const left = startDays * this.options.cellWidth;
-        const width = Math.max(durationDays * this.options.cellWidth, 30);
 
-        // 统一使用完整日期格式
-        const startTimeLabel = formatDate(start);
-        const endTimeLabel = formatDate(end);
+        const indent = '　'.repeat((task.outlineLevel || 1) - 1);
+        const icon = task.isMilestone ? '🎯' : task.isSummary ? '📁' : '📋';
+        const wbsPrefix = task.wbs ? `<span class="wbs-badge">[${task.wbs}]</span> ` : '';
+        
+        // ⭐ 折叠/展开按钮
+        const collapseBtn = task.isSummary && task.children && task.children.length > 0 ? 
+            `<span class="task-collapse-btn" data-task-id="${task.id}" title="${task.isCollapsed ? '展开' : '折叠'}子任务">
+                ${task.isCollapsed ? '▶' : '▼'}
+            </span>` : '';
 
         return `
-            <div class="gantt-row" role="row" aria-label="任务行: ${this.escapeHtml(task.name)}">
-                ${this.renderCells(dates)}
-                
-                <!-- 左侧双层时间标签 -->
-                <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
-                     data-task-id="${task.id}"
-                     style="right: calc(100% - ${left}px + 8px);"
-                     role="button"
-                     tabindex="0"
-                     aria-label="时间范围: ${startTimeLabel} 至 ${endTimeLabel}">
-                    <div class="time-label-row time-start" title="开始时间">
-                        ${this.escapeHtml(startTimeLabel)}
-                    </div>
-                    <div class="time-label-row time-end" title="结束时间">
-                        ${this.escapeHtml(endTimeLabel)}
-                    </div>
-                </div>
-                
-                <!-- 任务条 -->
-                <div class="gantt-bar ${isSelected ? 'selected' : ''}" 
-                     data-task-id="${task.id}"
-                     style="left: ${left}px; width: ${width}px;"
-                     role="button"
-                     tabindex="0"
-                     aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
-                    <div class="gantt-bar-progress" style="width: ${progress}%" aria-hidden="true"></div>
-                    ${this.options.enableResize ? '<div class="gantt-bar-handle left" role="button" aria-label="调整开始日期"></div>' : ''}
-                    ${this.options.enableResize ? '<div class="gantt-bar-handle right" role="button" aria-label="调整结束日期"></div>' : ''}
-                </div>
-                
-                <!-- 右侧任务名称标签 -->
-                <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
-                     data-task-id="${task.id}"
-                     style="left: ${left + width + 8}px;"
-                     role="button"
-                     tabindex="0"
-                     aria-label="任务标签: ${this.escapeHtml(task.name)}">
-                    ${this.escapeHtml(task.name)} (${progress}%)
-                </div>
+            <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''} 
+                        ${task.isSummary ? 'summary-task' : ''} 
+                        ${task.isMilestone ? 'milestone-task' : ''}" 
+                 data-task-id="${task.id}"
+                 data-outline-level="${task.outlineLevel || 1}"
+                 role="button"
+                 tabindex="0"
+                 aria-label="任务: ${this.escapeHtml(task.name)}">
+                ${collapseBtn}
+                <span class="task-name-content">
+                    ${indent}${icon} ${wbsPrefix}${this.escapeHtml(task.name)}
+                </span>
             </div>
         `;
-    };
+    }).join('');
+};
+
+/**
+ * 渲染单个任务行（支持里程碑和汇总任务）
+ */
+GanttChart.prototype.renderRow = function(task, dates) {
+    // ⭐ 跳过折叠的子任务
+    if (task.parentId) {
+        const parent = this.tasks.find(t => t.id === task.parentId);
+        if (parent && parent.isCollapsed) {
+            return '';
+        }
+    }
+
+    const start = new Date(task.start);
+    const end = new Date(task.end || task.start);
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        console.warn(`Invalid date for task: ${task.name}`);
+        return '';
+    }
+    
+    const progress = Math.min(Math.max(task.progress || 0, 0), 100);
+    const isSelected = this.selectedTask === task.id;
+    
+    const startDays = daysBetween(this.startDate, start);
+    const durationDays = daysBetween(start, end) + 1;
+    
+    const left = startDays * this.options.cellWidth;
+    const width = Math.max(durationDays * this.options.cellWidth, task.isMilestone ? 20 : 30);
+
+    const startTimeLabel = formatDate(start);
+    const endTimeLabel = formatDate(end);
+
+    // 任务名称显示
+    const indent = '　'.repeat((task.outlineLevel || 1) - 1);
+    const icon = task.isMilestone ? '🎯' : task.isSummary ? '📁' : '📋';
+    const wbsPrefix = task.wbs ? `[${task.wbs}] ` : '';
+    const displayName = `${indent}${icon} ${wbsPrefix}${task.name}`;
+
+    // 优先级标记
+    const priorityAttr = task.priority ? `data-priority="${task.priority}"` : '';
+
+    return `
+        <div class="gantt-row ${task.isSummary ? 'gantt-row-summary' : ''}" 
+             role="row" 
+             aria-label="任务行: ${this.escapeHtml(task.name)}">
+            ${this.renderCells(dates)}
+            
+            <!-- 左侧时间标签 -->
+            <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
+                 data-task-id="${task.id}"
+                 style="right: calc(100% - ${left}px + 8px);"
+                 role="button"
+                 tabindex="0">
+                <div class="time-label-row time-start">${this.escapeHtml(startTimeLabel)}</div>
+                <div class="time-label-row time-end">${this.escapeHtml(endTimeLabel)}</div>
+            </div>
+            
+            ${task.isMilestone ? `
+                <!-- ⭐ 里程碑菱形 -->
+                <div class="gantt-milestone ${isSelected ? 'selected' : ''}" 
+                     data-task-id="${task.id}"
+                     style="left: ${left}px;"
+                     role="button"
+                     tabindex="0"
+                     title="${this.escapeHtml(task.name)}">
+                    <div class="milestone-diamond">
+                        <span class="milestone-icon">🎯</span>
+                    </div>
+                </div>
+            ` : `
+                <!-- 普通任务条/汇总任务条 -->
+                <div class="gantt-bar ${task.isSummary ? 'gantt-bar-summary' : ''} ${isSelected ? 'selected' : ''}" 
+                     data-task-id="${task.id}"
+                     ${priorityAttr}
+                     style="left: ${left}px; width: ${width}px;"
+                     role="button"
+                     tabindex="0">
+                    <div class="gantt-bar-progress" style="width: ${progress}%" aria-hidden="true"></div>
+                    ${this.options.enableResize && !task.isSummary ? '<div class="gantt-bar-handle left" role="button"></div>' : ''}
+                    ${this.options.enableResize && !task.isSummary ? '<div class="gantt-bar-handle right" role="button"></div>' : ''}
+                </div>
+            `}
+            
+            <!-- 右侧任务名称标签 -->
+            <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
+                 data-task-id="${task.id}"
+                 style="left: ${left + width + 8}px;"
+                 role="button"
+                 tabindex="0">
+                ${this.escapeHtml(displayName)} 
+                ${!task.isMilestone ? `<span class="task-progress-badge">${progress}%</span>` : ''}
+            </div>
+        </div>
+    `;
+};
 
     /**
      * 渲染单元格

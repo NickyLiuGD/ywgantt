@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图拖拽操作模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-drag.js                           ▓▓
-// ▓▓ 版本: Delta7 - 支持双层时间标签更新                            ▓▓
+// ▓▓ 版本: Epsilon4 - 支持双层时间标签更新 + 父任务自动更新         ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -11,6 +11,17 @@
      * 开始拖拽任务
      */
     GanttChart.prototype.startDrag = function(e, task, bar) {
+        // ⭐ 里程碑和汇总任务不可拖拽
+        if (task.isMilestone) {
+            addLog(`⚠️ 里程碑不可拖拽`);
+            return;
+        }
+        
+        if (task.isSummary) {
+            addLog(`⚠️ 汇总任务不可拖拽，时间由子任务自动计算`);
+            return;
+        }
+        
         this.dragState = { 
             type: 'move', 
             task, 
@@ -27,6 +38,17 @@
      * 开始调整任务大小
      */
     GanttChart.prototype.startResize = function(e, task, bar, isRight) {
+        // ⭐ 里程碑和汇总任务不可调整大小
+        if (task.isMilestone) {
+            addLog(`⚠️ 里程碑工期固定为0，不可调整`);
+            return;
+        }
+        
+        if (task.isSummary) {
+            addLog(`⚠️ 汇总任务时间由子任务自动计算，不可调整`);
+            return;
+        }
+        
         this.dragState = { 
             type: 'resize', 
             task, 
@@ -64,7 +86,7 @@
                 externalLabel.style.left = (offset * this.options.cellWidth + barWidth + 8) + 'px';
             }
             
-            // ⭐ 更新左侧双层时间标签
+            // 更新左侧双层时间标签
             const startLabel = this.container.querySelector(`.gantt-bar-label-start[data-task-id="${this.dragState.task.id}"]`);
             if (startLabel) {
                 startLabel.style.right = `calc(100% - ${offset * this.options.cellWidth}px + 8px)`;
@@ -99,7 +121,7 @@
                         externalLabel.style.left = (offset * this.options.cellWidth + w + 8) + 'px';
                     }
                     
-                    // ⭐ 更新左侧时间标签（只更新结束时间）
+                    // 更新左侧时间标签（只更新结束时间）
                     const startLabel = this.container.querySelector(`.gantt-bar-label-start[data-task-id="${this.dragState.task.id}"]`);
                     if (startLabel) {
                         const timeEndEl = startLabel.querySelector('.time-end');
@@ -124,7 +146,7 @@
                         externalLabel.style.left = (offset * this.options.cellWidth + w + 8) + 'px';
                     }
                     
-                    // ⭐ 更新左侧时间标签（更新开始时间和位置）
+                    // 更新左侧时间标签（更新开始时间和位置）
                     const startLabel = this.container.querySelector(`.gantt-bar-label-start[data-task-id="${this.dragState.task.id}"]`);
                     if (startLabel) {
                         startLabel.style.right = `calc(100% - ${offset * this.options.cellWidth}px + 8px)`;
@@ -146,19 +168,30 @@
     };
 
     /**
-     * 鼠标释放处理
+     * 鼠标释放处理（⭐ 更新父任务）
      */
     GanttChart.prototype.onMouseUp = function(e) {
         if (!this.dragState) return;
+        
         const task = this.dragState.task;
         const duration = daysBetween(task.start, task.end) + 1;
+        
         this.dragState.bar.classList.remove('dragging');
+        
         addLog(`任务 "${task.name}" 已${this.dragState.type === 'move' ? '移动' : '调整'}到 ${task.start} ~ ${task.end}，工期 ${duration} 天`);
+        
+        // ⭐ 更新 duration 字段
+        task.duration = duration;
+        
         this.dragState = null;
+        
+        // ⭐ 更新所有父任务的时间范围
+        this.updateParentTasks(task.id);
+        
         this.calculateDateRange();
         this.render();
     };
 
-    console.log('✅ gantt-events-drag.js loaded successfully (Delta7)');
+    console.log('✅ gantt-events-drag.js loaded successfully (Epsilon4 - 父任务自动更新)');
 
 })();

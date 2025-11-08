@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图任务操作模块                                              ▓▓
 // ▓▓ 路径: js/gantt/gantt-operations.js                             ▓▓
-// ▓▓ 版本: Delta6 - 完整版（包含选择/取消选择）                     ▓▓
+// ▓▓ 版本: Epsilon4 - 支持层级任务/汇总任务/里程碑                  ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -21,7 +21,7 @@
         }
 
         // 清除所有高亮和旧表单
-        this.container.querySelectorAll('.gantt-bar, .gantt-task-name, .gantt-bar-label-external').forEach(el => {
+        this.container.querySelectorAll('.gantt-bar, .gantt-milestone, .gantt-task-name, .gantt-bar-label-external').forEach(el => {
             el.classList.remove('selected', 'dep-highlight');
         });
         this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
@@ -34,7 +34,8 @@
         this.selectedTask = taskId;
 
         // 高亮选中任务
-        const selectedBar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
+        const selectedBar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`) ||
+                           this.container.querySelector(`.gantt-milestone[data-task-id="${taskId}"]`);
         if (selectedBar) selectedBar.classList.add('selected');
 
         const selectedLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${taskId}"]`);
@@ -43,10 +44,11 @@
         const selectedName = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
         if (selectedName) selectedName.classList.add('selected');
 
-        // ⭐ 获取并高亮所有依赖任务
+        // 获取并高亮所有依赖任务
         const deps = this.getAllDependencies(taskId);
         deps.forEach(depId => {
-            const bar = this.container.querySelector(`.gantt-bar[data-task-id="${depId}"]`);
+            const bar = this.container.querySelector(`.gantt-bar[data-task-id="${depId}"]`) ||
+                       this.container.querySelector(`.gantt-milestone[data-task-id="${depId}"]`);
             if (bar) bar.classList.add('dep-highlight');
             
             const label = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${depId}"]`);
@@ -56,7 +58,7 @@
             if (name) name.classList.add('dep-highlight');
         });
 
-        // ⭐ 高亮依赖箭头
+        // 高亮依赖箭头
         this.container.querySelectorAll('.gantt-dependencies path').forEach(path => {
             const fromId = path.dataset.from;
             const toId = path.dataset.to;
@@ -81,12 +83,12 @@
 
         this.selectedTask = null;
         
-        // ⭐ 清除所有选中和依赖高亮
+        // 清除所有选中和依赖高亮
         this.container.querySelectorAll('.selected, .dep-highlight').forEach(el => {
             el.classList.remove('selected', 'dep-highlight');
         });
         
-        // ⭐ 清除依赖箭头高亮
+        // 清除依赖箭头高亮
         this.container.querySelectorAll('.dep-highlight-arrow').forEach(path => {
             path.classList.remove('dep-highlight-arrow');
         });
@@ -108,7 +110,8 @@
             return;
         }
         
-        const bar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
+        const bar = this.container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`) ||
+                    this.container.querySelector(`.gantt-milestone[data-task-id="${taskId}"]`);
         const rowsContainer = this.container.querySelector('.gantt-rows-container');
         
         if (!bar || !rowsContainer) {
@@ -224,13 +227,26 @@
         }
 
         if (!task.id) task.id = generateId();
+        if (!task.uid) task.uid = this.getNextUID();
         if (!task.name) task.name = '新任务';
         if (!task.start) task.start = formatDate(new Date());
         if (!task.end) task.end = formatDate(addDays(new Date(), 3));
+        if (typeof task.duration !== 'number') task.duration = 4;
         if (typeof task.progress !== 'number') task.progress = 0;
         if (!Array.isArray(task.dependencies)) task.dependencies = [];
+        
+        // ⭐ 新增字段默认值
+        if (typeof task.isMilestone !== 'boolean') task.isMilestone = false;
+        if (typeof task.isSummary !== 'boolean') task.isSummary = false;
+        if (!task.parentId) task.parentId = null;
+        if (!Array.isArray(task.children)) task.children = [];
+        if (!task.outlineLevel) task.outlineLevel = 1;
+        if (!task.wbs) task.wbs = this.generateWBS(task.id);
+        if (!task.priority) task.priority = 'medium';
+        if (!task.notes) task.notes = '';
 
         this.tasks.push(task);
+        this.sortTasksByWBS();
         this.calculateDateRange();
         this.render();
     };
@@ -240,20 +256,337 @@
      * @param {string} taskId - 任务ID
      */
     GanttChart.prototype.deleteTask = function(taskId) {
-        this.tasks = this.tasks.filter(t => t.id !== taskId);
+        this.deleteTaskWithChildren(taskId);
+    };
+
+    /**
+     * ⭐ 删除任务及其所有子任务
+     */
+    GanttChart.prototype.deleteTaskWithChildren = function(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const toDelete = [taskId];
         
-        this.tasks.forEach(task => {
-            if (Array.isArray(task.dependencies)) {
-                task.dependencies = task.dependencies.filter(dep => dep !== taskId);
+        // 🤖 递归收集所有子任务
+        const collectChildren = (id) => {
+            const t = this.tasks.find(task => task.id === id);
+            if (t && t.children && t.children.length > 0) {
+                t.children.forEach(childId => {
+                    toDelete.push(childId);
+                    collectChildren(childId);
+                });
+            }
+        };
+        collectChildren(taskId);
+
+        // 🤖 从父任务移除
+        if (task.parentId) {
+            const parent = this.tasks.find(t => t.id === task.parentId);
+            if (parent && parent.children) {
+                parent.children = parent.children.filter(cid => cid !== taskId);
+                
+                // 🤖 如果父任务没有子任务了，取消汇总状态
+                if (parent.children.length === 0) {
+                    parent.isSummary = false;
+                    addLog(`   "${parent.name}" 已自动取消汇总任务状态`);
+                } else {
+                    // 重新计算父任务
+                    this.recalculateSummaryTask(parent.id);
+                }
+            }
+        }
+
+        // 删除所有相关任务
+        this.tasks = this.tasks.filter(t => !toDelete.includes(t.id));
+        
+        // 🤖 清理其他任务的依赖
+        this.tasks.forEach(t => {
+            if (t.dependencies && t.dependencies.length > 0) {
+                t.dependencies = t.dependencies.filter(dep => {
+                    const depId = typeof dep === 'string' ? dep : dep.taskId;
+                    return !toDelete.includes(depId);
+                });
             }
         });
-        
+
         if (this.selectedTask === taskId) {
             this.selectedTask = null;
         }
-        
+
+        // 🤖 重新生成所有 WBS
+        this.tasks.forEach(t => {
+            t.wbs = this.generateWBS(t.id);
+        });
+
         this.calculateDateRange();
         this.render();
+
+        addLog(`✅ 已删除任务 "${task.name}"${toDelete.length > 1 ? ` 及 ${toDelete.length - 1} 个子任务` : ''}`);
+    };
+
+    /**
+     * ⭐ 添加子任务
+     */
+    GanttChart.prototype.addChildTask = function(parentId) {
+        const parent = this.tasks.find(t => t.id === parentId);
+        if (!parent) return;
+
+        const newTask = {
+            id: generateId(),
+            uid: this.getNextUID(),
+            name: '新子任务',
+            start: formatDate(new Date(parent.start)),
+            end: formatDate(addDays(new Date(parent.start), 2)),
+            duration: 3,
+            progress: 0,
+            isMilestone: false,
+            isSummary: false,
+            parentId: parentId,
+            children: [],
+            outlineLevel: (parent.outlineLevel || 1) + 1,
+            wbs: '',
+            priority: 'medium',
+            notes: '',
+            dependencies: []
+        };
+
+        // 🤖 添加到父任务的子任务列表
+        if (!parent.children) parent.children = [];
+        parent.children.push(newTask.id);
+        
+        // 🤖 设置父任务为汇总任务
+        parent.isSummary = true;
+
+        // 插入到父任务后面
+        const parentIndex = this.tasks.findIndex(t => t.id === parentId);
+        this.tasks.splice(parentIndex + 1, 0, newTask);
+
+        // 🤖 生成 WBS
+        newTask.wbs = this.generateWBS(newTask.id);
+
+        // 🤖 重新计算父任务时间
+        this.recalculateSummaryTask(parentId);
+
+        this.calculateDateRange();
+        this.render();
+
+        // 自动选中并编辑
+        setTimeout(() => {
+            this.selectTask(newTask.id);
+            this.showInlineTaskForm(newTask);
+            addLog(`✅ 已为 "${parent.name}" 添加子任务 [${newTask.wbs}]`);
+        }, 100);
+    };
+
+    /**
+     * ⭐ 更新父子关系
+     */
+    GanttChart.prototype.updateParentRelationship = function(task, oldParentId, newParentId) {
+        // 从旧父任务移除
+        if (oldParentId) {
+            const oldParent = this.tasks.find(t => t.id === oldParentId);
+            if (oldParent && oldParent.children) {
+                oldParent.children = oldParent.children.filter(cid => cid !== task.id);
+                
+                // 🤖 如果旧父任务没有子任务了，取消汇总状态
+                if (oldParent.children.length === 0) {
+                    oldParent.isSummary = false;
+                    addLog(`   "${oldParent.name}" 已自动取消汇总任务状态`);
+                } else {
+                    // 重新计算旧父任务
+                    this.recalculateSummaryTask(oldParentId);
+                }
+            }
+        }
+        
+        // 添加到新父任务
+        if (newParentId) {
+            const newParent = this.tasks.find(t => t.id === newParentId);
+            if (newParent) {
+                if (!newParent.children) newParent.children = [];
+                if (!newParent.children.includes(task.id)) {
+                    newParent.children.push(task.id);
+                }
+                
+                // 🤖 自动设置为汇总任务
+                if (!newParent.isSummary) {
+                    newParent.isSummary = true;
+                    addLog(`   "${newParent.name}" 已自动设为汇总任务`);
+                }
+                
+                // 🤖 自动更新层级深度
+                task.outlineLevel = (newParent.outlineLevel || 1) + 1;
+                
+                // 🤖 递归更新所有子任务的层级
+                this.updateChildrenOutlineLevel(task.id);
+            }
+        } else {
+            // 🤖 设为顶级任务
+            task.outlineLevel = 1;
+            this.updateChildrenOutlineLevel(task.id);
+        }
+
+        task.parentId = newParentId;
+    };
+
+    /**
+     * ⭐ 递归更新子任务的层级深度
+     */
+    GanttChart.prototype.updateChildrenOutlineLevel = function(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task || !task.children || task.children.length === 0) return;
+
+        const parentLevel = task.outlineLevel || 1;
+        
+        task.children.forEach(childId => {
+            const child = this.tasks.find(t => t.id === childId);
+            if (child) {
+                child.outlineLevel = parentLevel + 1;
+                this.updateChildrenOutlineLevel(childId); // 递归
+            }
+        });
+    };
+
+    /**
+     * ⭐ 重新计算汇总任务的时间范围
+     */
+    GanttChart.prototype.recalculateSummaryTask = function(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task || !task.isSummary || !task.children || task.children.length === 0) {
+            return;
+        }
+
+        let minStart = null;
+        let maxEnd = null;
+        let totalProgress = 0;
+        let totalDuration = 0;
+
+        // 遍历所有子任务
+        task.children.forEach(childId => {
+            const child = this.tasks.find(t => t.id === childId);
+            if (!child) return;
+
+            // 🤖 如果子任务也是汇总任务，先递归计算
+            if (child.isSummary) {
+                this.recalculateSummaryTask(childId);
+            }
+
+            const childStart = new Date(child.start);
+            const childEnd = new Date(child.end);
+
+            if (!minStart || childStart < minStart) minStart = childStart;
+            if (!maxEnd || childEnd > maxEnd) maxEnd = childEnd;
+
+            // 🤖 加权平均进度（按工期加权）
+            const childDuration = child.duration || 1;
+            totalProgress += (child.progress || 0) * childDuration;
+            totalDuration += childDuration;
+        });
+
+        if (minStart && maxEnd) {
+            task.start = formatDate(minStart);
+            task.end = formatDate(maxEnd);
+            task.duration = daysBetween(minStart, maxEnd) + 1;
+            task.progress = totalDuration > 0 ? 
+                Math.round(totalProgress / totalDuration) : 0;
+        }
+    };
+
+    /**
+     * ⭐ 更新所有父任务（递归向上）
+     */
+    GanttChart.prototype.updateParentTasks = function(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task || !task.parentId) return;
+
+        this.recalculateSummaryTask(task.parentId);
+        this.updateParentTasks(task.parentId); // 递归
+    };
+
+    /**
+     * ⭐ 自动生成 WBS 编号
+     */
+    GanttChart.prototype.generateWBS = function(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return '';
+
+        if (!task.parentId) {
+            // 🤖 顶级任务：计算同级序号
+            const topLevelTasks = this.tasks.filter(t => !t.parentId);
+            const index = topLevelTasks.findIndex(t => t.id === taskId);
+            return String(index + 1);
+        } else {
+            // 🤖 子任务：父WBS + 同级序号
+            const parent = this.tasks.find(t => t.id === task.parentId);
+            if (!parent) return '';
+
+            const parentWBS = parent.wbs || this.generateWBS(parent.id);
+            const siblings = parent.children || [];
+            const index = siblings.indexOf(taskId);
+            
+            return `${parentWBS}.${index + 1}`;
+        }
+    };
+
+    /**
+     * ⭐ 按 WBS 排序任务
+     */
+    GanttChart.prototype.sortTasksByWBS = function() {
+        this.tasks.sort((a, b) => {
+            const wbsA = a.wbs || '';
+            const wbsB = b.wbs || '';
+            
+            if (!wbsA && !wbsB) return 0;
+            if (!wbsA) return 1;
+            if (!wbsB) return -1;
+            
+            const partsA = wbsA.split('.').map(n => parseInt(n));
+            const partsB = wbsB.split('.').map(n => parseInt(n));
+            
+            for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+                const numA = partsA[i] || 0;
+                const numB = partsB[i] || 0;
+                if (numA !== numB) return numA - numB;
+            }
+            
+            return 0;
+        });
+    };
+
+    /**
+     * ⭐ 切换任务折叠状态
+     */
+    GanttChart.prototype.toggleTaskCollapse = function(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task || !task.isSummary) return;
+
+        task.isCollapsed = !task.isCollapsed;
+        this.render();
+
+        const childrenCount = task.children ? task.children.length : 0;
+        addLog(`${task.isCollapsed ? '📂' : '📁'} 任务 "${task.name}" 已${task.isCollapsed ? '折叠' : '展开'}（${childrenCount}个子任务）`);
+    };
+
+    /**
+     * ⭐ 判断任务A是否是任务B的后代
+     */
+    GanttChart.prototype.isDescendantOf = function(taskAId, taskBId) {
+        const taskA = this.tasks.find(t => t.id === taskAId);
+        if (!taskA || !taskA.parentId) return false;
+        
+        if (taskA.parentId === taskBId) return true;
+        
+        return this.isDescendantOf(taskA.parentId, taskBId);
+    };
+
+    /**
+     * ⭐ 获取下一个 UID
+     */
+    GanttChart.prototype.getNextUID = function() {
+        const maxUID = this.tasks.reduce((max, task) => 
+            Math.max(max, task.uid || 0), 0);
+        return maxUID + 1;
     };
 
     /**
@@ -306,6 +639,6 @@
         }
     };
 
-    console.log('✅ gantt-operations.js loaded successfully (Delta6 - 完整版)');
+    console.log('✅ gantt-operations.js loaded successfully (Epsilon4 - 层级任务支持)');
 
 })();

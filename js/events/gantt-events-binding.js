@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图事件绑定模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-binding.js                        ▓▓
-// ▓▓ 版本: Delta8 - 完整版（包含所有事件处理 + 双层时间标签）       ▓▓
+// ▓▓ 版本: Epsilon4 - 支持里程碑/汇总任务/折叠按钮                  ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -13,8 +13,22 @@
     GanttChart.prototype.attachEvents = function() {
         // ==================== 左侧任务名称事件 ====================
         this.container.querySelectorAll('.gantt-task-name').forEach(el => {
+            // ⭐ 折叠按钮事件（优先处理，阻止冒泡）
+            const collapseBtn = el.querySelector('.task-collapse-btn');
+            if (collapseBtn) {
+                collapseBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const taskId = collapseBtn.dataset.taskId;
+                    this.toggleTaskCollapse(taskId);
+                };
+            }
+
             // 单击：选中任务并打开编辑表单
             el.onclick = (e) => {
+                // 如果点击的是折叠按钮，不触发选择
+                if (e.target.classList.contains('task-collapse-btn')) return;
+                
                 if (el.classList.contains('editing')) return;
                 const taskId = el.dataset.taskId;
                 const task = this.tasks.find(t => t.id === taskId);
@@ -34,8 +48,22 @@
 
         // ==================== 右侧任务名称标签事件 ====================
         this.container.querySelectorAll('.gantt-bar-label-external').forEach(label => {
+            // ⭐ 折叠按钮事件
+            const collapseToggle = label.querySelector('.collapse-toggle');
+            if (collapseToggle) {
+                collapseToggle.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const taskId = collapseToggle.dataset.taskId;
+                    this.toggleTaskCollapse(taskId);
+                };
+            }
+
             // 单击：选中任务并打开编辑表单
             label.onclick = (e) => {
+                // 如果点击的是折叠按钮，不触发选择
+                if (e.target.classList.contains('collapse-toggle')) return;
+                
                 e.preventDefault();
                 e.stopPropagation();
                 
@@ -80,7 +108,18 @@
                 const task = this.tasks.find(t => t.id === taskId);
                 if (!task) return;
                 
-                // 判断点击的是上层还是下层
+                // ⭐ 汇总任务不允许手动修改时间
+                if (task.isSummary) {
+                    alert('汇总任务的时间由子任务自动计算，无法手动修改');
+                    return;
+                }
+                
+                // ⭐ 里程碑不允许修改结束日期
+                if (task.isMilestone) {
+                    alert('里程碑的工期为0，无法修改结束日期');
+                    return;
+                }
+                
                 const clickedElement = e.target;
                 const isStartTime = clickedElement.classList.contains('time-start');
                 
@@ -88,9 +127,13 @@
                     // 修改开始日期
                     const newDate = prompt('修改开始日期 (YYYY-MM-DD):', task.start);
                     if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-                        const duration = daysBetween(task.start, task.end);
+                        const duration = task.duration || daysBetween(task.start, task.end);
                         task.start = newDate;
                         task.end = formatDate(addDays(new Date(newDate), duration));
+                        
+                        // ⭐ 更新父任务
+                        this.updateParentTasks(taskId);
+                        
                         this.calculateDateRange();
                         this.render();
                         addLog(`✅ 已修改任务"${task.name}"的开始日期为 ${newDate}`);
@@ -103,6 +146,11 @@
                         const startDate = new Date(task.start);
                         if (newEndDate >= startDate) {
                             task.end = newDate;
+                            task.duration = daysBetween(task.start, task.end) + 1;
+                            
+                            // ⭐ 更新父任务
+                            this.updateParentTasks(taskId);
+                            
                             this.calculateDateRange();
                             this.render();
                             addLog(`✅ 已修改任务"${task.name}"的结束日期为 ${newDate}`);
@@ -114,9 +162,10 @@
             };
         });
 
-        // ==================== 甘特图任务条事件 ====================
-        this.container.querySelectorAll('.gantt-bar').forEach(bar => {
+        // ==================== 甘特图任务条/里程碑事件 ====================
+        this.container.querySelectorAll('.gantt-bar, .gantt-milestone').forEach(bar => {
             const taskId = bar.dataset.taskId;
+            const task = this.tasks.find(t => t.id === taskId);
 
             // 单击：切换依赖（仅在表单打开时）
             bar.onclick = (e) => {
@@ -129,7 +178,6 @@
                         const depInput = document.getElementById(`dep_${taskId}`);
                         if (depInput) {
                             depInput.checked = !depInput.checked;
-                            const task = this.tasks.find(t => t.id === taskId);
                             addLog(`${depInput.checked ? '添加' : '移除'}依赖：${task.name}`);
                         }
                     }
@@ -140,18 +188,22 @@
 
             // 鼠标按下：开始拖拽或调整大小
             bar.onmousedown = (e) => {
+                // ⭐ 里程碑和汇总任务不可拖拽
+                if (task && (task.isMilestone || task.isSummary)) {
+                    addLog(`⚠️ ${task.isMilestone ? '里程碑' : '汇总任务'}不可拖拽，时间${task.isSummary ? '由子任务自动计算' : '固定为0'}`);
+                    return;
+                }
+                
                 const target = e.target;
                 
                 // 如果点击的是调整手柄
                 if (target.classList.contains('gantt-bar-handle')) {
                     if (!this.options.enableResize) return;
                     const isRight = target.classList.contains('right');
-                    const task = this.tasks.find(t => t.id === taskId);
                     this.startResize(e, task, bar, isRight);
                 } else {
                     // 点击任务条主体，开始拖拽
                     if (!this.options.enableEdit) return;
-                    const task = this.tasks.find(t => t.id === taskId);
                     this.startDrag(e, task, bar);
                 }
                 e.preventDefault();
@@ -173,7 +225,7 @@
         if (timelineWrapper) {
             timelineWrapper.addEventListener('click', (e) => {
                 // 如果点击的不是任务条、手柄、表单或标签，则取消选择
-                if (!e.target.closest('.gantt-bar, .gantt-bar-handle, .inline-task-form, .gantt-bar-label-external, .gantt-bar-label-start')) {
+                if (!e.target.closest('.gantt-bar, .gantt-milestone, .gantt-bar-handle, .inline-task-form, .gantt-bar-label-external, .gantt-bar-label-start')) {
                     this.deselect();
                 }
             });
@@ -232,13 +284,33 @@
             }
             
             // 恢复显示
-            element.textContent = task.name;
+            const indent = '　'.repeat((task.outlineLevel || 1) - 1);
+            const icon = task.isMilestone ? '🎯' : task.isSummary ? '📁' : '📋';
+            const wbsPrefix = task.wbs ? `<span class="wbs-badge">[${task.wbs}]</span> ` : '';
+            
+            // ⭐ 重新生成折叠按钮
+            const collapseBtn = task.isSummary && task.children && task.children.length > 0 ? 
+                `<span class="task-collapse-btn" data-task-id="${task.id}">${task.isCollapsed ? '▶' : '▼'}</span>` : '';
+            
+            element.innerHTML = `${collapseBtn}<span class="task-name-content">${indent}${icon} ${wbsPrefix}${task.name}</span>`;
             element.classList.remove('editing');
+            
+            // ⭐ 重新绑定折叠按钮事件
+            const newCollapseBtn = element.querySelector('.task-collapse-btn');
+            if (newCollapseBtn) {
+                newCollapseBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    this.toggleTaskCollapse(task.id);
+                };
+            }
             
             // 更新外部标签
             const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${taskId}"]`);
             if (externalLabel) {
-                externalLabel.textContent = `${task.name} (${task.progress || 0}%)`;
+                const displayName = `${indent}${icon} ${task.wbs ? '[' + task.wbs + '] ' : ''}${task.name}`;
+                const progressBadge = !task.isMilestone ? `<span class="task-progress-badge">${task.progress || 0}%</span>` : '';
+                externalLabel.innerHTML = `${displayName} ${progressBadge}`;
             }
         };
 
@@ -261,6 +333,6 @@
         input.onclick = (e) => e.stopPropagation();
     };
 
-    console.log('✅ gantt-events-binding.js loaded successfully (Delta8 - 完整版)');
+    console.log('✅ gantt-events-binding.js loaded successfully (Epsilon4 - 层级任务支持)');
 
 })();
