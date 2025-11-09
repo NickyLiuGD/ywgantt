@@ -41,13 +41,25 @@
         };
     }
 
-    // 导出文件
+    // ==================== 导出文件（增强版） ====================
     const saveDataBtn = document.getElementById('saveData');
     if (saveDataBtn) {
         saveDataBtn.onclick = () => {
-            const filename = `gantt-${formatDate(new Date()).replace(/-/g, '')}.json`;
-            downloadJSON(gantt.tasks, filename);
-            addLog(`✅ 已导出文件：${filename}`);
+            const exportType = confirm('是否导出为JSON模板格式？\n\n点击"确定"导出模板格式（包含项目信息）\n点击"取消"导出简单格式（仅任务数据）');
+            
+            if (exportType) {
+                // 导出为JSON模板格式
+                const baseDate = new Date();
+                const jsonData = convertTasksToJSON(gantt.tasks, baseDate);
+                const filename = `gantt-template-${formatDate(baseDate).replace(/-/g, '')}.json`;
+                downloadJSON(jsonData, filename);
+                addLog(`✅ 已导出JSON模板：${filename}`);
+            } else {
+                // 导出为简单格式
+                const filename = `gantt-${formatDate(new Date()).replace(/-/g, '')}.json`;
+                downloadJSON(gantt.tasks, filename);
+                addLog(`✅ 已导出文件：${filename}`);
+            }
         };
     }
 
