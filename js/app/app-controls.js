@@ -41,25 +41,81 @@
         };
     }
 
-    // ==================== 导出文件（增强版） ====================
+    // ==================== 导出文件（支持模板格式） ====================
     const saveDataBtn = document.getElementById('saveData');
     if (saveDataBtn) {
         saveDataBtn.onclick = () => {
-            const exportType = confirm('是否导出为JSON模板格式？\n\n点击"确定"导出模板格式（包含项目信息）\n点击"取消"导出简单格式（仅任务数据）');
+            // 询问导出格式
+            const exportTemplate = confirm(
+                '选择导出格式：\n\n' +
+                '✅ 确定 → JSON模板格式（包含项目信息，使用时间偏移）\n' +
+                '❌ 取消 → 简单格式（仅任务数据，绝对日期）'
+            );
             
-            if (exportType) {
+            const timestamp = formatDate(new Date()).replace(/-/g, '');
+            
+            if (exportTemplate) {
                 // 导出为JSON模板格式
                 const baseDate = new Date();
-                const jsonData = convertTasksToJSON(gantt.tasks, baseDate);
-                const filename = `gantt-template-${formatDate(baseDate).replace(/-/g, '')}.json`;
+                const jsonData = convertTasksToTemplate(gantt.tasks, baseDate);
+                const filename = `gantt-template-${timestamp}.json`;
                 downloadJSON(jsonData, filename);
                 addLog(`✅ 已导出JSON模板：${filename}`);
             } else {
                 // 导出为简单格式
-                const filename = `gantt-${formatDate(new Date()).replace(/-/g, '')}.json`;
+                const filename = `gantt-${timestamp}.json`;
                 downloadJSON(gantt.tasks, filename);
-                addLog(`✅ 已导出文件：${filename}`);
+                addLog(`✅ 已导出简单格式：${filename}`);
             }
+        };
+    }
+
+    /**
+     * 将任务转换为JSON模板格式
+     */
+    function convertTasksToTemplate(tasks, baseDate) {
+        const idToUidMap = {};
+        
+        const jsonTasks = tasks.map(task => {
+            idToUidMap[task.id] = task.uid;
+            
+            const startDate = new Date(task.start);
+            const startOffset = daysBetween(baseDate, startDate);
+            
+            return {
+                uid: task.uid,
+                name: task.name,
+                startOffset: startOffset,
+                duration: task.duration || 0,
+                progress: task.progress || 0,
+                isMilestone: task.isMilestone || false,
+                isSummary: task.isSummary || false,
+                parentId: task.parentId ? `temp-parent-${idToUidMap[task.parentId]}` : null,
+                children: (task.children || []).map(cid => `temp-child-${idToUidMap[cid]}`),
+                outlineLevel: task.outlineLevel || 1,
+                wbs: task.wbs || '',
+                priority: task.priority || 'medium',
+                notes: task.notes || '',
+                isCollapsed: task.isCollapsed || false,
+                dependencies: (task.dependencies || []).map(dep => {
+                    const depId = typeof dep === 'string' ? dep : dep.taskId;
+                    return {
+                        taskUid: idToUidMap[depId],
+                        type: dep.type || 'FS',
+                        lag: dep.lag || 0
+                    };
+                })
+            };
+        });
+        
+        return {
+            project: {
+                name: "导出的项目",
+                version: "1.0",
+                description: `导出于 ${formatDate(baseDate)}`,
+                createdDate: new Date().toISOString()
+            },
+            tasks: jsonTasks
         };
     }
 

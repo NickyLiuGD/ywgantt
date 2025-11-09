@@ -2,27 +2,17 @@
   "project": {
     "name": "在线甘特图示例项目",
     "version": "1.0",
-    "description": "演示项目，包含普通任务、里程碑、汇总任务等",
-    "createdDate": "2025-01-10T10:00:00",
-    "author": "Gantt Team"
+    "description": "演示里程碑、汇总任务、层级结构等功能"
   },
   "tasks": [
     {
       "uid": 1,
-      "name": "网站设计",
+      "name": "网站界面设计",
       "startOffset": -5,
       "duration": 8,
       "progress": 65,
-      "isMilestone": false,
-      "isSummary": false,
-      "parentId": null,
-      "children": [],
-      "outlineLevel": 1,
-      "wbs": "1",
       "priority": "high",
-      "notes": "使用 Figma 完成所有页面的 UI 设计",
-      "isCollapsed": false,
-      "dependencies": []
+      "notes": "使用 Figma 完成所有页面的 UI 设计"
     },
     {
       "uid": 2,
@@ -30,16 +20,7 @@
       "startOffset": 3,
       "duration": 8,
       "progress": 30,
-      "isMilestone": false,
-      "isSummary": false,
-      "parentId": null,
-      "children": [],
-      "outlineLevel": 1,
-      "wbs": "2",
-      "priority": "medium",
-      "notes": "编写网站文案和产品说明文档",
-      "isCollapsed": false,
-      "dependencies": []
+      "notes": "编写网站文案和产品说明文档"
     },
     {
       "uid": 3,
@@ -47,16 +28,7 @@
       "startOffset": 5,
       "duration": 4,
       "progress": 45,
-      "isMilestone": false,
-      "isSummary": false,
-      "parentId": null,
-      "children": [],
-      "outlineLevel": 1,
-      "wbs": "3",
-      "priority": "medium",
-      "notes": "CSS 样式开发和响应式适配",
-      "isCollapsed": false,
-      "dependencies": []
+      "notes": "CSS 样式开发和响应式适配"
     },
     {
       "uid": 4,
@@ -64,33 +36,17 @@
       "startOffset": -2,
       "duration": 4,
       "progress": 80,
-      "isMilestone": false,
-      "isSummary": false,
-      "parentId": null,
-      "children": [],
-      "outlineLevel": 1,
-      "wbs": "4",
       "priority": "high",
-      "notes": "功能测试、性能测试、安全测试",
-      "isCollapsed": false,
-      "dependencies": []
+      "notes": "功能测试、性能测试、安全测试"
     },
     {
       "uid": 5,
       "name": "项目上线",
       "startOffset": 12,
       "duration": 0,
-      "progress": 100,
       "isMilestone": true,
-      "isSummary": false,
-      "parentId": null,
-      "children": [],
-      "outlineLevel": 1,
-      "wbs": "5",
       "priority": "high",
-      "notes": "项目正式上线，发布到生产环境",
-      "isCollapsed": false,
-      "dependencies": []
+      "notes": "项目正式上线，发布到生产环境"
     }
   ]
 }
