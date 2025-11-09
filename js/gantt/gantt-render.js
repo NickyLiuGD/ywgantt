@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Delta8 - 添加项目全貌视图按钮                            ▓▓
+// ▓▓ 版本: Epsilon5 - 支持里程碑/汇总任务/层级显示                  ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -40,7 +40,7 @@
                                 ${this.renderDateHeaders(dates, weekdays)}
                             </div>
                             
-                            <!-- ⭐ 时间轴视图切换菜单 -->
+                            <!-- 时间轴视图切换菜单 -->
                             <div class="timeline-view-menu" id="timelineViewMenu">
                                 <div class="view-menu-title">时间刻度</div>
                                 <button class="view-menu-btn ${this.options.timeScale === 'day' && !this.options.isOverviewMode ? 'active' : ''}" 
@@ -59,10 +59,8 @@
                                     <span class="view-text">月视图</span>
                                 </button>
                                 
-                                <!-- ⭐ 分隔线 -->
                                 <div class="view-menu-divider"></div>
                                 
-                                <!-- ⭐ 新增：项目全貌视图 -->
                                 <button class="view-menu-btn view-menu-overview ${this.options.isOverviewMode ? 'active' : ''}" 
                                         data-scale="overview" title="自适应显示整个项目">
                                     <span class="view-icon">🔭</span>
@@ -96,7 +94,6 @@
         this.attachEvents();
         this.attachQuickMenus();
         
-        // 延迟绑定时间轴菜单事件，确保 DOM 已完全生成
         setTimeout(() => {
             this.attachTimelineViewMenu();
         }, 100);
@@ -105,26 +102,50 @@
     };
 
     /**
-     * 渲染任务名称列表
-     * @returns {string} HTML字符串
+     * 渲染任务名称列表（⭐ 支持层级和折叠）
      */
     GanttChart.prototype.renderTaskNames = function() {
-        return this.tasks.map(task => `
-            <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''}" 
-                 data-task-id="${task.id}"
-                 role="button"
-                 tabindex="0"
-                 aria-label="任务: ${this.escapeHtml(task.name)}">
-                ${this.escapeHtml(task.name)}
-            </div>
-        `).join('');
+        return this.tasks.map(task => {
+            if (!task || !task.id) return '';
+            
+            // 跳过折叠的子任务
+            if (task.parentId) {
+                const parent = this.tasks.find(t => t.id === task.parentId);
+                if (parent && parent.isCollapsed) {
+                    return '';
+                }
+            }
+
+            const outlineLevel = task.outlineLevel || 1;
+            const indent = '　'.repeat(outlineLevel - 1);
+            const icon = task.isMilestone ? '🎯' : (task.isSummary ? '📁' : '📋');
+            const wbsPrefix = task.wbs ? `<span class="wbs-badge">[${task.wbs}]</span> ` : '';
+            
+            const collapseBtn = (task.isSummary && task.children && task.children.length > 0) ? 
+                `<span class="task-collapse-btn" data-task-id="${task.id}" title="${task.isCollapsed ? '展开' : '折叠'}子任务">
+                    ${task.isCollapsed ? '▶' : '▼'}
+                </span>` : '';
+
+            return `
+                <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''} 
+                            ${task.isSummary ? 'summary-task' : ''} 
+                            ${task.isMilestone ? 'milestone-task' : ''}" 
+                     data-task-id="${task.id}"
+                     data-outline-level="${outlineLevel}"
+                     role="button"
+                     tabindex="0"
+                     aria-label="任务: ${this.escapeHtml(task.name)}">
+                    ${collapseBtn}
+                    <span class="task-name-content">
+                        ${indent}${icon} ${wbsPrefix}${this.escapeHtml(task.name)}
+                    </span>
+                </div>
+            `;
+        }).join('');
     };
 
     /**
      * 渲染日期表头（支持不同时间刻度）
-     * @param {Array<Object>} dates - 日期对象数组
-     * @param {Array<string>} weekdays - 星期名称数组
-     * @returns {string} HTML字符串
      */
     GanttChart.prototype.renderDateHeaders = function(dates, weekdays) {
         const scale = this.options.timeScale || 'day';
@@ -178,12 +199,20 @@
         }).join('');
     };
 
-/**
- * 渲染任务名称列表（支持层级和折叠）
- */
-GanttChart.prototype.renderTaskNames = function() {
-    return this.tasks.map(task => {
-        // ⭐ 跳过折叠的子任务
+    /**
+     * 渲染所有任务行
+     */
+    GanttChart.prototype.renderTaskRows = function(dates) {
+        return this.tasks.map(task => this.renderRow(task, dates)).join('');
+    };
+
+    /**
+     * 渲染单个任务行（⭐ 支持里程碑和汇总任务）
+     */
+    GanttChart.prototype.renderRow = function(task, dates) {
+        if (!task || !task.id) return '';
+        
+        // 跳过折叠的子任务
         if (task.parentId) {
             const parent = this.tasks.find(t => t.id === task.parentId);
             if (parent && parent.isCollapsed) {
@@ -191,134 +220,107 @@ GanttChart.prototype.renderTaskNames = function() {
             }
         }
 
-        const indent = '　'.repeat((task.outlineLevel || 1) - 1);
-        const icon = task.isMilestone ? '🎯' : task.isSummary ? '📁' : '📋';
-        const wbsPrefix = task.wbs ? `<span class="wbs-badge">[${task.wbs}]</span> ` : '';
+        const start = new Date(task.start);
+        const end = new Date(task.end || task.start);
         
-        // ⭐ 折叠/展开按钮
-        const collapseBtn = task.isSummary && task.children && task.children.length > 0 ? 
-            `<span class="task-collapse-btn" data-task-id="${task.id}" title="${task.isCollapsed ? '展开' : '折叠'}子任务">
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            console.warn(`Invalid date for task: ${task.name}`);
+            return '';
+        }
+        
+        const progress = Math.min(Math.max(task.progress || 0, 0), 100);
+        const isSelected = this.selectedTask === task.id;
+        
+        const startDays = daysBetween(this.startDate, start);
+        const durationDays = daysBetween(start, end) + 1;
+        
+        const left = startDays * this.options.cellWidth;
+        const width = Math.max(durationDays * this.options.cellWidth, task.isMilestone ? 20 : 30);
+
+        const startTimeLabel = formatDate(start);
+        const endTimeLabel = formatDate(end);
+
+        // 任务名称显示
+        const outlineLevel = task.outlineLevel || 1;
+        const indent = '　'.repeat(outlineLevel - 1);
+        const icon = task.isMilestone ? '🎯' : (task.isSummary ? '📁' : '📋');
+        const wbsPrefix = task.wbs ? `[${task.wbs}] ` : '';
+        const displayName = `${indent}${icon} ${wbsPrefix}${task.name}`;
+
+        // 优先级标记
+        const priorityAttr = task.priority ? `data-priority="${task.priority}"` : '';
+
+        // 折叠按钮（仅汇总任务）
+        const collapseToggle = (task.isSummary && task.children && task.children.length > 0) ? 
+            `<span class="collapse-toggle" data-task-id="${task.id}" title="${task.isCollapsed ? '展开' : '折叠'}子任务">
                 ${task.isCollapsed ? '▶' : '▼'}
             </span>` : '';
 
         return `
-            <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''} 
-                        ${task.isSummary ? 'summary-task' : ''} 
-                        ${task.isMilestone ? 'milestone-task' : ''}" 
-                 data-task-id="${task.id}"
-                 data-outline-level="${task.outlineLevel || 1}"
-                 role="button"
-                 tabindex="0"
-                 aria-label="任务: ${this.escapeHtml(task.name)}">
-                ${collapseBtn}
-                <span class="task-name-content">
-                    ${indent}${icon} ${wbsPrefix}${this.escapeHtml(task.name)}
-                </span>
-            </div>
-        `;
-    }).join('');
-};
-
-/**
- * 渲染单个任务行（支持里程碑和汇总任务）
- */
-GanttChart.prototype.renderRow = function(task, dates) {
-    // ⭐ 跳过折叠的子任务
-    if (task.parentId) {
-        const parent = this.tasks.find(t => t.id === task.parentId);
-        if (parent && parent.isCollapsed) {
-            return '';
-        }
-    }
-
-    const start = new Date(task.start);
-    const end = new Date(task.end || task.start);
-    
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        console.warn(`Invalid date for task: ${task.name}`);
-        return '';
-    }
-    
-    const progress = Math.min(Math.max(task.progress || 0, 0), 100);
-    const isSelected = this.selectedTask === task.id;
-    
-    const startDays = daysBetween(this.startDate, start);
-    const durationDays = daysBetween(start, end) + 1;
-    
-    const left = startDays * this.options.cellWidth;
-    const width = Math.max(durationDays * this.options.cellWidth, task.isMilestone ? 20 : 30);
-
-    const startTimeLabel = formatDate(start);
-    const endTimeLabel = formatDate(end);
-
-    // 任务名称显示
-    const indent = '　'.repeat((task.outlineLevel || 1) - 1);
-    const icon = task.isMilestone ? '🎯' : task.isSummary ? '📁' : '📋';
-    const wbsPrefix = task.wbs ? `[${task.wbs}] ` : '';
-    const displayName = `${indent}${icon} ${wbsPrefix}${task.name}`;
-
-    // 优先级标记
-    const priorityAttr = task.priority ? `data-priority="${task.priority}"` : '';
-
-    return `
-        <div class="gantt-row ${task.isSummary ? 'gantt-row-summary' : ''}" 
-             role="row" 
-             aria-label="任务行: ${this.escapeHtml(task.name)}">
-            ${this.renderCells(dates)}
-            
-            <!-- 左侧时间标签 -->
-            <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
-                 data-task-id="${task.id}"
-                 style="right: calc(100% - ${left}px + 8px);"
-                 role="button"
-                 tabindex="0">
-                <div class="time-label-row time-start">${this.escapeHtml(startTimeLabel)}</div>
-                <div class="time-label-row time-end">${this.escapeHtml(endTimeLabel)}</div>
-            </div>
-            
-            ${task.isMilestone ? `
-                <!-- ⭐ 里程碑菱形 -->
-                <div class="gantt-milestone ${isSelected ? 'selected' : ''}" 
+            <div class="gantt-row ${task.isSummary ? 'gantt-row-summary' : ''}" 
+                 role="row" 
+                 aria-label="任务行: ${this.escapeHtml(task.name)}">
+                ${this.renderCells(dates)}
+                
+                <!-- 左侧双层时间标签 -->
+                <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
                      data-task-id="${task.id}"
-                     style="left: ${left}px;"
+                     style="right: calc(100% - ${left}px + 8px);"
                      role="button"
                      tabindex="0"
-                     title="${this.escapeHtml(task.name)}">
-                    <div class="milestone-diamond">
-                        <span class="milestone-icon">🎯</span>
+                     aria-label="时间范围: ${startTimeLabel} 至 ${endTimeLabel}">
+                    <div class="time-label-row time-start" title="开始时间">
+                        ${this.escapeHtml(startTimeLabel)}
+                    </div>
+                    <div class="time-label-row time-end" title="结束时间">
+                        ${this.escapeHtml(endTimeLabel)}
                     </div>
                 </div>
-            ` : `
-                <!-- 普通任务条/汇总任务条 -->
-                <div class="gantt-bar ${task.isSummary ? 'gantt-bar-summary' : ''} ${isSelected ? 'selected' : ''}" 
+                
+                ${task.isMilestone ? `
+                    <!-- ⭐ 里程碑菱形 -->
+                    <div class="gantt-milestone ${isSelected ? 'selected' : ''}" 
+                         data-task-id="${task.id}"
+                         style="left: ${left}px;"
+                         role="button"
+                         tabindex="0"
+                         title="${this.escapeHtml(task.name)}">
+                        <div class="milestone-diamond">
+                            <span class="milestone-icon">🎯</span>
+                        </div>
+                    </div>
+                ` : `
+                    <!-- 任务条（普通/汇总） -->
+                    <div class="gantt-bar ${task.isSummary ? 'gantt-bar-summary' : ''} ${isSelected ? 'selected' : ''}" 
+                         data-task-id="${task.id}"
+                         ${priorityAttr}
+                         style="left: ${left}px; width: ${width}px;"
+                         role="button"
+                         tabindex="0"
+                         aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
+                        <div class="gantt-bar-progress" style="width: ${progress}%" aria-hidden="true"></div>
+                        ${this.options.enableResize && !task.isSummary ? '<div class="gantt-bar-handle left" role="button" aria-label="调整开始日期"></div>' : ''}
+                        ${this.options.enableResize && !task.isSummary ? '<div class="gantt-bar-handle right" role="button" aria-label="调整结束日期"></div>' : ''}
+                    </div>
+                `}
+                
+                <!-- 右侧任务名称标签 -->
+                <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
                      data-task-id="${task.id}"
-                     ${priorityAttr}
-                     style="left: ${left}px; width: ${width}px;"
+                     style="left: ${left + width + 8}px;"
                      role="button"
-                     tabindex="0">
-                    <div class="gantt-bar-progress" style="width: ${progress}%" aria-hidden="true"></div>
-                    ${this.options.enableResize && !task.isSummary ? '<div class="gantt-bar-handle left" role="button"></div>' : ''}
-                    ${this.options.enableResize && !task.isSummary ? '<div class="gantt-bar-handle right" role="button"></div>' : ''}
+                     tabindex="0"
+                     aria-label="任务标签: ${this.escapeHtml(task.name)}">
+                    ${this.escapeHtml(displayName)} 
+                    ${!task.isMilestone ? `<span class="task-progress-badge">${progress}%</span>` : ''}
+                    ${collapseToggle}
                 </div>
-            `}
-            
-            <!-- 右侧任务名称标签 -->
-            <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
-                 data-task-id="${task.id}"
-                 style="left: ${left + width + 8}px;"
-                 role="button"
-                 tabindex="0">
-                ${this.escapeHtml(displayName)} 
-                ${!task.isMilestone ? `<span class="task-progress-badge">${progress}%</span>` : ''}
             </div>
-        </div>
-    `;
-};
+        `;
+    };
 
     /**
      * 渲染单元格
-     * @param {Array<Object>} dates - 日期对象数组
-     * @returns {string} HTML字符串
      */
     GanttChart.prototype.renderCells = function(dates) {
         const scale = this.options.timeScale || 'day';
@@ -383,7 +385,7 @@ GanttChart.prototype.renderRow = function(task, dates) {
     };
 
     /**
-     * 绑定时间轴视图切换菜单事件（支持全貌视图）
+     * 绑定时间轴视图切换菜单事件
      */
     GanttChart.prototype.attachTimelineViewMenu = function() {
         const headerWrapper = document.getElementById('ganttTimelineHeaderWrapper');
@@ -396,7 +398,6 @@ GanttChart.prototype.renderRow = function(task, dates) {
 
         let menuTimer = null;
 
-        // 鼠标进入时间轴表头区域：显示菜单
         headerWrapper.addEventListener('mouseenter', (e) => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
@@ -404,7 +405,6 @@ GanttChart.prototype.renderRow = function(task, dates) {
             }, 300);
         });
 
-        // 鼠标离开时间轴表头区域：延迟隐藏菜单
         headerWrapper.addEventListener('mouseleave', (e) => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
@@ -414,29 +414,24 @@ GanttChart.prototype.renderRow = function(task, dates) {
             }, 200);
         });
 
-        // 鼠标进入菜单：保持显示
         viewMenu.addEventListener('mouseenter', () => {
             clearTimeout(menuTimer);
         });
 
-        // 鼠标离开菜单：隐藏
         viewMenu.addEventListener('mouseleave', () => {
             menuTimer = setTimeout(() => {
                 viewMenu.classList.remove('show');
             }, 200);
         });
 
-        // 菜单按钮点击事件
         viewMenu.querySelectorAll('.view-menu-btn').forEach(btn => {
             btn.onclick = (e) => {
                 e.stopPropagation();
                 const scale = btn.dataset.scale;
                 
-                // ⭐ 判断是否为全貌视图
                 if (scale === 'overview') {
                     this.switchToOverviewMode();
                 } else {
-                    // 普通视图切换
                     this.options.isOverviewMode = false;
                     this.options.timeScale = scale;
                     this.options.cellWidth = getRecommendedCellWidth(scale);
@@ -447,14 +442,13 @@ GanttChart.prototype.renderRow = function(task, dates) {
                     addLog(`✅ 已切换到${scaleNames[scale]}视图`);
                 }
                 
-                // 隐藏菜单
                 viewMenu.classList.remove('show');
             };
         });
 
-        console.log('✅ 时间轴视图菜单事件已绑定（支持全貌视图）');
+        console.log('✅ 时间轴视图菜单事件已绑定');
     };
 
-    console.log('✅ gantt-render.js loaded successfully (Delta8 - 全貌视图)');
+    console.log('✅ gantt-render.js loaded successfully (Epsilon5 - 层级任务支持)');
 
 })();

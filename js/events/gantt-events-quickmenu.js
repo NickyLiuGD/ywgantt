@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图快捷菜单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-quickmenu.js                      ▓▓
-// ▓▓ 版本: Delta6 - 新任务下方添加并自动打开编辑                    ▓▓
+// ▓▓ 版本: Epsilon5 - 兼容层级任务                                  ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -27,21 +27,17 @@
 
     /**
      * 为元素添加快捷菜单
-     * @param {HTMLElement} element - 目标元素
-     * @param {string} position - 菜单位置 ('left' 或 'right')
      */
     GanttChart.prototype.addQuickMenuToElement = function(element, position) {
         const taskId = element.dataset.taskId;
         
-        // 鼠标进入：延迟显示菜单
         element.addEventListener('mouseenter', (e) => {
             clearTimeout(quickMenuTimer);
             quickMenuTimer = setTimeout(() => {
                 this.showQuickMenu(element, taskId, position);
-            }, 300); // 300ms 延迟，避免误触发
+            }, 300);
         });
 
-        // 鼠标离开：延迟隐藏菜单
         element.addEventListener('mouseleave', (e) => {
             clearTimeout(quickMenuTimer);
             quickMenuTimer = setTimeout(() => {
@@ -54,18 +50,13 @@
 
     /**
      * 显示快捷菜单
-     * @param {HTMLElement} targetElement - 目标元素
-     * @param {string} taskId - 任务ID
-     * @param {string} position - 菜单位置
      */
     GanttChart.prototype.showQuickMenu = function(targetElement, taskId, position) {
-        // 移除旧菜单
         this.hideQuickMenu();
 
         const task = this.tasks.find(t => t.id === taskId);
         if (!task) return;
 
-        // 创建菜单
         const menu = document.createElement('div');
         menu.className = 'quick-menu';
         menu.dataset.taskId = taskId;
@@ -82,13 +73,11 @@
             </button>
         `;
 
-        // 定位菜单
         document.body.appendChild(menu);
         this.positionQuickMenu(menu, targetElement, position);
         
         currentQuickMenu = menu;
 
-        // 绑定菜单按钮事件
         menu.querySelectorAll('.quick-menu-btn').forEach(btn => {
             btn.onclick = (e) => {
                 e.stopPropagation();
@@ -98,7 +87,6 @@
             };
         });
 
-        // 鼠标离开菜单时隐藏
         menu.addEventListener('mouseleave', () => {
             quickMenuTimer = setTimeout(() => {
                 if (!targetElement.matches(':hover')) {
@@ -107,12 +95,10 @@
             }, 200);
         });
 
-        // 鼠标进入菜单时取消隐藏
         menu.addEventListener('mouseenter', () => {
             clearTimeout(quickMenuTimer);
         });
 
-        // 添加淡入动画
         requestAnimationFrame(() => {
             menu.classList.add('show');
         });
@@ -120,33 +106,27 @@
 
     /**
      * 定位快捷菜单
-     * @param {HTMLElement} menu - 菜单元素
-     * @param {HTMLElement} target - 目标元素
-     * @param {string} position - 位置 ('left' 或 'right')
      */
     GanttChart.prototype.positionQuickMenu = function(menu, target, position) {
         const rect = target.getBoundingClientRect();
-        const menuWidth = 140; // 菜单宽度
-        const menuHeight = 44; // 菜单高度
+        const menuWidth = 140;
+        const menuHeight = 44;
         
         let left, top;
         
         if (position === 'left') {
-            // 左侧任务名称：菜单显示在右侧
             left = rect.right + 8;
             top = rect.top + (rect.height - menuHeight) / 2;
         } else {
-            // 右侧标签：菜单显示在右侧
             left = rect.right + 8;
             top = rect.top + (rect.height - menuHeight) / 2;
         }
         
-        // 防止菜单超出视口
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         
         if (left + menuWidth > viewportWidth) {
-            left = rect.left - menuWidth - 8; // 显示在左侧
+            left = rect.left - menuWidth - 8;
         }
         
         if (top + menuHeight > viewportHeight) {
@@ -178,8 +158,6 @@
 
     /**
      * 处理快捷菜单操作
-     * @param {string} action - 操作类型 ('add'/'edit'/'delete')
-     * @param {string} taskId - 任务ID
      */
     GanttChart.prototype.handleQuickMenuAction = function(action, taskId) {
         const task = this.tasks.find(t => t.id === taskId);
@@ -187,25 +165,44 @@
 
         switch (action) {
             case 'add':
-                // ⭐ 在当前任务下方添加新任务
+                // 在当前任务下方添加新任务（同级）
                 const currentIndex = this.tasks.findIndex(t => t.id === taskId);
                 
                 const newTask = {
                     id: generateId(),
+                    uid: this.getNextUID(),
                     name: '新任务',
-                    start: formatDate(addDays(new Date(task.end), 1)), // 在当前任务结束后的次日开始
-                    end: formatDate(addDays(new Date(task.end), 4)),   // 默认3天工期
+                    start: formatDate(addDays(new Date(task.end), 1)),
+                    end: formatDate(addDays(new Date(task.end), 4)),
+                    duration: 4,
                     progress: 0,
-                    dependencies: [taskId] // 自动依赖当前任务
+                    isMilestone: false,
+                    isSummary: false,
+                    parentId: task.parentId,  // ⭐ 继承父任务
+                    children: [],
+                    outlineLevel: task.outlineLevel || 1,  // ⭐ 继承层级
+                    wbs: '',
+                    priority: 'medium',
+                    notes: '',
+                    isCollapsed: false,
+                    dependencies: [{taskId: taskId, type: 'FS', lag: 0}]
                 };
                 
-                // ⭐ 插入到当前任务的下一个位置
                 this.tasks.splice(currentIndex + 1, 0, newTask);
                 
+                // ⭐ 如果有父任务，添加到父任务的子任务列表
+                if (task.parentId) {
+                    const parent = this.tasks.find(t => t.id === task.parentId);
+                    if (parent) {
+                        if (!parent.children) parent.children = [];
+                        parent.children.push(newTask.id);
+                    }
+                }
+                
+                newTask.wbs = this.generateWBS(newTask.id);
                 this.calculateDateRange();
                 this.render();
                 
-                // ⭐ 选中新任务并自动打开编辑表单
                 setTimeout(() => {
                     this.selectTask(newTask.id);
                     this.showInlineTaskForm(newTask);
@@ -214,16 +211,19 @@
                 break;
 
             case 'edit':
-                // 编辑任务
                 this.selectTask(taskId);
                 this.showInlineTaskForm(task);
                 addLog(`✏️ 编辑任务 "${task.name}"`);
                 break;
 
             case 'delete':
-                // 删除任务（带确认）
-                if (confirm(`确定删除任务 "${task.name}"?\n\n注意：其他依赖此任务的任务将失去该依赖关系。`)) {
-                    this.deleteTask(taskId);
+                const childrenCount = task.children ? task.children.length : 0;
+                const warningMsg = childrenCount > 0 ? 
+                    `\n\n⚠️ 此任务包含 ${childrenCount} 个子任务，将一并删除！` : 
+                    '\n\n注意：其他依赖此任务的任务将失去该依赖关系。';
+                
+                if (confirm(`确定删除任务 "${task.name}"?${warningMsg}`)) {
+                    this.deleteTaskWithChildren(taskId);
                     addLog(`✅ 已删除任务 "${task.name}"`);
                 }
                 break;
@@ -231,9 +231,7 @@
     };
 
     /**
-     * 在指定位置插入任务（新增方法）
-     * @param {Object} task - 任务对象
-     * @param {number} index - 插入位置索引
+     * 在指定位置插入任务
      */
     GanttChart.prototype.insertTaskAt = function(task, index) {
         if (!task || typeof task !== 'object') {
@@ -241,24 +239,34 @@
             return;
         }
 
-        // 确保任务有必要的属性
+        // ⭐ 确保所有必需字段
         if (!task.id) task.id = generateId();
+        if (!task.uid) task.uid = this.getNextUID();
         if (!task.name) task.name = '新任务';
         if (!task.start) task.start = formatDate(new Date());
         if (!task.end) task.end = formatDate(addDays(new Date(), 3));
+        if (typeof task.duration !== 'number') task.duration = 4;
         if (typeof task.progress !== 'number') task.progress = 0;
         if (!Array.isArray(task.dependencies)) task.dependencies = [];
+        if (typeof task.isMilestone !== 'boolean') task.isMilestone = false;
+        if (typeof task.isSummary !== 'boolean') task.isSummary = false;
+        if (task.parentId === undefined) task.parentId = null;
+        if (!Array.isArray(task.children)) task.children = [];
+        if (!task.outlineLevel) task.outlineLevel = 1;
+        if (!task.priority) task.priority = 'medium';
+        if (task.notes === undefined) task.notes = '';
+        if (typeof task.isCollapsed !== 'boolean') task.isCollapsed = false;
 
-        // 插入到指定位置
         const insertIndex = Math.max(0, Math.min(index, this.tasks.length));
         this.tasks.splice(insertIndex, 0, task);
         
+        task.wbs = this.generateWBS(task.id);
         this.calculateDateRange();
         this.render();
         
         return task;
     };
 
-    console.log('✅ gantt-events-quickmenu.js loaded successfully (Delta6 - 下方添加并自动编辑)');
+    console.log('✅ gantt-events-quickmenu.js loaded successfully (Epsilon5)');
 
 })();

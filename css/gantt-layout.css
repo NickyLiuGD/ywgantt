@@ -1,7 +1,7 @@
 /**
  * 甘特图布局样式
  * 路径: css/gantt-layout.css
- * 版本: Epsilon4
+ * 版本: Epsilon5 - 完整版
  * 包含: 容器、侧边栏、时间轴、行列布局、层级样式
  */
 
@@ -94,7 +94,7 @@
     overflow-x: hidden;
 }
 
-/* ⭐ 任务名称基础样式 */
+/* 任务名称基础样式 */
 .gantt-task-name {
     padding: 10px 8px;
     border-bottom: 1px solid var(--gray-300);
@@ -176,6 +176,20 @@
     font-weight: normal;
 }
 
+.gantt-task-name[data-outline-level="5"] {
+    padding-left: 100px;
+    font-size: 0.7rem;
+    color: #ced4da;
+}
+
+.gantt-task-name[data-outline-level="5"]::before {
+    content: '│ │ │ ├─';
+    position: absolute;
+    left: 10px;
+    color: #dee2e6;
+    font-weight: normal;
+}
+
 /* ⭐ 汇总任务名称特殊样式 */
 .gantt-task-name.summary-task {
     background: linear-gradient(to right, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
@@ -233,6 +247,32 @@
     transform: translateX(2px);
 }
 
+/* ⭐ 折叠/展开按钮 */
+.task-collapse-btn {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    line-height: 16px;
+    text-align: center;
+    margin-right: 6px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    transition: all 0.2s ease;
+    vertical-align: middle;
+    font-weight: bold;
+}
+
+.task-collapse-btn:hover {
+    background: rgba(102, 126, 234, 0.25);
+    transform: scale(1.15);
+}
+
+.task-collapse-btn:active {
+    transform: scale(0.95);
+}
+
 /* 侧边栏折叠按钮 */
 .sidebar-toggle-btn {
     position: absolute;
@@ -287,6 +327,7 @@
     height: 100%;
 }
 
+/* 时间轴表头包装器 */
 .gantt-timeline-header-wrapper {
     position: relative;
     height: var(--header-height);
@@ -307,6 +348,7 @@
     background: rgba(102, 126, 234, 0.05);
 }
 
+/* 悬停提示 */
 .gantt-timeline-header-wrapper::after {
     content: '悬停切换视图 ↓';
     position: absolute;
@@ -325,6 +367,7 @@
     opacity: 1;
 }
 
+/* 行容器 */
 .gantt-rows-container {
     flex: 1;
     overflow-y: auto;
@@ -379,6 +422,7 @@
     color: var(--gray-500);
 }
 
+/* 周视图样式 */
 .gantt-date-week {
     font-weight: 600;
     font-size: 0.85rem;
@@ -391,6 +435,7 @@
     color: var(--gray-500);
 }
 
+/* 月视图样式 */
 .gantt-date-year {
     font-size: 0.75rem;
     color: var(--gray-500);
@@ -403,6 +448,7 @@
     color: var(--gray-700);
 }
 
+/* 特殊日期样式 */
 .gantt-date-cell.weekend {
     background: var(--gray-100);
 }
@@ -413,6 +459,7 @@
     border-right: 2px solid var(--warning-color);
 }
 
+/* 不同刻度下的单元格样式 */
 .gantt-date-cell[data-scale="week"],
 .gantt-cell[data-scale="week"] {
     border-right: 2px solid var(--gray-400);
@@ -430,6 +477,7 @@
     border-right: 3px solid var(--warning-color);
 }
 
+/* 单元格 */
 .gantt-cell {
     width: var(--default-cell-width);
     min-width: var(--default-cell-width);
@@ -481,6 +529,28 @@
     .gantt-task-name[data-outline-level="4"] {
         padding-left: 52px;
     }
+    
+    .gantt-task-name[data-outline-level="2"]::before {
+        left: 6px;
+        font-size: 0.7rem;
+    }
+    
+    .gantt-task-name[data-outline-level="3"]::before,
+    .gantt-task-name[data-outline-level="4"]::before {
+        left: 6px;
+        font-size: 0.65rem;
+    }
+    
+    .wbs-badge {
+        font-size: 0.65rem;
+        padding: 1px 4px;
+    }
+    
+    .task-collapse-btn {
+        width: 16px;
+        height: 16px;
+        font-size: 0.65rem;
+    }
 
     .gantt-date-cell {
         font-size: 0.65rem;
@@ -527,9 +597,20 @@
         overflow: visible;
     }
     
+    .task-collapse-btn {
+        display: none !important;
+    }
+    
     .gantt-task-name[data-outline-level="2"]::before,
     .gantt-task-name[data-outline-level="3"]::before,
-    .gantt-task-name[data-outline-level="4"]::before {
+    .gantt-task-name[data-outline-level="4"]::before,
+    .gantt-task-name[data-outline-level="5"]::before {
         color: #999;
+    }
+    
+    .gantt-task-name.summary-task,
+    .gantt-task-name.milestone-task {
+        background: transparent;
+        border-left: 2px solid #333;
     }
 }

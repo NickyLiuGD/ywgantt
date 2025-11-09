@@ -1,7 +1,7 @@
 /**
  * 通用组件样式文件
  * 路径: css/components.css
- * 版本: Epsilon4
+ * 版本: Epsilon5 - 完整版
  * 包含: 工具栏、设置面板、日志面板、快捷菜单、表单
  */
 
@@ -612,6 +612,7 @@ input:checked + .switch-slider:before {
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
 
+/* 添加按钮 */
 .quick-menu-add .quick-menu-icon {
     color: var(--success-color);
 }
@@ -625,6 +626,7 @@ input:checked + .switch-slider:before {
     filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
 }
 
+/* 编辑按钮 */
 .quick-menu-edit .quick-menu-icon {
     color: var(--info-color);
 }
@@ -638,6 +640,7 @@ input:checked + .switch-slider:before {
     filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6));
 }
 
+/* 删除按钮 */
 .quick-menu-delete .quick-menu-icon {
     color: var(--danger-color);
 }
@@ -656,7 +659,7 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   ⭐ 内联编辑表单增强
+   ⭐ 内联编辑表单
    ====================== */
 .inline-task-form {
     animation: fadeInUp 0.2s ease-out;
@@ -668,16 +671,26 @@ input:checked + .switch-slider:before {
 }
 
 .inline-task-form::-webkit-scrollbar {
-    width: 4px;
+    width: 6px;
+}
+
+.inline-task-form::-webkit-scrollbar-track {
+    background: #f1f1f1;
 }
 
 .inline-task-form::-webkit-scrollbar-thumb {
     background: #ccc;
-    border-radius: 2px;
+    border-radius: 3px;
 }
 
 .inline-task-form::-webkit-scrollbar-thumb:hover {
     background: #999;
+}
+
+.inline-task-form .form-control-sm,
+.inline-task-form .form-range,
+.inline-task-form .form-check-input {
+    font-size: 0.85rem;
 }
 
 /* ⭐ 表单图标 */
@@ -690,7 +703,7 @@ input:checked + .switch-slider:before {
 
 /* ⭐ 表单分区 */
 .form-section {
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     padding-bottom: 12px;
     border-bottom: 1px solid #f0f0f0;
 }
@@ -707,10 +720,20 @@ input:checked + .switch-slider:before {
     border: 1px solid rgba(102, 126, 234, 0.2);
     border-radius: 8px;
     font-size: 0.85rem;
+    padding: 12px;
 }
 
 .alert-info strong {
     font-family: 'Courier New', monospace;
+    color: #667eea;
+}
+
+.alert-info .d-flex {
+    margin-bottom: 4px;
+}
+
+.alert-info .d-flex:last-child {
+    margin-bottom: 0;
 }
 
 /* ⭐ 里程碑开关样式 */
@@ -718,6 +741,7 @@ input:checked + .switch-slider:before {
     width: 2.5rem;
     height: 1.25rem;
     cursor: pointer;
+    border: 2px solid #dee2e6;
 }
 
 .form-check-input:checked {
@@ -731,15 +755,26 @@ input:checked + .switch-slider:before {
     box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
 }
 
+.form-check-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .form-check-label {
     cursor: pointer;
     user-select: none;
 }
 
 /* ⭐ 优先级按钮组 */
+.btn-group {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
 .btn-group .btn-check:checked + label {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    transform: translateY(-1px);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    transform: translateY(0);
 }
 
 .btn-check:checked + .btn-outline-secondary {
@@ -764,10 +799,15 @@ input:checked + .switch-slider:before {
 #depList {
     max-height: 120px;
     overflow-y: auto;
+    background: #f8f9fa;
 }
 
 #depList::-webkit-scrollbar {
     width: 4px;
+}
+
+#depList::-webkit-scrollbar-track {
+    background: #e9ecef;
 }
 
 #depList::-webkit-scrollbar-thumb {
@@ -775,16 +815,26 @@ input:checked + .switch-slider:before {
     border-radius: 2px;
 }
 
+#depList::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
 #depList .form-check {
     padding: 6px 8px;
     border-radius: 6px;
     transition: all 0.2s ease;
     margin-bottom: 4px;
+    background: transparent;
 }
 
 #depList .form-check:hover {
     background: white;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+#depList .form-check-input {
+    width: 1rem;
+    height: 1rem;
 }
 
 #depList .form-check-input:checked ~ .form-check-label {
@@ -795,6 +845,12 @@ input:checked + .switch-slider:before {
 #depList .badge {
     font-size: 0.6rem;
     padding: 2px 5px;
+    margin-left: 4px;
+}
+
+#depList .form-check-label {
+    font-size: 0.85rem;
+    width: 100%;
 }
 
 /* ⭐ 备注输入框 */
@@ -802,13 +858,23 @@ input:checked + .switch-slider:before {
     font-size: 0.85rem;
     resize: vertical;
     min-height: 60px;
+    max-height: 120px;
     font-family: inherit;
     line-height: 1.5;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 8px;
 }
 
 #editNotes:focus {
     border-color: #667eea;
     box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    outline: none;
+}
+
+#editNotes::placeholder {
+    color: #adb5bd;
+    font-style: italic;
 }
 
 #notesCounter {
@@ -822,6 +888,13 @@ input:checked + .switch-slider:before {
 #editParent {
     font-family: 'Courier New', monospace;
     font-size: 0.85rem;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+#editParent:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
 }
 
 #editParent option {
@@ -834,26 +907,33 @@ input:checked + .switch-slider:before {
     font-size: 0.85rem;
     padding: 8px 12px;
     transition: all 0.2s ease;
+    border-width: 1.5px;
+}
+
+#addSubTask {
+    border-color: #10b981;
+    color: #10b981;
 }
 
 #addSubTask:hover {
     background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
     border-color: #10b981;
+    color: #059669;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+}
+
+#deleteTask {
+    border-color: #dc3545;
+    color: #dc3545;
 }
 
 #deleteTask:hover {
     background: linear-gradient(135deg, rgba(220, 53, 69, 0.1) 0%, rgba(200, 35, 51, 0.1) 100%);
     border-color: #dc3545;
+    color: #c82333;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
-}
-
-.inline-task-form .form-control-sm,
-.inline-task-form .form-range,
-.inline-task-form .form-check-input {
-    font-size: 0.85rem;
 }
 
 .dep-list {
@@ -919,6 +999,16 @@ input:checked + .switch-slider:before {
         width: 280px !important;
         font-size: 0.85rem;
     }
+    
+    .alert-info {
+        font-size: 0.75rem;
+        padding: 8px;
+    }
+    
+    #editNotes {
+        min-height: 50px;
+        font-size: 0.8rem;
+    }
 }
 
 /* 打印样式 */
@@ -928,6 +1018,10 @@ input:checked + .switch-slider:before {
     .settings-panel,
     .log-panel,
     .quick-menu {
+        display: none !important;
+    }
+    
+    .inline-task-form {
         display: none !important;
     }
 }
