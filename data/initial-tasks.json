@@ -1,52 +1,56 @@
 {
   "project": {
     "name": "在线甘特图示例项目",
-    "version": "1.0",
-    "description": "演示里程碑、汇总任务、层级结构等功能"
+    "version": "2.0",
+    "description": "演示工作日/自然日工期计算"
   },
   "tasks": [
     {
       "uid": 1,
-      "name": "网站界面设计",
+      "name": "网站设计",
       "startOffset": -5,
-      "duration": 8,
+      "duration": 5,
+      "durationType": "workdays",
       "progress": 65,
       "priority": "high",
-      "notes": "使用 Figma 完成所有页面的 UI 设计"
+      "notes": "使用 Figma 完成所有页面的 UI 设计（按工作日计算）"
     },
     {
       "uid": 2,
       "name": "内容编写",
       "startOffset": 3,
-      "duration": 8,
+      "duration": 10,
+      "durationType": "days",
       "progress": 30,
-      "notes": "编写网站文案和产品说明文档"
+      "notes": "编写网站文案（按自然日计算，包含周末）"
     },
     {
       "uid": 3,
       "name": "样式开发",
       "startOffset": 5,
-      "duration": 4,
+      "duration": 3,
+      "durationType": "workdays",
       "progress": 45,
-      "notes": "CSS 样式开发和响应式适配"
+      "notes": "CSS 样式开发（按工作日）"
     },
     {
       "uid": 4,
       "name": "测试审核",
       "startOffset": -2,
-      "duration": 4,
+      "duration": 5,
+      "durationType": "days",
       "progress": 80,
       "priority": "high",
-      "notes": "功能测试、性能测试、安全测试"
+      "notes": "功能测试（按自然日，含周末加班）"
     },
     {
       "uid": 5,
       "name": "项目上线",
-      "startOffset": 12,
+      "startOffset": 15,
       "duration": 0,
       "isMilestone": true,
       "priority": "high",
-      "notes": "项目正式上线，发布到生产环境"
+      "notes": "项目正式上线"
     }
   ]
 }

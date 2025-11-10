@@ -168,25 +168,31 @@
     };
 
     /**
-     * 鼠标释放处理（⭐ 更新父任务）
+     * 鼠标释放处理（⭐ 根据工期类型重新计算）
      */
     GanttChart.prototype.onMouseUp = function(e) {
         if (!this.dragState) return;
         
         const task = this.dragState.task;
-        const duration = daysBetween(task.start, task.end) + 1;
+        
+        // ⭐ 根据工期类型重新计算 duration
+        if (task.durationType === 'workdays') {
+            task.duration = workdaysBetween(task.start, task.end);
+        } else {
+            task.duration = daysBetween(task.start, task.end) + 1;
+        }
         
         this.dragState.bar.classList.remove('dragging');
         
-        addLog(`任务 "${task.name}" 已${this.dragState.type === 'move' ? '移动' : '调整'}到 ${task.start} ~ ${task.end}，工期 ${duration} 天`);
-        
-        // ⭐ 更新 duration 字段
-        task.duration = duration;
+        const durationLabel = task.durationType === 'workdays' ? '工作日' : '自然日';
+        addLog(`任务 "${task.name}" 已${this.dragState.type === 'move' ? '移动' : '调整'}到 ${task.start} ~ ${task.end}，工期 ${task.duration} ${durationLabel}`);
         
         this.dragState = null;
         
-        // ⭐ 更新所有父任务的时间范围
-        this.updateParentTasks(task.id);
+        // 更新父任务
+        if (typeof this.updateParentTasks === 'function') {
+            this.updateParentTasks(task.id);
+        }
         
         this.calculateDateRange();
         this.render();

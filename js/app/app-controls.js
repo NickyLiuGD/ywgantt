@@ -9,7 +9,7 @@
 
     const today = new Date();
 
-    // 添加任务
+    // ==================== 添加任务（⭐ 默认工期类型） ====================
     const addTaskBtn = document.getElementById('addTask');
     if (addTaskBtn) {
         addTaskBtn.onclick = () => {
@@ -17,13 +17,14 @@
                 id: generateId(),
                 name: '新任务',
                 start: formatDate(today),
-                end: formatDate(addDays(today, 3)),
+                duration: 4,
+                durationType: 'workdays', // ⭐ 默认工作日
                 progress: 0,
                 dependencies: []
             };
             gantt.addTask(newTask);
             gantt.selectTask(newTask.id);
-            addLog('✅ 已添加新任务');
+            addLog('✅ 已添加新任务（工作日模式）');
         };
     }
 

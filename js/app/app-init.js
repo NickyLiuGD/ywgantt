@@ -53,12 +53,16 @@
         return tasks;
     }
 
+
     /**
-     * 创建任务对象
+     * 创建任务对象（支持工期类型）
      */
     function createTask(jt, baseDate) {
         const start = addDays(baseDate, jt.startOffset || 0);
-        const end = jt.duration === 0 ? start : addDays(start, jt.duration - 1);
+        
+        // ⭐ 根据工期类型计算结束日期
+        const durationType = jt.durationType || 'workdays';
+        const end = calculateEndDate(start, jt.duration || 0, durationType);
         
         return {
             id: generateId(),
@@ -66,7 +70,8 @@
             name: jt.name,
             start: formatDate(start),
             end: formatDate(end),
-            duration: jt.duration,
+            duration: jt.duration || 0,
+            durationType: durationType,  // ⭐ 新增字段
             progress: jt.progress || 0,
             isMilestone: jt.isMilestone || false,
             isSummary: jt.isSummary || false,
@@ -80,6 +85,7 @@
             dependencies: jt.dependencies || []
         };
     }
+
 
     /**
      * 解析临时引用

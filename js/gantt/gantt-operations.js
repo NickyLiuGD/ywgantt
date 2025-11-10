@@ -217,8 +217,7 @@
     };
 
     /**
-     * 添加任务
-     * @param {Object} task - 任务对象
+     * 添加任务（完整版 - 支持工期类型）
      */
     GanttChart.prototype.addTask = function(task) {
         if (!task || typeof task !== 'object') {
@@ -226,119 +225,62 @@
             return;
         }
 
+        // 基础字段补全
         if (!task.id) task.id = generateId();
         if (!task.uid) task.uid = this.getNextUID();
         if (!task.name) task.name = '新任务';
         if (!task.start) task.start = formatDate(new Date());
-        if (!task.end) task.end = formatDate(addDays(new Date(), 3));
+        
+        // ⭐ 工期类型默认值
+        if (!task.durationType) task.durationType = 'workdays';
+        
+        // ⭐ 根据工期类型计算结束日期
+        if (!task.end) {
+            const defaultDuration = typeof task.duration === 'number' ? task.duration : 4;
+            const startDate = new Date(task.start);
+            const endDate = calculateEndDate(startDate, defaultDuration, task.durationType);
+            task.end = formatDate(endDate);
+        }
+        
         if (typeof task.duration !== 'number') task.duration = 4;
         if (typeof task.progress !== 'number') task.progress = 0;
         if (!Array.isArray(task.dependencies)) task.dependencies = [];
         
-        // ⭐ 新增字段默认值
+        // 新字段默认值
         if (typeof task.isMilestone !== 'boolean') task.isMilestone = false;
         if (typeof task.isSummary !== 'boolean') task.isSummary = false;
-        if (!task.parentId) task.parentId = null;
+        if (task.parentId === undefined) task.parentId = null;
         if (!Array.isArray(task.children)) task.children = [];
         if (!task.outlineLevel) task.outlineLevel = 1;
-        if (!task.wbs) task.wbs = this.generateWBS(task.id);
         if (!task.priority) task.priority = 'medium';
-        if (!task.notes) task.notes = '';
+        if (task.notes === undefined) task.notes = '';
+        if (typeof task.isCollapsed !== 'boolean') task.isCollapsed = false;
 
         this.tasks.push(task);
+        
+        task.wbs = this.generateWBS(task.id);
         this.sortTasksByWBS();
         this.calculateDateRange();
         this.render();
     };
 
     /**
-     * 删除任务
-     * @param {string} taskId - 任务ID
-     */
-    GanttChart.prototype.deleteTask = function(taskId) {
-        this.deleteTaskWithChildren(taskId);
-    };
-
-    /**
-     * ⭐ 删除任务及其所有子任务
-     */
-    GanttChart.prototype.deleteTaskWithChildren = function(taskId) {
-        const task = this.tasks.find(t => t.id === taskId);
-        if (!task) return;
-
-        const toDelete = [taskId];
-        
-        // 🤖 递归收集所有子任务
-        const collectChildren = (id) => {
-            const t = this.tasks.find(task => task.id === id);
-            if (t && t.children && t.children.length > 0) {
-                t.children.forEach(childId => {
-                    toDelete.push(childId);
-                    collectChildren(childId);
-                });
-            }
-        };
-        collectChildren(taskId);
-
-        // 🤖 从父任务移除
-        if (task.parentId) {
-            const parent = this.tasks.find(t => t.id === task.parentId);
-            if (parent && parent.children) {
-                parent.children = parent.children.filter(cid => cid !== taskId);
-                
-                // 🤖 如果父任务没有子任务了，取消汇总状态
-                if (parent.children.length === 0) {
-                    parent.isSummary = false;
-                    addLog(`   "${parent.name}" 已自动取消汇总任务状态`);
-                } else {
-                    // 重新计算父任务
-                    this.recalculateSummaryTask(parent.id);
-                }
-            }
-        }
-
-        // 删除所有相关任务
-        this.tasks = this.tasks.filter(t => !toDelete.includes(t.id));
-        
-        // 🤖 清理其他任务的依赖
-        this.tasks.forEach(t => {
-            if (t.dependencies && t.dependencies.length > 0) {
-                t.dependencies = t.dependencies.filter(dep => {
-                    const depId = typeof dep === 'string' ? dep : dep.taskId;
-                    return !toDelete.includes(depId);
-                });
-            }
-        });
-
-        if (this.selectedTask === taskId) {
-            this.selectedTask = null;
-        }
-
-        // 🤖 重新生成所有 WBS
-        this.tasks.forEach(t => {
-            t.wbs = this.generateWBS(t.id);
-        });
-
-        this.calculateDateRange();
-        this.render();
-
-        addLog(`✅ 已删除任务 "${task.name}"${toDelete.length > 1 ? ` 及 ${toDelete.length - 1} 个子任务` : ''}`);
-    };
-
-    /**
-     * ⭐ 添加子任务
+     * 添加子任务（⭐ 继承父任务的工期类型）
      */
     GanttChart.prototype.addChildTask = function(parentId) {
         const parent = this.tasks.find(t => t.id === parentId);
         if (!parent) return;
 
+        // ⭐ 子任务继承父任务的工期类型
+        const inheritedDurationType = parent.durationType || 'workdays';
+        
         const newTask = {
             id: generateId(),
             uid: this.getNextUID(),
             name: '新子任务',
             start: formatDate(new Date(parent.start)),
-            end: formatDate(addDays(new Date(parent.start), 2)),
             duration: 3,
+            durationType: inheritedDurationType, // ⭐ 继承
             progress: 0,
             isMilestone: false,
             isSummary: false,
@@ -348,34 +290,31 @@
             wbs: '',
             priority: 'medium',
             notes: '',
+            isCollapsed: false,
             dependencies: []
         };
+        
+        // ⭐ 根据工期类型计算结束日期
+        const startDate = new Date(newTask.start);
+        const endDate = calculateEndDate(startDate, newTask.duration, newTask.durationType);
+        newTask.end = formatDate(endDate);
 
-        // 🤖 添加到父任务的子任务列表
         if (!parent.children) parent.children = [];
         parent.children.push(newTask.id);
-        
-        // 🤖 设置父任务为汇总任务
         parent.isSummary = true;
 
-        // 插入到父任务后面
         const parentIndex = this.tasks.findIndex(t => t.id === parentId);
         this.tasks.splice(parentIndex + 1, 0, newTask);
 
-        // 🤖 生成 WBS
         newTask.wbs = this.generateWBS(newTask.id);
-
-        // 🤖 重新计算父任务时间
         this.recalculateSummaryTask(parentId);
-
         this.calculateDateRange();
         this.render();
 
-        // 自动选中并编辑
         setTimeout(() => {
             this.selectTask(newTask.id);
             this.showInlineTaskForm(newTask);
-            addLog(`✅ 已为 "${parent.name}" 添加子任务 [${newTask.wbs}]`);
+            addLog(`✅ 已为 "${parent.name}" 添加子任务 [${newTask.wbs}]（继承${inheritedDurationType === 'workdays' ? '工作日' : '自然日'}模式）`);
         }, 100);
     };
 
