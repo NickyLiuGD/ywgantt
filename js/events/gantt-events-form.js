@@ -1,8 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图编辑表单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-form.js                           ▓▓
-// ▓▓ 版本: Epsilon10 - 支持工作日/自然日工期计算                    ▓▓
-// ▓▓ 行数: ~580行                                                   ▓▓
+// ▓▓ 版本: Epsilon10 - 支持工作日/自然日工期计算 + 手柄颜色区分     ▓▓
+// ▓▓ 行数: ~630行                                                   ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -23,7 +23,7 @@
         form.className = 'inline-task-form';
         form.dataset.taskId = task.id;
 
-        // 获取可选父任务
+        // 获取可选父任务（排除自己和自己的后代）
         const availableParents = this.tasks.filter(t => 
             t.id !== task.id && 
             !this.isDescendantOf(t.id, task.id) &&
@@ -169,11 +169,16 @@
                         <span class="text-muted small">结束日期：</span>
                         <strong id="calculatedEndDate" class="text-success" style="font-size: 0.95rem;">${task.end}</strong>
                     </div>
-                    <small class="text-muted d-block" id="durationTypeHint" style="padding: 4px 8px; background: rgba(102, 126, 234, 0.05); border-radius: 4px;">
+                    <div id="durationTypeHint" 
+                         data-type="${currentDurationType}"
+                         style="font-size: 0.75rem; padding: 6px 10px; border-radius: 6px; 
+                                background: ${currentDurationType === 'workdays' ? 'rgba(102, 126, 234, 0.1)' : 'rgba(16, 185, 129, 0.1)'};
+                                color: ${currentDurationType === 'workdays' ? '#667eea' : '#10b981'};
+                                border-left: 3px solid ${currentDurationType === 'workdays' ? '#667eea' : '#10b981'};">
                         ${currentDurationType === 'workdays' ? 
                             '💼 按工作日计算（跳过周末）' : 
                             '📅 按自然日计算（包含周末）'}
-                    </small>`}
+                    </div>`}
             </div>
 
             <!-- 进度 -->
@@ -407,7 +412,7 @@
             };
         }
 
-        // ⭐⭐⭐ 自动计算结束日期（支持工期类型） ⭐⭐⭐
+        // ⭐⭐⭐ 自动计算结束日期（支持工期类型 + 增强提示） ⭐⭐⭐
         const startInput = form.querySelector('#editStart');
         const endDateDisplay = form.querySelector('#calculatedEndDate');
         const durationTypeHint = form.querySelector('#durationTypeHint');
@@ -424,25 +429,45 @@
                 const endDate = calculateEndDate(startDate, duration, durationType);
                 const endDateStr = formatDate(endDate);
                 
+                // 更新结束日期显示（带颜色）
                 endDateDisplay.textContent = endDateStr;
-                endDateDisplay.style.color = '#10b981';
+                endDateDisplay.style.color = durationType === 'workdays' ? '#667eea' : '#10b981';
                 endDateDisplay.style.fontWeight = '600';
+                endDateDisplay.style.transition = 'all 0.3s ease';
                 
-                // ⭐ 更新提示文字
+                // ⭐ 更新提示文字和样式
                 if (durationTypeHint) {
+                    durationTypeHint.setAttribute('data-type', durationType);
+                    
                     if (durationType === 'workdays') {
                         durationTypeHint.innerHTML = '💼 按工作日计算（跳过周末）';
+                        durationTypeHint.style.background = 'rgba(102, 126, 234, 0.1)';
                         durationTypeHint.style.color = '#667eea';
+                        durationTypeHint.style.borderLeft = '3px solid #667eea';
                     } else {
                         durationTypeHint.innerHTML = '📅 按自然日计算（包含周末）';
-                        durationTypeHint.style.color = '#6c757d';
+                        durationTypeHint.style.background = 'rgba(16, 185, 129, 0.1)';
+                        durationTypeHint.style.color = '#10b981';
+                        durationTypeHint.style.borderLeft = '3px solid #10b981';
                     }
                     
-                    // ⭐ 显示实际跨度天数
+                    // ⭐ 显示详细信息
                     if (duration > 0 && !task.isMilestone) {
                         const actualDays = daysBetween(startDate, endDate) + 1;
-                        if (durationType === 'workdays' && actualDays !== duration) {
-                            durationTypeHint.innerHTML += ` <span class="text-info fw-semibold">(实际跨度 ${actualDays} 天)</span>`;
+                        
+                        if (durationType === 'workdays') {
+                            // 工作日模式：显示实际跨度和跳过的周末
+                            if (actualDays !== duration) {
+                                const weekendDays = actualDays - duration;
+                                durationTypeHint.innerHTML += ` <span class="text-info fw-semibold">(实际跨度 ${actualDays} 天)</span>`;
+                                durationTypeHint.innerHTML += ` <span class="badge bg-secondary" style="font-size:0.65rem">跳过 ${weekendDays} 天周末</span>`;
+                            }
+                        } else {
+                            // 自然日模式：显示包含的周末天数
+                            const weekendCount = countWeekendsInRange(startDate, endDate);
+                            if (weekendCount > 0) {
+                                durationTypeHint.innerHTML += ` <span class="badge bg-success" style="font-size:0.65rem">含 ${weekendCount} 天周末</span>`;
+                            }
                         }
                     }
                 }
@@ -452,11 +477,28 @@
         if (startInput) startInput.addEventListener('change', updateEndDate);
         if (durationInput) durationInput.addEventListener('input', updateEndDate);
         
-        // ⭐ 工期类型切换事件
+        // ⭐ 工期类型切换事件（带动画效果）
         if (durationTypeSelect) {
             durationTypeSelect.onchange = () => {
+                // 添加切换动画
+                if (endDateDisplay) {
+                    endDateDisplay.style.transform = 'scale(1.15)';
+                    setTimeout(() => {
+                        endDateDisplay.style.transform = 'scale(1)';
+                    }, 300);
+                }
+                
+                if (durationTypeHint) {
+                    durationTypeHint.style.transform = 'translateX(-5px)';
+                    setTimeout(() => {
+                        durationTypeHint.style.transform = 'translateX(0)';
+                    }, 300);
+                }
+                
                 updateEndDate();
-                addLog(`🔄 工期类型切换为：${durationTypeSelect.value === 'workdays' ? '工作日' : '自然日'}`);
+                
+                const typeLabel = durationTypeSelect.value === 'workdays' ? '工作日' : '自然日';
+                addLog(`🔄 工期类型切换为：${typeLabel}`);
             };
         }
 
@@ -550,7 +592,7 @@
             return;
         }
 
-        // ==================== 保存旧值 ====================
+        // ==================== 保存旧值（用于日志） ====================
         const oldParentId = task.parentId;
         const oldName = task.name;
         const oldDurationType = task.durationType;
@@ -563,7 +605,7 @@
         task.isSummary = hasChildren;
         task.durationType = durationType; // ⭐ 保存工期类型
 
-        // ==================== 更新时间 ====================
+        // ==================== 更新时间（汇总任务跳过） ====================
         if (!hasChildren) {
             task.start = start;
             
@@ -672,7 +714,7 @@
         
         const viewportHeight = containerRect.height;
         const barBottomInViewport = barRect.bottom - containerRect.top;
-        const formHeight = 650; // ⭐ 增加高度（新增了工期类型选择）
+        const formHeight = 680; // ⭐ 增加高度（新增工期类型选择 + 提示信息）
         
         if (barBottomInViewport + formHeight > viewportHeight) {
             formTop = barTopInContainer - formHeight - 8;
@@ -808,6 +850,23 @@
         }
     };
 
-    console.log('✅ gantt-events-form.js loaded successfully (Epsilon10 - 工期类型支持)');
+    /**
+     * ⭐ 计算日期范围内的周末天数
+     */
+    function countWeekendsInRange(startDate, endDate) {
+        let count = 0;
+        let current = new Date(startDate);
+        
+        while (current <= endDate) {
+            if (isWeekend(current)) {
+                count++;
+            }
+            current = addDays(current, 1);
+        }
+        
+        return count;
+    }
+
+    console.log('✅ gantt-events-form.js loaded successfully (Epsilon10 - 工期类型 + 手柄颜色)');
 
 })();

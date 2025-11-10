@@ -207,7 +207,7 @@
     };
 
     /**
-     * 渲染单个任务行（⭐ 支持里程碑和汇总任务）
+     * 渲染单个任务行（⭐ 手柄颜色区分工期类型）
      */
     GanttChart.prototype.renderRow = function(task, dates) {
         if (!task || !task.id) return '';
@@ -249,8 +249,14 @@
 
         // 优先级标记
         const priorityAttr = task.priority ? `data-priority="${task.priority}"` : '';
+        
+        // ⭐ 工期类型标记
+        const durationType = task.durationType || 'workdays';
+        const durationTypeAttr = `data-duration-type="${durationType}"`;
+        const durationTypeIcon = durationType === 'workdays' ? '💼' : '📅';
+        const durationTypeTitle = durationType === 'workdays' ? '工作日' : '自然日';
 
-        // 折叠按钮（仅汇总任务）
+        // 折叠按钮
         const collapseToggle = (task.isSummary && task.children && task.children.length > 0) ? 
             `<span class="collapse-toggle" data-task-id="${task.id}" title="${task.isCollapsed ? '展开' : '折叠'}子任务">
                 ${task.isCollapsed ? '▶' : '▼'}
@@ -258,59 +264,74 @@
 
         return `
             <div class="gantt-row ${task.isSummary ? 'gantt-row-summary' : ''}" 
-                 role="row" 
-                 aria-label="任务行: ${this.escapeHtml(task.name)}">
+                role="row" 
+                aria-label="任务行: ${this.escapeHtml(task.name)}">
                 ${this.renderCells(dates)}
                 
                 <!-- 左侧双层时间标签 -->
                 <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
-                     data-task-id="${task.id}"
-                     style="right: calc(100% - ${left}px + 8px);"
-                     role="button"
-                     tabindex="0"
-                     aria-label="时间范围: ${startTimeLabel} 至 ${endTimeLabel}">
+                    data-task-id="${task.id}"
+                    style="right: calc(100% - ${left}px + 8px);"
+                    role="button"
+                    tabindex="0"
+                    title="${durationTypeTitle}"
+                    aria-label="时间范围: ${startTimeLabel} 至 ${endTimeLabel}">
                     <div class="time-label-row time-start" title="开始时间">
                         ${this.escapeHtml(startTimeLabel)}
                     </div>
                     <div class="time-label-row time-end" title="结束时间">
                         ${this.escapeHtml(endTimeLabel)}
+                        ${!task.isMilestone && !task.isSummary ? 
+                            `<span class="duration-type-icon" title="${durationTypeTitle}">${durationTypeIcon}</span>` : ''}
                     </div>
                 </div>
                 
                 ${task.isMilestone ? `
-                    <!-- ⭐ 里程碑菱形 -->
+                    <!-- 里程碑菱形 -->
                     <div class="gantt-milestone ${isSelected ? 'selected' : ''}" 
-                         data-task-id="${task.id}"
-                         style="left: ${left}px;"
-                         role="button"
-                         tabindex="0"
-                         title="${this.escapeHtml(task.name)}">
+                        data-task-id="${task.id}"
+                        style="left: ${left}px;"
+                        role="button"
+                        tabindex="0"
+                        title="${this.escapeHtml(task.name)}">
                         <div class="milestone-diamond">
                             <span class="milestone-icon">🎯</span>
                         </div>
                     </div>
                 ` : `
-                    <!-- 任务条（普通/汇总） -->
+                    <!-- 任务条（⭐ 添加工期类型属性） -->
                     <div class="gantt-bar ${task.isSummary ? 'gantt-bar-summary' : ''} ${isSelected ? 'selected' : ''}" 
-                         data-task-id="${task.id}"
-                         ${priorityAttr}
-                         style="left: ${left}px; width: ${width}px;"
-                         role="button"
-                         tabindex="0"
-                         aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
+                        data-task-id="${task.id}"
+                        ${priorityAttr}
+                        ${durationTypeAttr}
+                        style="left: ${left}px; width: ${width}px;"
+                        role="button"
+                        tabindex="0"
+                        title="${task.duration} ${durationTypeTitle}"
+                        aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
                         <div class="gantt-bar-progress" style="width: ${progress}%" aria-hidden="true"></div>
-                        ${this.options.enableResize && !task.isSummary ? '<div class="gantt-bar-handle left" role="button" aria-label="调整开始日期"></div>' : ''}
-                        ${this.options.enableResize && !task.isSummary ? '<div class="gantt-bar-handle right" role="button" aria-label="调整结束日期"></div>' : ''}
+                        ${this.options.enableResize && !task.isSummary ? `
+                            <div class="gantt-bar-handle left" 
+                                role="button" 
+                                aria-label="调整开始日期"
+                                title="拖拽调整开始日期"></div>
+                        ` : ''}
+                        ${this.options.enableResize && !task.isSummary ? `
+                            <div class="gantt-bar-handle right" 
+                                role="button" 
+                                aria-label="调整结束日期"
+                                title="拖拽调整结束日期"></div>
+                        ` : ''}
                     </div>
                 `}
                 
                 <!-- 右侧任务名称标签 -->
                 <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
-                     data-task-id="${task.id}"
-                     style="left: ${left + width + 8}px;"
-                     role="button"
-                     tabindex="0"
-                     aria-label="任务标签: ${this.escapeHtml(task.name)}">
+                    data-task-id="${task.id}"
+                    style="left: ${left + width + 8}px;"
+                    role="button"
+                    tabindex="0"
+                    aria-label="任务标签: ${this.escapeHtml(task.name)}">
                     ${this.escapeHtml(displayName)} 
                     ${!task.isMilestone ? `<span class="task-progress-badge">${progress}%</span>` : ''}
                     ${collapseToggle}

@@ -1208,3 +1208,232 @@
 #durationTypeHint .text-info {
     font-weight: 600;
 }
+
+/* ======================
+   ⭐ 工期类型相关样式
+   ====================== */
+
+/* 工期类型图标 */
+.duration-type-icon {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 0.65rem;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+}
+
+.gantt-bar-label-start:hover .duration-type-icon {
+    opacity: 1;
+    transform: scale(1.15);
+}
+
+/* ======================
+   ⭐ 手柄颜色区分（工作日 vs 自然日）
+   ====================== */
+
+/* 默认手柄样式 */
+.gantt-bar-handle {
+    width: 6px;
+    height: 100%;
+    cursor: ew-resize;
+    position: absolute;
+    top: 0;
+    transition: all 0.3s ease;
+    z-index: 2;
+}
+
+/* ⭐ 工作日任务 - 蓝色手柄 */
+.gantt-bar[data-duration-type="workdays"] .gantt-bar-handle {
+    background: linear-gradient(to bottom, #667eea 0%, #5568d3 100%);
+}
+
+.gantt-bar[data-duration-type="workdays"] .gantt-bar-handle:hover {
+    background: linear-gradient(to bottom, #5568d3 0%, #4557c2 100%);
+    width: 8px;
+    box-shadow: 0 0 8px rgba(102, 126, 234, 0.6);
+}
+
+/* ⭐ 自然日任务 - 绿色手柄 */
+.gantt-bar[data-duration-type="days"] .gantt-bar-handle {
+    background: linear-gradient(to bottom, #10b981 0%, #059669 100%);
+}
+
+.gantt-bar[data-duration-type="days"] .gantt-bar-handle:hover {
+    background: linear-gradient(to bottom, #059669 0%, #047857 100%);
+    width: 8px;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+/* 手柄位置 */
+.gantt-bar-handle.left {
+    left: 0;
+    border-radius: 4px 0 0 4px;
+}
+
+.gantt-bar-handle.right {
+    right: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+/* ⭐ 拖拽时的手柄高亮 */
+.gantt-bar.dragging[data-duration-type="workdays"] .gantt-bar-handle {
+    background: #667eea;
+    width: 10px;
+    box-shadow: 0 0 12px rgba(102, 126, 234, 0.8);
+}
+
+.gantt-bar.dragging[data-duration-type="days"] .gantt-bar-handle {
+    background: #10b981;
+    width: 10px;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
+}
+
+/* ======================
+   ⭐ 任务条边框样式区分
+   ====================== */
+
+/* 工作日任务 - 实线边框 */
+.gantt-bar[data-duration-type="workdays"] {
+    border: 2px solid var(--gray-300);
+    border-style: solid;
+}
+
+.gantt-bar[data-duration-type="workdays"]:hover {
+    border-color: #667eea;
+}
+
+.gantt-bar[data-duration-type="workdays"].selected {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3),
+                0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* 自然日任务 - 虚线边框 */
+.gantt-bar[data-duration-type="days"] {
+    border: 2px dashed var(--gray-300);
+    border-style: dashed;
+}
+
+.gantt-bar[data-duration-type="days"]:hover {
+    border-color: #10b981;
+}
+
+.gantt-bar[data-duration-type="days"].selected {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3),
+                0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+/* ======================
+   ⭐ 工期类型标签样式
+   ====================== */
+
+/* 工作日标签 */
+.gantt-bar[data-duration-type="workdays"] ~ .gantt-bar-label-start .time-end,
+.gantt-bar[data-duration-type="workdays"] ~ .gantt-bar-label-external {
+    color: #667eea;
+}
+
+/* 自然日标签 */
+.gantt-bar[data-duration-type="days"] ~ .gantt-bar-label-start .time-end,
+.gantt-bar[data-duration-type="days"] ~ .gantt-bar-label-external {
+    color: #10b981;
+}
+
+/* ======================
+   工期类型提示样式
+   ====================== */
+
+#durationTypeHint {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-top: 8px;
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+/* 工作日提示 - 蓝色背景 */
+#durationTypeHint[data-type="workdays"] {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+    border-left: 3px solid #667eea;
+}
+
+/* 自然日提示 - 绿色背景 */
+#durationTypeHint[data-type="days"] {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border-left: 3px solid #10b981;
+}
+
+#durationTypeHint .text-info {
+    font-weight: 600;
+}
+
+/* ======================
+   工期类型选择框样式
+   ====================== */
+
+#editDurationType {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+#editDurationType option {
+    padding: 8px;
+}
+
+/* 选中工作日时的样式 */
+#editDurationType[value="workdays"] {
+    color: #667eea;
+    border-color: #667eea;
+}
+
+/* 选中自然日时的样式 */
+#editDurationType[value="days"] {
+    color: #10b981;
+    border-color: #10b981;
+}
+
+/* ======================
+   响应式
+   ====================== */
+
+@media (max-width: 768px) {
+    .gantt-bar-handle {
+        width: 5px;
+    }
+    
+    .gantt-bar-handle:hover {
+        width: 7px;
+    }
+    
+    .duration-type-icon {
+        font-size: 0.6rem;
+    }
+}
+
+/* ======================
+   打印样式
+   ====================== */
+
+@media print {
+    .gantt-bar-handle {
+        display: none !important;
+    }
+    
+    /* 打印时用边框样式区分 */
+    .gantt-bar[data-duration-type="workdays"] {
+        border: 2px solid #667eea !important;
+    }
+    
+    .gantt-bar[data-duration-type="days"] {
+        border: 2px dashed #10b981 !important;
+    }
+    
+    .duration-type-icon::after {
+        content: attr(title);
+        margin-left: 2px;
+    }
+}
