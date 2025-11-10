@@ -1173,3 +1173,32 @@ input:checked + .switch-slider:before {
         padding: 3px 6px;
     }
 }
+
+/* ⭐ 依赖选择器中的禁用项 */
+.deps-item-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f8f9fa;
+}
+
+.deps-item-disabled:hover {
+    background: #f8f9fa;
+}
+
+.deps-item-disabled .form-check-input {
+    cursor: not-allowed;
+}
+
+.deps-item-disabled .form-check-label {
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+
+.deps-item-disabled .badge {
+    font-size: 0.6rem;
+}
+
+/* 有效项样式 */
+.deps-item:not(.deps-item-disabled):hover {
+    background: rgba(102, 126, 234, 0.05);
+}

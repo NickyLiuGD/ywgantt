@@ -486,10 +486,9 @@
     };
 
     /**
-     * ⭐ 显示依赖任务选择器（模态框）
+     * 显示依赖任务选择器（⭐ 禁用无效选项）
      */
     GanttChart.prototype.showDependencySelector = function(task, parentForm) {
-        // 移除旧的选择器
         const oldSelector = document.querySelector('.dependency-selector-modal');
         if (oldSelector) oldSelector.remove();
 
@@ -514,7 +513,7 @@
                     <!-- 搜索框 -->
                     <div class="mb-2">
                         <input type="text" class="form-control form-control-sm" id="depsSearchInput" 
-                               placeholder="🔍 搜索任务名称或WBS..." style="font-size: 0.85rem;">
+                            placeholder="🔍 搜索任务名称或WBS..." style="font-size: 0.85rem;">
                     </div>
                     
                     <!-- 任务列表 -->
@@ -524,15 +523,24 @@
                             const indent = '　'.repeat((t.outlineLevel || 1) - 1);
                             const icon = t.isMilestone ? '🎯' : (t.children?.length > 0 ? '📁' : '📋');
                             
+                            // ⭐⭐⭐ 验证是否可以添加此依赖 ⭐⭐⭐
+                            const validation = this.canAddDependency(t.id, task.id);
+                            const isDisabled = !validation.canAdd;
+                            
                             return `
-                                <div class="form-check deps-item" data-task-name="${t.name.toLowerCase()}" data-task-wbs="${t.wbs || ''}">
+                                <div class="form-check deps-item ${isDisabled ? 'deps-item-disabled' : ''}" 
+                                    data-task-name="${t.name.toLowerCase()}" 
+                                    data-task-wbs="${t.wbs || ''}"
+                                    ${isDisabled ? `title="禁用原因: ${validation.reason}"` : ''}>
                                     <input class="form-check-input" type="checkbox" 
-                                           value="${t.id}" 
-                                           id="depCheck_${t.id}"
-                                           ${isChecked ? 'checked' : ''}>
-                                    <label class="form-check-label" for="depCheck_${t.id}">
+                                        value="${t.id}" 
+                                        id="depCheck_${t.id}"
+                                        ${isChecked ? 'checked' : ''}
+                                        ${isDisabled ? 'disabled' : ''}>
+                                    <label class="form-check-label ${isDisabled ? 'text-muted' : ''}" for="depCheck_${t.id}">
                                         ${indent}${icon} ${t.wbs ? '<span class="wbs-badge-small">[' + t.wbs + ']</span> ' : ''}${t.name}
                                         ${t.isMilestone ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem">里程碑</span>' : ''}
+                                        ${isDisabled ? `<span class="badge bg-secondary ms-1" style="font-size:0.6rem">${validation.reason}</span>` : ''}
                                     </label>
                                 </div>
                             `;
@@ -543,6 +551,7 @@
                 <div class="dependency-selector-footer">
                     <div class="text-muted small mb-2">
                         已选择 <strong id="selectedCount">${currentDeps.length}</strong> 个任务
+                        <span class="text-info ms-2" style="font-size: 0.7rem;">💡 灰色项为禁止依赖</span>
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-primary btn-sm flex-fill" id="confirmDeps" type="button">
@@ -557,18 +566,15 @@
         `;
 
         document.body.appendChild(modal);
-
-        // 绑定模态框事件
         this.bindDependencySelectorEvents(modal, task, parentForm);
 
-        // 显示动画
         requestAnimationFrame(() => {
             modal.classList.add('show');
         });
     };
 
     /**
-     * 绑定依赖选择器事件
+     * 绑定依赖选择器事件（⭐ 添加禁用项提示）
      */
     GanttChart.prototype.bindDependencySelectorEvents = function(modal, task, parentForm) {
         const closeDepsSelector = () => {
@@ -616,24 +622,38 @@
         
         checkboxes.forEach(cb => {
             cb.onchange = () => {
-                const count = Array.from(checkboxes).filter(c => c.checked).length;
+                const count = Array.from(checkboxes).filter(c => c.checked && !c.disabled).length;
                 if (selectedCount) {
                     selectedCount.textContent = count;
                 }
             };
         });
 
-        // ⭐⭐⭐ 确定按钮（修复版） ⭐⭐⭐
+        // ⭐ 禁用项点击提示
+        depsItems.forEach(item => {
+            if (item.classList.contains('deps-item-disabled')) {
+                item.onclick = (e) => {
+                    e.preventDefault();
+                    const reason = item.getAttribute('title');
+                    if (reason) {
+                        // 显示提示气泡
+                        showTooltip(item, reason.replace('禁用原因: ', ''));
+                    }
+                };
+            }
+        });
+
+        // 确定按钮
         const confirmBtn = modal.querySelector('#confirmDeps');
         if (confirmBtn) {
             confirmBtn.onclick = () => {
                 const selectedIds = Array.from(checkboxes)
-                    .filter(cb => cb.checked)
+                    .filter(cb => cb.checked && !cb.disabled)
                     .map(cb => cb.value);
                 
                 console.log('✅ 选中的依赖任务ID:', selectedIds);
                 
-                // ⭐ 更新任务的依赖关系（对象格式）
+                // 更新任务的依赖关系
                 task.dependencies = selectedIds.map(depId => ({
                     taskId: depId,
                     type: 'FS',
@@ -642,8 +662,13 @@
                 
                 console.log('✅ 任务依赖已更新:', task.dependencies);
                 
-                // ⭐ 更新父表单的依赖标签显示
+                // 更新父表单的依赖标签显示
                 this.updateDependencyTags(task, parentForm);
+                
+                // 立即重新渲染依赖箭头
+                const dates = this.generateDates();
+                this.renderDependencies(dates);
+                console.log('🔄 依赖箭头已立即渲染');
                 
                 addLog(`✅ 已更新 "${task.name}" 的依赖关系（${selectedIds.length} 个）`);
                 
@@ -651,6 +676,43 @@
             };
         }
     };
+
+    /**
+     * ⭐ 显示临时提示气泡
+     */
+    function showTooltip(element, message) {
+        const tooltip = document.createElement('div');
+        tooltip.className = 'temp-tooltip';
+        tooltip.textContent = message;
+        tooltip.style.cssText = `
+            position: absolute;
+            background: rgba(220, 53, 69, 0.95);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            z-index: 9999;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `;
+        
+        document.body.appendChild(tooltip);
+        
+        const rect = element.getBoundingClientRect();
+        tooltip.style.left = rect.right + 10 + 'px';
+        tooltip.style.top = rect.top + (rect.height - tooltip.offsetHeight) / 2 + 'px';
+        
+        // 3秒后自动消失
+        setTimeout(() => {
+            tooltip.style.opacity = '0';
+            tooltip.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => {
+                if (tooltip.parentElement) {
+                    tooltip.parentElement.removeChild(tooltip);
+                }
+            }, 300);
+        }, 3000);
+    }
 
     /**
      * ⭐ 更新依赖标签显示
