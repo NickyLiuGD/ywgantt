@@ -1,8 +1,8 @@
 /**
  * 通用组件样式文件
  * 路径: css/components.css
- * 版本: Epsilon5 - 完整版
- * 包含: 工具栏、设置面板、日志面板、快捷菜单、表单
+ * 版本: Epsilon14
+ * 包含: 工具栏、设置面板、日志面板、快捷菜单、紧凑表单
  */
 
 /* ======================
@@ -114,7 +114,6 @@
     pointer-events: auto;
 }
 
-/* 工具栏按钮 */
 .toolbar-section {
     display: flex;
     gap: 8px;
@@ -183,7 +182,6 @@
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
-/* 彩色图标 */
 .toolbar-btn:nth-child(1) .btn-icon { color: var(--success-color); }
 .toolbar-btn:nth-child(2) .btn-icon { color: var(--danger-color); }
 .toolbar-section:nth-child(1) .toolbar-btn:nth-child(3) .btn-icon { color: var(--info-color); }
@@ -407,14 +405,11 @@ input:checked + .switch-slider:before {
     background: linear-gradient(to right, var(--gray-200) 0%, rgba(102, 126, 234, 0.2) 100%);
     outline: none;
     -webkit-appearance: none;
-    -moz-appearance: none;
     appearance: none;
-    position: relative;
 }
 
 .custom-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    appearance: none;
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -612,43 +607,28 @@ input:checked + .switch-slider:before {
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
 
-/* 添加按钮 */
-.quick-menu-add .quick-menu-icon {
-    color: var(--success-color);
-}
-
+.quick-menu-add .quick-menu-icon { color: var(--success-color); }
 .quick-menu-add:hover {
     background: rgba(16, 185, 129, 0.15);
 }
-
 .quick-menu-add:hover .quick-menu-icon {
     transform: scale(1.25) rotate(90deg);
     filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
 }
 
-/* 编辑按钮 */
-.quick-menu-edit .quick-menu-icon {
-    color: var(--info-color);
-}
-
+.quick-menu-edit .quick-menu-icon { color: var(--info-color); }
 .quick-menu-edit:hover {
     background: rgba(59, 130, 246, 0.15);
 }
-
 .quick-menu-edit:hover .quick-menu-icon {
     transform: scale(1.25);
     filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6));
 }
 
-/* 删除按钮 */
-.quick-menu-delete .quick-menu-icon {
-    color: var(--danger-color);
-}
-
+.quick-menu-delete .quick-menu-icon { color: var(--danger-color); }
 .quick-menu-delete:hover {
     background: rgba(239, 68, 68, 0.15);
 }
-
 .quick-menu-delete:hover .quick-menu-icon {
     transform: scale(1.25) rotate(10deg);
     filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6));
@@ -659,23 +639,17 @@ input:checked + .switch-slider:before {
 }
 
 /* ======================
-   ⭐ 内联编辑表单
+   ⭐ 紧凑表单布局样式
    ====================== */
+
 .inline-task-form {
     animation: fadeInUp 0.2s ease-out;
     pointer-events: auto;
     will-change: transform, opacity;
-    max-height: 85vh;
-    overflow-y: auto;
-    font-size: 0.9rem;
 }
 
 .inline-task-form::-webkit-scrollbar {
     width: 6px;
-}
-
-.inline-task-form::-webkit-scrollbar-track {
-    background: #f1f1f1;
 }
 
 .inline-task-form::-webkit-scrollbar-thumb {
@@ -687,67 +661,172 @@ input:checked + .switch-slider:before {
     background: #999;
 }
 
-.inline-task-form .form-control-sm,
-.inline-task-form .form-range,
-.inline-task-form .form-check-input {
-    font-size: 0.85rem;
+/* ⭐ 表单工具栏 */
+.form-toolbar {
+    margin: -14px -14px 12px -14px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 2px solid #dee2e6;
+    border-radius: 12px 12px 0 0;
 }
 
-/* ⭐ 表单图标 */
-.task-form-icon {
-    font-size: 1.3rem;
-    margin-right: 6px;
-    display: inline-block;
-    animation: iconFloat 2s ease-in-out infinite;
-}
-
-/* ⭐ 表单分区 */
-.form-section {
-    margin-bottom: 14px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.form-section:last-of-type {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-}
-
-/* ⭐ 自动信息提示框 */
-.alert-info {
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%);
-    border: 1px solid rgba(102, 126, 234, 0.2);
+.form-toolbar .btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 8px;
-    font-size: 0.85rem;
-    padding: 12px;
+    transition: all 0.2s ease;
 }
 
-.alert-info strong {
-    font-family: 'Courier New', monospace;
+.form-toolbar .btn:hover:not([disabled]) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.form-toolbar .btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.form-toolbar .btn[disabled]:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.form-toolbar h6 {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+/* ⭐ 紧凑标签 */
+.form-label-compact {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 4px;
+    display: block;
+}
+
+/* ⭐ 紧凑行布局 */
+.form-row-compact {
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+}
+
+/* ⭐ 自动信息显示（紧凑） */
+.auto-info-compact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.05) 100%);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    color: #495057;
+    flex-wrap: wrap;
+}
+
+.auto-info-compact strong {
+    font-weight: 600;
     color: #667eea;
 }
 
-.alert-info .d-flex {
-    margin-bottom: 4px;
+.auto-info-compact code {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: #667eea;
+    font-weight: 600;
 }
 
-.alert-info .d-flex:last-child {
-    margin-bottom: 0;
+.auto-info-compact .separator {
+    color: #dee2e6;
+    font-weight: bold;
 }
 
-/* ⭐ 里程碑开关样式 */
+/* ⭐ 结束日期显示（紧凑） */
+.end-date-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+
+.end-date-display strong {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* ⭐ 工期下拉框 */
+#editDuration {
+    font-size: 0.85rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+/* ⭐ 工期类型下拉框 */
+#editDurationType {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+#editDurationType option {
+    padding: 6px;
+}
+
+/* ⭐ 优先级下拉框 */
+#editPriority {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+#editPriority option {
+    padding: 6px;
+}
+
+/* ⭐ 依赖任务多选框 */
+#editDependencies {
+    font-size: 0.8rem;
+    font-family: 'Courier New', monospace;
+    padding: 6px;
+}
+
+#editDependencies option {
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+}
+
+#editDependencies option:checked {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+    color: #667eea;
+    font-weight: 600;
+}
+
+#editDependencies:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+/* ⭐ 里程碑开关（紧凑版） */
 .form-check-input {
-    width: 2.5rem;
-    height: 1.25rem;
+    width: 2rem;
+    height: 1rem;
     cursor: pointer;
-    border: 2px solid #dee2e6;
 }
 
 .form-check-input:checked {
     background-color: #ffc107;
     border-color: #ffc107;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10l3 3l6-6'/%3e%3c/svg%3e");
 }
 
 .form-check-input:focus {
@@ -755,208 +834,49 @@ input:checked + .switch-slider:before {
     box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
 }
 
-.form-check-input:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
 .form-check-label {
     cursor: pointer;
     user-select: none;
 }
 
-/* ⭐ 优先级按钮组 */
-.btn-group {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-.btn-group .btn-check:checked + label {
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
-    transform: translateY(0);
-}
-
-.btn-check:checked + .btn-outline-secondary {
-    background: #6c757d;
-    color: white;
-    border-color: #6c757d;
-}
-
-.btn-check:checked + .btn-outline-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-color: #667eea;
-}
-
-.btn-check:checked + .btn-outline-danger {
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-    color: white;
-    border-color: #dc3545;
-}
-
-/* ⭐ 依赖列表样式 */
-#depList {
-    max-height: 120px;
-    overflow-y: auto;
-    background: #f8f9fa;
-}
-
-#depList::-webkit-scrollbar {
-    width: 4px;
-}
-
-#depList::-webkit-scrollbar-track {
-    background: #e9ecef;
-}
-
-#depList::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 2px;
-}
-
-#depList::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
-
-#depList .form-check {
-    padding: 6px 8px;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-    margin-bottom: 4px;
-    background: transparent;
-}
-
-#depList .form-check:hover {
-    background: white;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-}
-
-#depList .form-check-input {
-    width: 1rem;
-    height: 1rem;
-}
-
-#depList .form-check-input:checked ~ .form-check-label {
-    color: #667eea;
-    font-weight: 600;
-}
-
-#depList .badge {
-    font-size: 0.6rem;
-    padding: 2px 5px;
-    margin-left: 4px;
-}
-
-#depList .form-check-label {
-    font-size: 0.85rem;
-    width: 100%;
-}
-
-/* ⭐ 备注输入框 */
+/* ⭐ 备注输入框（紧凑） */
 #editNotes {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     resize: vertical;
-    min-height: 60px;
-    max-height: 120px;
-    font-family: inherit;
-    line-height: 1.5;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    padding: 8px;
+    min-height: 50px;
+    line-height: 1.4;
 }
 
 #editNotes:focus {
     border-color: #667eea;
     box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-    outline: none;
-}
-
-#editNotes::placeholder {
-    color: #adb5bd;
-    font-style: italic;
 }
 
 #notesCounter {
-    display: block;
-    margin-top: 4px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     transition: color 0.2s ease;
 }
 
 /* ⭐ 父任务选择框 */
 #editParent {
     font-family: 'Courier New', monospace;
-    font-size: 0.85rem;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-}
-
-#editParent:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    font-size: 0.8rem;
 }
 
 #editParent option {
     padding: 4px 8px;
 }
 
-/* ⭐ 高级操作按钮 */
-#addSubTask,
-#deleteTask {
-    font-size: 0.85rem;
-    padding: 8px 12px;
-    transition: all 0.2s ease;
-    border-width: 1.5px;
+/* ⭐ 工期类型提示 */
+#durationTypeHint {
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
 }
 
-#addSubTask {
-    border-color: #10b981;
-    color: #10b981;
-}
-
-#addSubTask:hover {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
-    border-color: #10b981;
-    color: #059669;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
-}
-
-#deleteTask {
-    border-color: #dc3545;
-    color: #dc3545;
-}
-
-#deleteTask:hover {
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.1) 0%, rgba(200, 35, 51, 0.1) 100%);
-    border-color: #dc3545;
-    color: #c82333;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
-}
-
-.dep-list {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200) !important;
-    border-radius: 8px;
-    padding: 12px !important;
-}
-
-.dep-item {
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: 6px;
-    transition: all var(--transition-fast);
-}
-
-.dep-item:hover {
-    background: var(--gray-50);
-    border-color: var(--primary-color);
-    transform: translateX(2px);
-}
-
-/* 响应式设计 */
+/* ======================
+   响应式设计
+   ====================== */
 @media (max-width: 768px) {
     .floating-toolbar-expanded {
         left: 20px;
@@ -991,66 +911,42 @@ input:checked + .switch-slider:before {
         height: 32px;
     }
     
-    .quick-menu-icon {
-        font-size: 1rem;
-    }
-    
     .inline-task-form {
-        width: 280px !important;
-        font-size: 0.85rem;
+        width: 340px !important;
     }
     
-    .alert-info {
-        font-size: 0.75rem;
-        padding: 8px;
+    .form-row-compact {
+        flex-direction: column;
+        align-items: stretch;
     }
     
-    #editNotes {
-        min-height: 50px;
-        font-size: 0.8rem;
+    .form-row-compact > div {
+        width: 100% !important;
+        padding-left: 0 !important;
+        margin-bottom: 8px;
+    }
+    
+    .auto-info-compact {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+    
+    .auto-info-compact .separator {
+        display: none;
     }
 }
 
-/* 打印样式 */
+/* ======================
+   打印样式
+   ====================== */
 @media print {
     .toolbar-collapsed,
     .floating-toolbar-expanded,
     .settings-panel,
     .log-panel,
-    .quick-menu {
-        display: none !important;
-    }
-    
+    .quick-menu,
     .inline-task-form {
         display: none !important;
     }
-}
-
-/* ⭐ 删除按钮状态样式 */
-#deleteTask {
-    transition: all 0.2s ease;
-}
-
-#deleteTask:hover {
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.1) 0%, rgba(200, 35, 51, 0.1) 100%);
-    border-color: #dc3545;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.2);
-}
-
-#deleteTask:active {
-    transform: translateY(0);
-}
-
-/* 删除按钮禁用状态（有子任务时） */
-#deleteTask[disabled] {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background: #f8f9fa;
-}
-
-#deleteTask[disabled]:hover {
-    transform: none;
-    box-shadow: none;
-    border-color: #dee2e6;
 }
