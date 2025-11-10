@@ -1,14 +1,14 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图冲突检测模块                                              ▓▓
 // ▓▓ 路径: js/gantt-conflicts.js                                    ▓▓
-// ▓▓ 版本: Delta6 - 完整版                                          ▓▓
+// ▓▓ 版本: Epsilon15 - 兼容对象格式依赖 + 工期类型                  ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
     'use strict';
 
     /**
-     * 检测单个任务的时间冲突
+     * 检测单个任务的时间冲突（⭐ 兼容对象格式依赖）
      * @param {Object} task - 当前任务
      * @param {Array} allTasks - 所有任务数组
      * @returns {Array} 冲突信息数组
@@ -24,7 +24,15 @@
         const taskStart = new Date(task.start);
         
         // 遍历所有依赖任务
-        task.dependencies.forEach(depId => {
+        task.dependencies.forEach(dep => {
+            // ⭐ 兼容两种格式：字符串 或 对象
+            const depId = typeof dep === 'string' ? dep : (dep.taskId || dep);
+            
+            if (!depId) {
+                console.warn('Invalid dependency format:', dep);
+                return;
+            }
+            
             const depTask = allTasks.find(t => t.id === depId);
             
             if (!depTask) {
@@ -41,12 +49,11 @@
             
             const depEnd = new Date(depTask.end);
             
-            // 修正判断逻辑：任务开始时间 <= 依赖任务结束时间 就是冲突
-            // 因为任务应该在依赖任务结束后的次日开始
+            // 任务开始时间 <= 依赖任务结束时间 就是冲突
             if (taskStart <= depEnd) {
                 const daysDiff = daysBetween(taskStart, depEnd);
                 
-                // 计算正确的开始日期应该是什么
+                // 计算正确的开始日期
                 const correctStart = addDays(depEnd, 1);
                 const correctStartStr = formatDate(correctStart);
                 
@@ -58,7 +65,7 @@
                     dependencyId: depTask.id,
                     dependencyName: depTask.name,
                     dependencyEnd: depTask.end,
-                    daysDiff: daysDiff + 1, // 加1表示包含结束当天
+                    daysDiff: daysDiff + 1,
                     correctStart: correctStartStr,
                     message: `任务"${task.name}"(${task.start}开始)与依赖任务"${depTask.name}"(${depTask.end}结束)冲突，应在${correctStartStr}之后开始，当前冲突${daysDiff + 1}天`
                 });
@@ -162,13 +169,14 @@
      */
     function highlightConflictTasks(conflictTaskIds, container) {
         // 清除之前的高亮
-        container.querySelectorAll('.gantt-bar').forEach(bar => {
+        container.querySelectorAll('.gantt-bar, .gantt-milestone').forEach(bar => {
             bar.classList.remove('conflict');
         });
         
         // 添加冲突高亮
         conflictTaskIds.forEach(taskId => {
-            const bar = container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`);
+            const bar = container.querySelector(`.gantt-bar[data-task-id="${taskId}"]`) ||
+                       container.querySelector(`.gantt-milestone[data-task-id="${taskId}"]`);
             if (bar) {
                 bar.classList.add('conflict');
             }
@@ -176,7 +184,7 @@
     }
 
     /**
-     * 自动修复时间冲突（将任务移动到依赖任务结束后的次日）
+     * 自动修复时间冲突（⭐ 支持工期类型）
      * @param {Array} tasks - 任务数组
      * @returns {Object} 修复结果
      */
@@ -188,13 +196,23 @@
                 return;
             }
             
+            // 跳过汇总任务和里程碑
+            if (task.isSummary || task.isMilestone) {
+                return;
+            }
+            
             const taskStart = new Date(task.start);
-            const taskDuration = daysBetween(task.start, task.end);
+            const taskDuration = task.duration || daysBetween(task.start, task.end);
+            const taskDurationType = task.durationType || 'days';
             
             // 找出所有依赖任务中最晚的结束时间
             let latestDepEnd = null;
             let latestDepName = '';
-            task.dependencies.forEach(depId => {
+            
+            task.dependencies.forEach(dep => {
+                // ⭐ 兼容两种格式
+                const depId = typeof dep === 'string' ? dep : (dep.taskId || dep);
+                
                 const depTask = tasks.find(t => t.id === depId);
                 if (depTask) {
                     const depEnd = new Date(depTask.end);
@@ -205,14 +223,16 @@
                 }
             });
             
-            // 修正判断逻辑：如果任务开始 <= 依赖结束，则需要修复
+            // 如果任务开始 <= 依赖结束，则需要修复
             if (latestDepEnd && taskStart <= latestDepEnd) {
                 const oldStart = task.start;
                 const oldEnd = task.end;
                 
                 // 新开始时间 = 最晚依赖结束时间 + 1天
                 const newStart = addDays(latestDepEnd, 1);
-                const newEnd = addDays(newStart, taskDuration);
+                
+                // ⭐ 根据工期类型计算新结束时间
+                const newEnd = calculateEndDate(newStart, taskDuration, taskDurationType);
                 
                 task.start = formatDate(newStart);
                 task.end = formatDate(newEnd);
@@ -226,7 +246,8 @@
                     newEnd: task.end,
                     dependencyName: latestDepName,
                     dependencyEnd: formatDate(latestDepEnd),
-                    message: `任务"${task.name}"从 ${oldStart}~${oldEnd} 调整为 ${task.start}~${task.end} (依赖任务"${latestDepName}"结束于${formatDate(latestDepEnd)})`
+                    durationType: taskDurationType,
+                    message: `任务"${task.name}"从 ${oldStart}~${oldEnd} 调整为 ${task.start}~${task.end} (依赖任务"${latestDepName}"结束于${formatDate(latestDepEnd)}，工期${taskDuration}${taskDurationType === 'workdays' ? '工作日' : '自然日'})`
                 });
             }
         });
@@ -244,7 +265,11 @@
      * @returns {Object} 冲突检测结果
      */
     GanttChart.prototype.checkConflicts = function() {
+        console.log('🔍 开始检测冲突...');
+        
         const result = detectAllConflicts(this.tasks);
+        
+        console.log('冲突检测结果:', result);
         
         // 在日志区域显示报告
         const reportHtml = generateConflictReport(result);
@@ -272,15 +297,27 @@
     };
 
     /**
-     * 自动修复时间冲突
+     * 自动修复时间冲突（⭐ 支持工期类型）
      * @returns {Object} 修复结果
      */
     GanttChart.prototype.autoFixConflicts = function() {
+        console.log('🔧 开始自动修复冲突...');
+        
         const fixResult = autoFixConflicts(this.tasks);
+        
+        console.log('修复结果:', fixResult);
         
         if (fixResult.fixCount > 0) {
             fixResult.fixes.forEach(fix => {
                 addLog(`🔧 ${fix.message}`);
+            });
+            
+            // ⭐ 修复后更新父任务
+            fixResult.fixes.forEach(fix => {
+                const task = this.tasks.find(t => t.id === fix.taskId);
+                if (task && task.parentId) {
+                    this.updateParentTasks(task.id);
+                }
             });
             
             this.calculateDateRange();
@@ -308,7 +345,7 @@
      * 清除冲突高亮
      */
     GanttChart.prototype.clearConflictHighlights = function() {
-        this.container.querySelectorAll('.gantt-bar.conflict').forEach(bar => {
+        this.container.querySelectorAll('.gantt-bar.conflict, .gantt-milestone.conflict').forEach(bar => {
             bar.classList.remove('conflict');
         });
         addLog('🔄 已清除冲突高亮');
@@ -321,6 +358,6 @@
     global.highlightConflictTasks = highlightConflictTasks;
     global.autoFixConflicts = autoFixConflicts;
 
-    console.log('✅ gantt-conflicts.js loaded successfully (Delta6 - 完整版)');
+    console.log('✅ gantt-conflicts.js loaded successfully (Epsilon15 - 对象格式兼容)');
 
 })(typeof window !== 'undefined' ? window : this);
