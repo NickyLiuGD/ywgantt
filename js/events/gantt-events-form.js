@@ -1,15 +1,14 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图编辑表单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-form.js                           ▓▓
-// ▓▓ 版本: Epsilon14 - 紧凑布局优化版                               ▓▓
-// ▓▓ 宽度: 420px（原320px）                                         ▓▓
+// ▓▓ 版本: Epsilon15 - 依赖任务标签式选择                           ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
     'use strict';
 
     /**
-     * 显示任务编辑表单（紧凑布局版）
+     * 显示任务编辑表单
      */
     GanttChart.prototype.showInlineTaskForm = function(task) {
         const oldForm = this.container.querySelector('.inline-task-form');
@@ -32,8 +31,6 @@
             !t.isMilestone
         );
         
-        const availableDeps = this.tasks.filter(t => t.id !== task.id);
-        
         const currentDuration = task.isMilestone ? 0 : (task.duration || 1);
         const currentDurationType = task.durationType || 'days';
         
@@ -48,13 +45,20 @@
         const hasChildren = task.children && task.children.length > 0;
         const canDelete = !hasChildren;
 
-        // ⭐ 生成工期下拉选项（1-30天）
+        // ⭐ 生成工期下拉选项（1-30天 + 自定义）
         const durationOptions = Array.from({length: 30}, (_, i) => i + 1)
             .map(d => `<option value="${d}" ${currentDuration === d ? 'selected' : ''}>${d}</option>`)
             .join('');
 
+        // ⭐ 获取已选依赖任务
+        const selectedDeps = Array.isArray(task.dependencies) ? 
+            task.dependencies.map(dep => {
+                const depId = typeof dep === 'string' ? dep : dep.taskId;
+                return this.tasks.find(t => t.id === depId);
+            }).filter(t => t) : [];
+
         form.innerHTML = `
-            <!-- ⭐⭐⭐ 顶部工具栏（保存/删除图标化） ⭐⭐⭐ -->
+            <!-- 顶部工具栏 -->
             <div class="form-toolbar">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex gap-2">
@@ -75,7 +79,7 @@
                 </div>
             </div>
 
-            <!-- ⭐⭐⭐ 任务名称 + 里程碑开关（并列） ⭐⭐⭐ -->
+            <!-- 任务名称 + 里程碑开关 -->
             <div class="form-row-compact mb-2">
                 <div style="flex: 1;">
                     <label class="form-label-compact">任务名称</label>
@@ -97,7 +101,7 @@
                 </div>
             </div>
 
-            <!-- ⭐⭐⭐ 自动信息（紧凑显示） ⭐⭐⭐ -->
+            <!-- 自动信息 -->
             <div class="auto-info-compact mb-2">
                 <span><strong>WBS:</strong> <code id="autoWBS">${autoWBS}</code></span>
                 <span class="separator">|</span>
@@ -119,7 +123,7 @@
                 </select>
             </div>
 
-            <!-- ⭐⭐⭐ 开始日期 + 工期 + 工期类型（三项并列） ⭐⭐⭐ -->
+            <!-- 开始日期 + 工期 + 工期类型 -->
             <div class="form-row-compact mb-2">
                 <div style="flex: 1;">
                     <label class="form-label-compact">开始日期</label>
@@ -133,10 +137,10 @@
                             ${task.isMilestone || hasChildren ? 'disabled' : ''}>
                         <option value="0" ${currentDuration === 0 ? 'selected' : ''}>0</option>
                         ${durationOptions}
-                        <option value="custom" ${currentDuration > 30 ? 'selected' : ''}>自定义</option>
+                        ${currentDuration > 30 ? `<option value="${currentDuration}" selected>${currentDuration}</option>` : ''}
                     </select>
                 </div>
-                <div style="width: 100px; padding-left: 8px;">
+                <div style="width: 110px; padding-left: 8px;">
                     <label class="form-label-compact">类型</label>
                     <select class="form-select form-select-sm" id="editDurationType"
                             ${task.isMilestone || hasChildren ? 'disabled' : ''}>
@@ -163,7 +167,7 @@
                     </small>
                 </div>`}
 
-            <!-- ⭐⭐⭐ 进度 + 优先级（并列） ⭐⭐⭐ -->
+            <!-- 进度 + 优先级 -->
             <div class="form-row-compact mb-2" id="progressPrioritySection" 
                  ${hasChildren || task.isMilestone ? 'style="display:none"' : ''}>
                 <div style="flex: 1;">
@@ -185,27 +189,26 @@
                 </div>
             </div>
 
-            <!-- ⭐⭐⭐ 依赖任务（多选下拉框） ⭐⭐⭐ -->
+            <!-- ⭐⭐⭐ 依赖任务（标签式显示 + 编辑按钮） ⭐⭐⭐ -->
             <div class="mb-2">
-                <label class="form-label-compact">依赖任务（前置任务）</label>
-                <select class="form-select form-select-sm" id="editDependencies" multiple size="4">
-                    ${availableDeps.map(t => {
-                        const isSelected = Array.isArray(task.dependencies) ? 
-                            task.dependencies.some(dep => 
-                                (typeof dep === 'string' ? dep : dep.taskId) === t.id
-                            ) : false;
-                        
-                        const indent = '├─ '.repeat((t.outlineLevel || 1) - 1);
-                        const icon = t.isMilestone ? '🎯' : (t.children?.length > 0 ? '📁' : '📋');
-                        
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="form-label-compact mb-0">依赖任务（前置任务）</label>
+                    <button class="btn btn-sm btn-outline-primary" id="editDepsBtn" type="button" 
+                            style="padding: 2px 10px; font-size: 0.75rem;">
+                        <span>✏️</span> 编辑
+                    </button>
+                </div>
+                <div class="deps-tags-container" id="depsTagsContainer">
+                    ${selectedDeps.length > 0 ? selectedDeps.map(dep => {
+                        const icon = dep.isMilestone ? '🎯' : (dep.children?.length > 0 ? '📁' : '📋');
                         return `
-                            <option value="${t.id}" ${isSelected ? 'selected' : ''}>
-                                ${indent}${icon} ${t.wbs ? '[' + t.wbs + '] ' : ''}${t.name}
-                            </option>
+                            <span class="dep-tag" data-dep-id="${dep.id}">
+                                ${icon} ${dep.wbs ? '[' + dep.wbs + '] ' : ''}${dep.name}
+                                <button class="dep-tag-remove" data-dep-id="${dep.id}" type="button" title="移除">×</button>
+                            </span>
                         `;
-                    }).join('')}
-                </select>
-                <small class="text-muted">按住 Ctrl/Cmd 多选</small>
+                    }).join('') : '<span class="text-muted small">无依赖任务</span>'}
+                </div>
             </div>
 
             <!-- 任务备注 -->
@@ -220,7 +223,7 @@
             </div>
 
             ${!canDelete ? `
-                <small class="text-warning d-block" style="font-size: 0.7rem; padding: 4px 8px; background: rgba(255, 193, 7, 0.1); border-radius: 4px;">
+                <small class="text-warning d-block mb-2" style="font-size: 0.7rem; padding: 4px 8px; background: rgba(255, 193, 7, 0.1); border-radius: 4px;">
                     ⚠️ 包含 ${task.children.length} 个子任务，删除按钮已禁用
                 </small>
             ` : ''}
@@ -395,7 +398,24 @@
         if (durationSelect) durationSelect.addEventListener('change', updateEndDate);
         if (durationTypeSelect) durationTypeSelect.addEventListener('change', updateEndDate);
 
-        // ⭐ 保存按钮
+        // ⭐⭐⭐ 编辑依赖按钮 ⭐⭐⭐
+        const editDepsBtn = form.querySelector('#editDepsBtn');
+        if (editDepsBtn) {
+            editDepsBtn.onclick = () => {
+                this.showDependencySelector(task, form);
+            };
+        }
+
+        // ⭐ 依赖标签删除按钮
+        form.querySelectorAll('.dep-tag-remove').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const depId = btn.dataset.depId;
+                this.removeDependency(task, depId, form);
+            };
+        });
+
+        // 保存按钮
         const saveBtn = form.querySelector('#saveTask');
         if (saveBtn) {
             saveBtn.onclick = (e) => {
@@ -466,6 +486,228 @@
     };
 
     /**
+     * ⭐ 显示依赖任务选择器（模态框）
+     */
+    GanttChart.prototype.showDependencySelector = function(task, parentForm) {
+        // 移除旧的选择器
+        const oldSelector = document.querySelector('.dependency-selector-modal');
+        if (oldSelector) oldSelector.remove();
+
+        const modal = document.createElement('div');
+        modal.className = 'dependency-selector-modal';
+        
+        const availableTasks = this.tasks.filter(t => t.id !== task.id);
+        
+        // 获取当前已选依赖
+        const currentDeps = Array.isArray(task.dependencies) ? 
+            task.dependencies.map(dep => typeof dep === 'string' ? dep : dep.taskId) : [];
+
+        modal.innerHTML = `
+            <div class="dependency-selector-overlay"></div>
+            <div class="dependency-selector-content">
+                <div class="dependency-selector-header">
+                    <h6 class="mb-0 fw-bold">选择依赖任务</h6>
+                    <button type="button" class="btn-close" id="closeDepsSelector"></button>
+                </div>
+                
+                <div class="dependency-selector-body">
+                    <!-- 搜索框 -->
+                    <div class="mb-2">
+                        <input type="text" class="form-control form-control-sm" id="depsSearchInput" 
+                               placeholder="🔍 搜索任务名称或WBS..." style="font-size: 0.85rem;">
+                    </div>
+                    
+                    <!-- 任务列表 -->
+                    <div class="deps-list" id="depsList">
+                        ${availableTasks.map(t => {
+                            const isChecked = currentDeps.includes(t.id);
+                            const indent = '　'.repeat((t.outlineLevel || 1) - 1);
+                            const icon = t.isMilestone ? '🎯' : (t.children?.length > 0 ? '📁' : '📋');
+                            
+                            return `
+                                <div class="form-check deps-item" data-task-name="${t.name.toLowerCase()}" data-task-wbs="${t.wbs || ''}">
+                                    <input class="form-check-input" type="checkbox" 
+                                           value="${t.id}" 
+                                           id="depCheck_${t.id}"
+                                           ${isChecked ? 'checked' : ''}>
+                                    <label class="form-check-label" for="depCheck_${t.id}">
+                                        ${indent}${icon} ${t.wbs ? '<span class="wbs-badge-small">[' + t.wbs + ']</span> ' : ''}${t.name}
+                                        ${t.isMilestone ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem">里程碑</span>' : ''}
+                                    </label>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+                
+                <div class="dependency-selector-footer">
+                    <div class="text-muted small mb-2">
+                        已选择 <strong id="selectedCount">${currentDeps.length}</strong> 个任务
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary btn-sm flex-fill" id="confirmDeps" type="button">
+                            ✅ 确定
+                        </button>
+                        <button class="btn btn-secondary btn-sm flex-fill" id="cancelDeps" type="button">
+                            ❌ 取消
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // 绑定模态框事件
+        this.bindDependencySelectorEvents(modal, task, parentForm);
+
+        // 显示动画
+        requestAnimationFrame(() => {
+            modal.classList.add('show');
+        });
+    };
+
+    /**
+     * ⭐ 绑定依赖选择器事件
+     */
+    GanttChart.prototype.bindDependencySelectorEvents = function(modal, task, parentForm) {
+        const closeDepsSelector = () => {
+            modal.classList.remove('show');
+            setTimeout(() => {
+                if (modal.parentElement) {
+                    modal.parentElement.removeChild(modal);
+                }
+            }, 200);
+        };
+
+        // 关闭按钮
+        const closeBtn = modal.querySelector('#closeDepsSelector');
+        if (closeBtn) closeBtn.onclick = closeDepsSelector;
+
+        // 取消按钮
+        const cancelBtn = modal.querySelector('#cancelDeps');
+        if (cancelBtn) cancelBtn.onclick = closeDepsSelector;
+
+        // 点击遮罩关闭
+        const overlay = modal.querySelector('.dependency-selector-overlay');
+        if (overlay) overlay.onclick = closeDepsSelector;
+
+        // 搜索功能
+        const searchInput = modal.querySelector('#depsSearchInput');
+        const depsItems = modal.querySelectorAll('.deps-item');
+        
+        if (searchInput) {
+            searchInput.oninput = () => {
+                const keyword = searchInput.value.toLowerCase();
+                
+                depsItems.forEach(item => {
+                    const name = item.dataset.taskName;
+                    const wbs = item.dataset.taskWbs;
+                    
+                    if (name.includes(keyword) || wbs.includes(keyword)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            };
+        }
+
+        // 复选框计数
+        const checkboxes = modal.querySelectorAll('.deps-list input[type="checkbox"]');
+        const selectedCount = modal.querySelector('#selectedCount');
+        
+        checkboxes.forEach(cb => {
+            cb.onchange = () => {
+                const count = Array.from(checkboxes).filter(c => c.checked).length;
+                if (selectedCount) {
+                    selectedCount.textContent = count;
+                }
+            };
+        });
+
+        // 确定按钮
+        const confirmBtn = modal.querySelector('#confirmDeps');
+        if (confirmBtn) {
+            confirmBtn.onclick = () => {
+                const selectedIds = Array.from(checkboxes)
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value);
+                
+                // 更新任务的依赖关系
+                task.dependencies = selectedIds.map(depId => ({
+                    taskId: depId,
+                    type: 'FS',
+                    lag: 0
+                }));
+                
+                // 更新父表单的依赖标签显示
+                this.updateDependencyTags(task, parentForm);
+                
+                addLog(`✅ 已更新 "${task.name}" 的依赖关系（${selectedIds.length} 个）`);
+                
+                closeDepsSelector();
+            };
+        }
+    };
+
+    /**
+     * ⭐ 更新依赖标签显示
+     */
+    GanttChart.prototype.updateDependencyTags = function(task, form) {
+        const container = form.querySelector('#depsTagsContainer');
+        if (!container) return;
+
+        const selectedDeps = Array.isArray(task.dependencies) ? 
+            task.dependencies.map(dep => {
+                const depId = typeof dep === 'string' ? dep : dep.taskId;
+                return this.tasks.find(t => t.id === depId);
+            }).filter(t => t) : [];
+
+        if (selectedDeps.length > 0) {
+            container.innerHTML = selectedDeps.map(dep => {
+                const icon = dep.isMilestone ? '🎯' : (dep.children?.length > 0 ? '📁' : '📋');
+                return `
+                    <span class="dep-tag" data-dep-id="${dep.id}">
+                        ${icon} ${dep.wbs ? '[' + dep.wbs + '] ' : ''}${dep.name}
+                        <button class="dep-tag-remove" data-dep-id="${dep.id}" type="button" title="移除">×</button>
+                    </span>
+                `;
+            }).join('');
+            
+            // 重新绑定删除按钮
+            container.querySelectorAll('.dep-tag-remove').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    const depId = btn.dataset.depId;
+                    this.removeDependency(task, depId, form);
+                };
+            });
+        } else {
+            container.innerHTML = '<span class="text-muted small">无依赖任务</span>';
+        }
+    };
+
+    /**
+     * ⭐ 移除单个依赖
+     */
+    GanttChart.prototype.removeDependency = function(task, depId, form) {
+        if (!task.dependencies) return;
+
+        const depTask = this.tasks.find(t => t.id === depId);
+        const depName = depTask ? depTask.name : '未知任务';
+
+        task.dependencies = task.dependencies.filter(dep => {
+            const id = typeof dep === 'string' ? dep : dep.taskId;
+            return id !== depId;
+        });
+
+        this.updateDependencyTags(task, form);
+        
+        addLog(`✅ 已移除依赖：${depName}`);
+    };
+
+    /**
      * 保存任务表单
      */
     GanttChart.prototype.saveTaskForm = function(form, task) {
@@ -483,10 +725,6 @@
         const progress = parseInt(form.querySelector('#editProgress')?.value) || 0;
         const priority = form.querySelector('#editPriority').value;
         const notes = form.querySelector('#editNotes').value.trim();
-
-        // ⭐ 获取多选依赖
-        const depsSelect = form.querySelector('#editDependencies');
-        const selectedDeps = depsSelect ? Array.from(depsSelect.selectedOptions).map(opt => opt.value) : [];
 
         const hasChildren = task.children && task.children.length > 0;
         
@@ -534,12 +772,7 @@
 
         task.wbs = this.generateWBS(task.id);
 
-        // ⭐ 保存多选依赖
-        task.dependencies = selectedDeps.map(depId => ({
-            taskId: depId,
-            type: 'FS',
-            lag: 0
-        }));
+        // ⭐ 依赖关系已在编辑器中实时更新，这里不需要再处理
 
         if (hasChildren) {
             this.recalculateSummaryTask(task.id);
@@ -564,7 +797,7 @@
     };
 
     /**
-     * 更新表单位置（⭐ 宽度增加到420px）
+     * 更新表单位置
      */
     GanttChart.prototype.updateFormPosition = function(form, bar, container) {
         try {
@@ -580,7 +813,7 @@
             let formTop = barTopInContainer + barRect.height + 8;
             let formLeft = barLeftInContainer + 20;
             
-            const formWidth = 420; // ⭐ 从320px增加到420px
+            const formWidth = 420;
             const maxLeft = container.scrollWidth - formWidth - 20;
             if (formLeft > maxLeft) {
                 formLeft = maxLeft;
@@ -592,7 +825,7 @@
             
             const viewportHeight = containerRect.height;
             const barBottomInViewport = barRect.bottom - containerRect.top;
-            const formHeight = 480; // ⭐ 紧凑布局，高度降低
+            const formHeight = 450;
             
             if (barBottomInViewport + formHeight > viewportHeight) {
                 formTop = barTopInContainer - formHeight - 8;
@@ -606,7 +839,7 @@
             form.style.left = `${formLeft}px`;
             form.style.top = `${formTop}px`;
             form.style.zIndex = '1000';
-            form.style.width = '420px'; // ⭐ 宽度420px
+            form.style.width = '420px';
             form.style.maxHeight = '85vh';
             form.style.overflowY = 'auto';
             form.style.background = 'white';
@@ -722,6 +955,6 @@
         }
     };
 
-    console.log('✅ gantt-events-form.js loaded successfully (Epsilon14 - 紧凑布局)');
+    console.log('✅ gantt-events-form.js loaded successfully (Epsilon15 - 依赖标签式选择)');
 
 })();
