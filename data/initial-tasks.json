@@ -13,16 +13,16 @@
       "durationType": "workdays",
       "progress": 65,
       "priority": "high",
-      "notes": "使用 Figma 完成所有页面的 UI 设计（按工作日计算）"
+      "notes": "使用 Figma 完成 UI 设计（工作日）"
     },
     {
       "uid": 2,
       "name": "内容编写",
       "startOffset": 3,
-      "duration": 10,
+      "duration": 7,
       "durationType": "days",
       "progress": 30,
-      "notes": "编写网站文案（按自然日计算，包含周末）"
+      "notes": "编写网站文案（自然日，含周末）"
     },
     {
       "uid": 3,
@@ -31,17 +31,17 @@
       "duration": 3,
       "durationType": "workdays",
       "progress": 45,
-      "notes": "CSS 样式开发（按工作日）"
+      "notes": "CSS 开发（工作日）"
     },
     {
       "uid": 4,
       "name": "测试审核",
       "startOffset": -2,
-      "duration": 5,
+      "duration": 7,
       "durationType": "days",
       "progress": 80,
       "priority": "high",
-      "notes": "功能测试（按自然日，含周末加班）"
+      "notes": "测试（自然日，含周末加班）"
     },
     {
       "uid": 5,
@@ -50,7 +50,7 @@
       "duration": 0,
       "isMilestone": true,
       "priority": "high",
-      "notes": "项目正式上线"
+      "notes": "正式上线"
     }
   ]
 }

@@ -1,23 +1,28 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图编辑表单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-form.js                           ▓▓
-// ▓▓ 版本: Epsilon10 - 支持工作日/自然日工期计算 + 手柄颜色区分     ▓▓
-// ▓▓ 行数: ~630行                                                   ▓▓
+// ▓▓ 版本: Epsilon12 - 完整版（禁止删除有子任务 + 工期类型）        ▓▓
+// ▓▓ 行数: ~600行                                                   ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
     'use strict';
 
     /**
-     * 显示任务编辑表单（完整版 - 支持工期类型）
+     * 显示任务编辑表单（完整版）
      */
     GanttChart.prototype.showInlineTaskForm = function(task) {
+        // 移除旧表单
         const oldForm = this.container.querySelector('.inline-task-form');
         if (oldForm) oldForm.remove();
 
+        // 查找任务条
         const bar = this.container.querySelector(`.gantt-bar[data-task-id="${task.id}"]`) ||
                     this.container.querySelector(`.gantt-milestone[data-task-id="${task.id}"]`);
-        if (!bar) return;
+        if (!bar) {
+            console.warn('Task bar not found for:', task.id);
+            return;
+        }
 
         const form = document.createElement('div');
         form.className = 'inline-task-form';
@@ -33,9 +38,9 @@
         // 获取可选依赖任务
         const availableDeps = this.tasks.filter(t => t.id !== task.id);
         
-        // ⭐ 获取当前工期和类型
-        const currentDuration = task.isMilestone ? 0 : (task.duration || daysBetween(task.start, task.end) + 1);
-        const currentDurationType = task.durationType || 'workdays'; // 默认工作日
+        // 计算当前工期和类型
+        const currentDuration = task.isMilestone ? 0 : (task.duration || 1);
+        const currentDurationType = task.durationType || 'days'; // 默认自然日
         
         const currentParent = task.parentId ? this.tasks.find(t => t.id === task.parentId) : null;
         
@@ -45,11 +50,15 @@
                             '普通任务';
         const autoWBS = task.wbs || this.generateWBS(task.id);
         const autoOutlineLevel = task.outlineLevel || 1;
+        
+        // ⭐ 判断是否可删除
+        const hasChildren = task.children && task.children.length > 0;
+        const canDelete = !hasChildren;
 
         form.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h6 class="mb-0 fw-bold">
-                    <span class="task-form-icon">${task.isMilestone ? '🎯' : (task.children?.length > 0 ? '📁' : '📋')}</span>
+                    <span class="task-form-icon">${task.isMilestone ? '🎯' : (hasChildren ? '📁' : '📋')}</span>
                     编辑任务
                 </h6>
                 <button type="button" class="btn-close btn-close-sm" id="closeForm" aria-label="关闭"></button>
@@ -90,15 +99,15 @@
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="editMilestone" 
                            ${task.isMilestone ? 'checked' : ''}
-                           ${task.children && task.children.length > 0 ? 'disabled' : ''}>
+                           ${hasChildren ? 'disabled' : ''}>
                     <label class="form-check-label fw-semibold" for="editMilestone">
                         🎯 标记为里程碑
-                        ${task.children && task.children.length > 0 ? 
+                        ${hasChildren ? 
                             '<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem">有子任务，不可设为里程碑</span>' : ''}
                     </label>
                 </div>
                 <small class="text-muted d-block ms-4">
-                    ${task.children && task.children.length > 0 ? 
+                    ${hasChildren ? 
                         '⚠️ 有子任务的任务不能设为里程碑' : 
                         '里程碑用于标记项目关键节点，工期为0'}
                 </small>
@@ -118,7 +127,7 @@
                     <span>任务类型：</span>
                     <strong id="autoType" class="text-success">${autoTaskType}</strong>
                 </div>
-                ${task.children && task.children.length > 0 ? `
+                ${hasChildren ? `
                     <div class="mt-2 pt-2 border-top">
                         <small class="text-muted">
                             📊 包含 <strong>${task.children.length}</strong> 个子任务，时间和进度自动计算
@@ -127,14 +136,14 @@
                 ` : ''}
             </div>
 
-            <!-- ⭐⭐⭐ 时间设置区域（支持工期类型） ⭐⭐⭐ -->
+            <!-- 时间设置区域 -->
             <div class="mb-3" id="timeSection">
                 <!-- 开始日期 -->
                 <div class="mb-2">
                     <label class="form-label fw-semibold">开始日期</label>
                     <input type="date" class="form-control form-control-sm" id="editStart" 
                            value="${task.start}"
-                           ${task.children && task.children.length > 0 ? 'disabled' : ''}>
+                           ${hasChildren ? 'disabled' : ''}>
                 </div>
 
                 <!-- 工期和工期类型 -->
@@ -144,12 +153,12 @@
                         <input type="number" class="form-control form-control-sm" id="editDuration" 
                                value="${currentDuration}" 
                                min="0" max="365" step="1"
-                               ${task.isMilestone || (task.children && task.children.length > 0) ? 'disabled' : ''}>
+                               ${task.isMilestone || hasChildren ? 'disabled' : ''}>
                     </div>
                     <div class="col-6">
                         <label class="form-label fw-semibold">工期类型</label>
                         <select class="form-select form-select-sm" id="editDurationType"
-                                ${task.isMilestone || (task.children && task.children.length > 0) ? 'disabled' : ''}>
+                                ${task.isMilestone || hasChildren ? 'disabled' : ''}>
                             <option value="workdays" ${currentDurationType === 'workdays' ? 'selected' : ''}>
                                 💼 工作日
                             </option>
@@ -161,7 +170,7 @@
                 </div>
 
                 <!-- 结束日期显示 -->
-                ${task.children && task.children.length > 0 ? 
+                ${hasChildren ? 
                     `<div class="alert alert-warning py-2 mb-0" style="font-size: 0.8rem;">
                         ⚠️ 汇总任务的时间由子任务自动计算
                     </div>` : 
@@ -169,21 +178,21 @@
                         <span class="text-muted small">结束日期：</span>
                         <strong id="calculatedEndDate" class="text-success" style="font-size: 0.95rem;">${task.end}</strong>
                     </div>
-                    <div id="durationTypeHint" 
-                         data-type="${currentDurationType}"
-                         style="font-size: 0.75rem; padding: 6px 10px; border-radius: 6px; 
-                                background: ${currentDurationType === 'workdays' ? 'rgba(102, 126, 234, 0.1)' : 'rgba(16, 185, 129, 0.1)'};
-                                color: ${currentDurationType === 'workdays' ? '#667eea' : '#10b981'};
-                                border-left: 3px solid ${currentDurationType === 'workdays' ? '#667eea' : '#10b981'};">
+                    <small class="text-muted d-block" id="durationTypeHint" 
+                           data-type="${currentDurationType}"
+                           style="padding: 6px 10px; border-radius: 6px; 
+                                  background: ${currentDurationType === 'workdays' ? 'rgba(102, 126, 234, 0.1)' : 'rgba(16, 185, 129, 0.1)'};
+                                  color: ${currentDurationType === 'workdays' ? '#667eea' : '#10b981'};
+                                  border-left: 3px solid ${currentDurationType === 'workdays' ? '#667eea' : '#10b981'};">
                         ${currentDurationType === 'workdays' ? 
                             '💼 按工作日计算（跳过周末）' : 
                             '📅 按自然日计算（包含周末）'}
-                    </div>`}
+                    </small>`}
             </div>
 
             <!-- 进度 -->
             <div class="mb-3" id="progressSection" 
-                 ${task.children?.length > 0 || task.isMilestone ? 'style="display:none"' : ''}>
+                 ${hasChildren || task.isMilestone ? 'style="display:none"' : ''}>
                 <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
                     完成进度
                     <span id="progressVal" class="badge bg-primary">${task.progress || 0}%</span>
@@ -276,24 +285,34 @@
                     <button class="btn btn-outline-success btn-sm flex-fill" id="addSubTask">
                         <span>➕</span> 添加子任务
                     </button>
-                    <button class="btn btn-outline-danger btn-sm flex-fill" id="deleteTask">
+                    <button class="btn btn-outline-danger btn-sm flex-fill" id="deleteTask"
+                            ${!canDelete ? 'disabled' : ''}
+                            title="${!canDelete ? '有子任务的任务不可删除' : '删除此任务'}">
                         <span>🗑️</span> 删除任务
+                        ${!canDelete ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem">禁用</span>' : ''}
                     </button>
                 </div>
+                ${!canDelete ? `
+                    <small class="text-warning d-block mt-2" style="font-size: 0.75rem;">
+                        ⚠️ 此任务包含 ${task.children.length} 个子任务，请先删除子任务或移动到其他父任务下
+                    </small>
+                ` : ''}
             </div>
         `;
 
         const rowsContainer = this.container.querySelector('.gantt-rows-container');
-        if (!rowsContainer) return;
+        if (!rowsContainer) {
+            console.warn('Rows container not found');
+            return;
+        }
         
         rowsContainer.appendChild(form);
         this.updateFormPosition(form, bar, rowsContainer);
-
         this.bindFormEvents(form, task, bar, rowsContainer);
     };
 
     /**
-     * 绑定表单事件（完整版 - 支持工期类型）
+     * 绑定表单事件（完整版）
      */
     GanttChart.prototype.bindFormEvents = function(form, task, bar, rowsContainer) {
         // ==================== 滚动监听 ====================
@@ -347,7 +366,6 @@
         if (milestoneSwitch) {
             milestoneSwitch.onchange = () => {
                 if (milestoneSwitch.checked) {
-                    // 切换为里程碑
                     durationInput.value = 0;
                     durationInput.disabled = true;
                     if (durationTypeSelect) durationTypeSelect.disabled = true;
@@ -358,8 +376,7 @@
                     }
                     updateEndDate();
                 } else {
-                    // 切换为普通任务
-                    durationInput.value = 1;
+                    durationInput.value = 1; // 默认1天
                     durationInput.disabled = false;
                     if (durationTypeSelect) durationTypeSelect.disabled = false;
                     if (progressSection) progressSection.style.display = 'block';
@@ -412,58 +429,57 @@
             };
         }
 
-        // ⭐⭐⭐ 自动计算结束日期（支持工期类型 + 增强提示） ⭐⭐⭐
+        // ==================== 自动计算结束日期 ====================
         const startInput = form.querySelector('#editStart');
         const endDateDisplay = form.querySelector('#calculatedEndDate');
         const durationTypeHint = form.querySelector('#durationTypeHint');
         
         const updateEndDate = () => {
-            const start = startInput.value;
-            const duration = parseInt(durationInput.value) || 0;
-            const durationType = durationTypeSelect ? durationTypeSelect.value : 'workdays';
+            const start = startInput ? startInput.value : null;
+            const duration = durationInput ? (parseInt(durationInput.value) || 0) : 0;
+            const durationType = durationTypeSelect ? durationTypeSelect.value : 'days';
             
             if (start && duration >= 0 && endDateDisplay) {
                 const startDate = new Date(start);
                 
-                // ⭐ 根据工期类型计算结束日期
+                // 根据工期类型计算结束日期
                 const endDate = calculateEndDate(startDate, duration, durationType);
                 const endDateStr = formatDate(endDate);
                 
-                // 更新结束日期显示（带颜色）
                 endDateDisplay.textContent = endDateStr;
                 endDateDisplay.style.color = durationType === 'workdays' ? '#667eea' : '#10b981';
                 endDateDisplay.style.fontWeight = '600';
-                endDateDisplay.style.transition = 'all 0.3s ease';
                 
-                // ⭐ 更新提示文字和样式
+                // 更新提示文字
                 if (durationTypeHint) {
                     durationTypeHint.setAttribute('data-type', durationType);
                     
                     if (durationType === 'workdays') {
-                        durationTypeHint.innerHTML = '💼 按工作日计算（跳过周末）';
                         durationTypeHint.style.background = 'rgba(102, 126, 234, 0.1)';
                         durationTypeHint.style.color = '#667eea';
                         durationTypeHint.style.borderLeft = '3px solid #667eea';
+                        durationTypeHint.innerHTML = '💼 按工作日计算（跳过周末）';
                     } else {
-                        durationTypeHint.innerHTML = '📅 按自然日计算（包含周末）';
                         durationTypeHint.style.background = 'rgba(16, 185, 129, 0.1)';
                         durationTypeHint.style.color = '#10b981';
                         durationTypeHint.style.borderLeft = '3px solid #10b981';
+                        durationTypeHint.innerHTML = '📅 按自然日计算（包含周末）';
                     }
                     
-                    // ⭐ 显示详细信息
+                    // 显示实际跨度
                     if (duration > 0 && !task.isMilestone) {
                         const actualDays = daysBetween(startDate, endDate) + 1;
                         
                         if (durationType === 'workdays') {
-                            // 工作日模式：显示实际跨度和跳过的周末
                             if (actualDays !== duration) {
-                                const weekendDays = actualDays - duration;
                                 durationTypeHint.innerHTML += ` <span class="text-info fw-semibold">(实际跨度 ${actualDays} 天)</span>`;
+                            }
+                            
+                            const weekendDays = actualDays - duration;
+                            if (weekendDays > 0) {
                                 durationTypeHint.innerHTML += ` <span class="badge bg-secondary" style="font-size:0.65rem">跳过 ${weekendDays} 天周末</span>`;
                             }
                         } else {
-                            // 自然日模式：显示包含的周末天数
                             const weekendCount = countWeekendsInRange(startDate, endDate);
                             if (weekendCount > 0) {
                                 durationTypeHint.innerHTML += ` <span class="badge bg-success" style="font-size:0.65rem">含 ${weekendCount} 天周末</span>`;
@@ -477,21 +493,15 @@
         if (startInput) startInput.addEventListener('change', updateEndDate);
         if (durationInput) durationInput.addEventListener('input', updateEndDate);
         
-        // ⭐ 工期类型切换事件（带动画效果）
+        // 工期类型切换事件
         if (durationTypeSelect) {
             durationTypeSelect.onchange = () => {
                 // 添加切换动画
                 if (endDateDisplay) {
+                    endDateDisplay.style.transition = 'all 0.3s ease';
                     endDateDisplay.style.transform = 'scale(1.15)';
                     setTimeout(() => {
                         endDateDisplay.style.transform = 'scale(1)';
-                    }, 300);
-                }
-                
-                if (durationTypeHint) {
-                    durationTypeHint.style.transform = 'translateX(-5px)';
-                    setTimeout(() => {
-                        durationTypeHint.style.transform = 'translateX(0)';
                     }, 300);
                 }
                 
@@ -503,9 +513,12 @@
         }
 
         // ==================== 保存按钮 ====================
-        form.querySelector('#saveTask').onclick = () => {
-            this.saveTaskForm(form, task);
-        };
+        const saveBtn = form.querySelector('#saveTask');
+        if (saveBtn) {
+            saveBtn.onclick = () => {
+                this.saveTaskForm(form, task);
+            };
+        }
 
         // ==================== 取消按钮 ====================
         const cancelForm = () => {
@@ -513,8 +526,15 @@
             form.remove();
         };
         
-        form.querySelector('#cancelEdit').onclick = cancelForm;
-        form.querySelector('#closeForm').onclick = cancelForm;
+        const cancelBtn = form.querySelector('#cancelEdit');
+        if (cancelBtn) {
+            cancelBtn.onclick = cancelForm;
+        }
+        
+        const closeBtn = form.querySelector('#closeForm');
+        if (closeBtn) {
+            closeBtn.onclick = cancelForm;
+        }
 
         // ==================== 添加子任务按钮 ====================
         const addSubTaskBtn = form.querySelector('#addSubTask');
@@ -525,18 +545,67 @@
             };
         }
 
-        // ==================== 删除任务按钮 ====================
-        form.querySelector('#deleteTask').onclick = () => {
-            const childrenCount = task.children ? task.children.length : 0;
-            const warningMsg = childrenCount > 0 ? 
-                `\n\n⚠️ 此任务包含 ${childrenCount} 个子任务，将一并删除！` : 
-                '\n\n注意：其他依赖此任务的任务将失去该依赖关系。';
-            
-            if (confirm(`确定删除任务 "${task.name}"?${warningMsg}`)) {
-                this.deleteTaskWithChildren(task.id);
-                form.remove();
-            }
-        };
+        // ⭐⭐⭐ 删除任务按钮（新逻辑） ⭐⭐⭐
+        const deleteTaskBtn = form.querySelector('#deleteTask');
+        if (deleteTaskBtn) {
+            deleteTaskBtn.onclick = () => {
+                // 检查是否有子任务
+                if (task.children && task.children.length > 0) {
+                    // ⭐ 有子任务：禁止删除
+                    const childrenNames = task.children
+                        .map(childId => {
+                            const child = this.tasks.find(t => t.id === childId);
+                            return child ? child.name : null;
+                        })
+                        .filter(name => name);
+                    
+                    let message = `❌ 无法删除任务 "${task.name}"\n\n`;
+                    message += `此任务包含 ${task.children.length} 个子任务：\n`;
+                    childrenNames.slice(0, 5).forEach(name => {
+                        message += `  • ${name}\n`;
+                    });
+                    if (task.children.length > 5) {
+                        message += `  ... 等 ${task.children.length} 个子任务\n`;
+                    }
+                    message += `\n💡 建议操作：\n`;
+                    message += `  1. 先删除所有子任务\n`;
+                    message += `  2. 或将子任务移动到其他父任务下`;
+                    
+                    alert(message);
+                    addLog(`❌ 无法删除 "${task.name}"：包含 ${task.children.length} 个子任务`);
+                    return;
+                }
+                
+                // ⭐ 无子任务：检查依赖关系并确认删除
+                const dependentTasks = this.tasks.filter(t => 
+                    t.dependencies && t.dependencies.some(dep => 
+                        (typeof dep === 'string' ? dep : dep.taskId) === task.id
+                    )
+                );
+                
+                let confirmMessage = `确定删除任务 "${task.name}"？\n\n`;
+                
+                if (dependentTasks.length > 0) {
+                    confirmMessage += `⚠️ 警告：有 ${dependentTasks.length} 个任务依赖此任务：\n`;
+                    dependentTasks.slice(0, 3).forEach(t => {
+                        confirmMessage += `  • ${t.name}\n`;
+                    });
+                    if (dependentTasks.length > 3) {
+                        confirmMessage += `  ... 等 ${dependentTasks.length} 个任务\n`;
+                    }
+                    confirmMessage += `\n删除后，这些依赖关系将被移除。\n`;
+                }
+                
+                confirmMessage += `\n此操作不可撤销，是否继续？`;
+                
+                if (confirm(confirmMessage)) {
+                    this.deleteTaskWithChildren(task.id);
+                    form.remove();
+                } else {
+                    addLog(`❌ 已取消删除任务 "${task.name}"`);
+                }
+            };
+        }
 
         // ==================== 点击外部关闭 ====================
         const clickOutside = (e) => {
@@ -550,7 +619,7 @@
     };
 
     /**
-     * 保存任务表单（⭐ 支持工期类型）
+     * 保存任务表单
      */
     GanttChart.prototype.saveTaskForm = function(form, task) {
         // ==================== 获取表单数据 ====================
@@ -565,9 +634,9 @@
         const start = form.querySelector('#editStart').value;
         const duration = parseInt(form.querySelector('#editDuration').value) || 0;
         
-        // ⭐ 获取工期类型
+        // 获取工期类型
         const durationTypeSelect = form.querySelector('#editDurationType');
-        const durationType = durationTypeSelect ? durationTypeSelect.value : 'workdays';
+        const durationType = durationTypeSelect ? durationTypeSelect.value : 'days';
         
         const progressInput = form.querySelector('#editProgress');
         const progress = progressInput ? parseInt(progressInput.value) || 0 : 0;
@@ -592,7 +661,7 @@
             return;
         }
 
-        // ==================== 保存旧值（用于日志） ====================
+        // ==================== 保存旧值 ====================
         const oldParentId = task.parentId;
         const oldName = task.name;
         const oldDurationType = task.durationType;
@@ -603,9 +672,9 @@
         task.notes = notes;
         task.isMilestone = isMilestone && !hasChildren;
         task.isSummary = hasChildren;
-        task.durationType = durationType; // ⭐ 保存工期类型
+        task.durationType = durationType;
 
-        // ==================== 更新时间（汇总任务跳过） ====================
+        // ==================== 更新时间 ====================
         if (!hasChildren) {
             task.start = start;
             
@@ -613,11 +682,11 @@
                 task.end = start;
                 task.duration = 0;
                 task.progress = 100;
-                task.durationType = 'days'; // 里程碑固定为自然日
+                task.durationType = 'days';
             } else {
                 const startDate = new Date(start);
                 
-                // ⭐ 根据工期类型计算结束日期
+                // 根据工期类型计算结束日期
                 const endDate = calculateEndDate(startDate, duration, durationType);
                 
                 task.end = formatDate(endDate);
@@ -676,7 +745,7 @@
         
         const typeLabel = isMilestone ? '（里程碑）' : 
                          hasChildren ? '（汇总任务）' : 
-                         `（${durationType === 'workdays' ? '工作日' : '自然日'}）`;
+                         `（${task.duration}${durationType === 'workdays' ? '工作日' : '自然日'}）`;
         
         addLog(`✅ 任务已更新：${task.wbs ? '[' + task.wbs + '] ' : ''}${task.name}${typeLabel}`);
         if (changeLog.length > 0) {
@@ -690,51 +759,55 @@
      * 更新表单位置
      */
     GanttChart.prototype.updateFormPosition = function(form, bar, container) {
-        const barRect = bar.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
+        try {
+            const barRect = bar.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
 
-        const scrollTop = container.scrollTop;
-        const scrollLeft = container.scrollLeft;
-        
-        const barTopInContainer = barRect.top - containerRect.top + scrollTop;
-        const barLeftInContainer = barRect.left - containerRect.left + scrollLeft;
-        
-        let formTop = barTopInContainer + barRect.height + 8;
-        let formLeft = barLeftInContainer + 20;
-        
-        const formWidth = 320;
-        const maxLeft = container.scrollWidth - formWidth - 20;
-        if (formLeft > maxLeft) {
-            formLeft = maxLeft;
-        }
-        
-        if (formLeft < 10) {
-            formLeft = 10;
-        }
-        
-        const viewportHeight = containerRect.height;
-        const barBottomInViewport = barRect.bottom - containerRect.top;
-        const formHeight = 680; // ⭐ 增加高度（新增工期类型选择 + 提示信息）
-        
-        if (barBottomInViewport + formHeight > viewportHeight) {
-            formTop = barTopInContainer - formHeight - 8;
-            if (formTop < scrollTop) {
-                formLeft = barLeftInContainer + barRect.width + 20;
-                formTop = barTopInContainer;
+            const scrollTop = container.scrollTop;
+            const scrollLeft = container.scrollLeft;
+            
+            const barTopInContainer = barRect.top - containerRect.top + scrollTop;
+            const barLeftInContainer = barRect.left - containerRect.left + scrollLeft;
+            
+            let formTop = barTopInContainer + barRect.height + 8;
+            let formLeft = barLeftInContainer + 20;
+            
+            const formWidth = 320;
+            const maxLeft = container.scrollWidth - formWidth - 20;
+            if (formLeft > maxLeft) {
+                formLeft = maxLeft;
             }
-        }
+            
+            if (formLeft < 10) {
+                formLeft = 10;
+            }
+            
+            const viewportHeight = containerRect.height;
+            const barBottomInViewport = barRect.bottom - containerRect.top;
+            const formHeight = 680;
+            
+            if (barBottomInViewport + formHeight > viewportHeight) {
+                formTop = barTopInContainer - formHeight - 8;
+                if (formTop < scrollTop) {
+                    formLeft = barLeftInContainer + barRect.width + 20;
+                    formTop = barTopInContainer;
+                }
+            }
 
-        form.style.position = 'absolute';
-        form.style.left = `${formLeft}px`;
-        form.style.top = `${formTop}px`;
-        form.style.zIndex = '1000';
-        form.style.width = '320px';
-        form.style.background = 'white';
-        form.style.borderRadius = '12px';
-        form.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
-        form.style.padding = '16px';
-        form.style.border = '1px solid #dee2e6';
-        form.style.fontSize = '0.9rem';
+            form.style.position = 'absolute';
+            form.style.left = `${formLeft}px`;
+            form.style.top = `${formTop}px`;
+            form.style.zIndex = '1000';
+            form.style.width = '320px';
+            form.style.background = 'white';
+            form.style.borderRadius = '12px';
+            form.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
+            form.style.padding = '16px';
+            form.style.border = '1px solid #dee2e6';
+            form.style.fontSize = '0.9rem';
+        } catch (error) {
+            console.error('updateFormPosition error:', error);
+        }
     };
 
     /**
@@ -774,7 +847,7 @@
                 addLog(`✏️ 任务名称从 "${originalName}" 改为 "${newName}"`);
             }
             
-            // 恢复显示（包含层级、图标、WBS、折叠按钮）
+            // 恢复显示
             const indent = '　'.repeat((task.outlineLevel || 1) - 1);
             const icon = task.isMilestone ? '🎯' : (task.isSummary ? '📁' : '📋');
             const wbsPrefix = task.wbs ? `<span class="wbs-badge">[${task.wbs}]</span> ` : '';
@@ -787,7 +860,7 @@
             element.innerHTML = `${collapseBtn}<span class="task-name-content">${indent}${icon} ${wbsPrefix}${task.name}</span>`;
             element.classList.remove('editing');
             
-            // 重新绑定折叠按钮事件
+            // 重新绑定折叠按钮
             const newCollapseBtn = element.querySelector('.task-collapse-btn');
             if (newCollapseBtn) {
                 newCollapseBtn.onclick = (e) => {
@@ -807,7 +880,6 @@
                 
                 externalLabel.innerHTML = `${displayName} ${progressBadge}${collapseToggle}`;
                 
-                // 重新绑定外部标签的折叠按钮
                 const extCollapseToggle = externalLabel.querySelector('.collapse-toggle');
                 if (extCollapseToggle) {
                     extCollapseToggle.onclick = (e) => {
@@ -851,7 +923,7 @@
     };
 
     /**
-     * ⭐ 计算日期范围内的周末天数
+     * 计算日期范围内的周末天数
      */
     function countWeekendsInRange(startDate, endDate) {
         let count = 0;
@@ -867,6 +939,6 @@
         return count;
     }
 
-    console.log('✅ gantt-events-form.js loaded successfully (Epsilon10 - 工期类型 + 手柄颜色)');
+    console.log('✅ gantt-events-form.js loaded successfully (Epsilon12 - 完整版)');
 
 })();

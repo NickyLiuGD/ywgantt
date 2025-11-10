@@ -217,7 +217,7 @@
     };
 
     /**
-     * 添加任务（完整版 - 支持工期类型）
+     * 添加任务（⭐ 默认工期1天，自然日类型）
      */
     GanttChart.prototype.addTask = function(task) {
         if (!task || typeof task !== 'object') {
@@ -225,24 +225,23 @@
             return;
         }
 
-        // 基础字段补全
+        // 自动补全所有必需字段
         if (!task.id) task.id = generateId();
         if (!task.uid) task.uid = this.getNextUID();
         if (!task.name) task.name = '新任务';
         if (!task.start) task.start = formatDate(new Date());
         
-        // ⭐ 工期类型默认值
-        if (!task.durationType) task.durationType = 'workdays';
+        // ⭐ 默认工期1天，自然日类型
+        if (typeof task.duration !== 'number') task.duration = 1;
+        if (!task.durationType) task.durationType = 'days'; // ⭐ 默认自然日
         
-        // ⭐ 根据工期类型计算结束日期
+        // 根据工期类型计算结束日期
         if (!task.end) {
-            const defaultDuration = typeof task.duration === 'number' ? task.duration : 4;
             const startDate = new Date(task.start);
-            const endDate = calculateEndDate(startDate, defaultDuration, task.durationType);
+            const endDate = calculateEndDate(startDate, task.duration, task.durationType);
             task.end = formatDate(endDate);
         }
         
-        if (typeof task.duration !== 'number') task.duration = 4;
         if (typeof task.progress !== 'number') task.progress = 0;
         if (!Array.isArray(task.dependencies)) task.dependencies = [];
         
@@ -258,10 +257,15 @@
 
         this.tasks.push(task);
         
+        // 生成 WBS
         task.wbs = this.generateWBS(task.id);
+        
         this.sortTasksByWBS();
         this.calculateDateRange();
         this.render();
+        
+        const typeLabel = task.durationType === 'workdays' ? '工作日' : '自然日';
+        addLog(`✅ 已添加任务 "${task.name}"（${task.duration}${typeLabel}）`);
     };
 
     /**
@@ -271,16 +275,13 @@
         const parent = this.tasks.find(t => t.id === parentId);
         if (!parent) return;
 
-        // ⭐ 子任务继承父任务的工期类型
-        const inheritedDurationType = parent.durationType || 'workdays';
-        
         const newTask = {
             id: generateId(),
             uid: this.getNextUID(),
             name: '新子任务',
             start: formatDate(new Date(parent.start)),
-            duration: 3,
-            durationType: inheritedDurationType, // ⭐ 继承
+            duration: 1, // ⭐ 默认1天
+            durationType: parent.durationType || 'days', // ⭐ 继承父任务的工期类型
             progress: 0,
             isMilestone: false,
             isSummary: false,
@@ -294,7 +295,7 @@
             dependencies: []
         };
         
-        // ⭐ 根据工期类型计算结束日期
+        // 计算结束日期
         const startDate = new Date(newTask.start);
         const endDate = calculateEndDate(startDate, newTask.duration, newTask.durationType);
         newTask.end = formatDate(endDate);
@@ -314,8 +315,127 @@
         setTimeout(() => {
             this.selectTask(newTask.id);
             this.showInlineTaskForm(newTask);
-            addLog(`✅ 已为 "${parent.name}" 添加子任务 [${newTask.wbs}]（继承${inheritedDurationType === 'workdays' ? '工作日' : '自然日'}模式）`);
+            addLog(`✅ 已为 "${parent.name}" 添加子任务 [${newTask.wbs}]`);
         }, 100);
+    };
+
+    /**
+     * ⭐ 删除任务（禁止删除有子任务的任务）
+     */
+    GanttChart.prototype.deleteTaskWithChildren = function(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) {
+            console.warn('Task not found:', taskId);
+            return;
+        }
+
+        // ⭐⭐⭐ 新规则：有子任务时禁止删除 ⭐⭐⭐
+        if (task.children && task.children.length > 0) {
+            const childrenNames = task.children
+                .map(childId => {
+                    const child = this.tasks.find(t => t.id === childId);
+                    return child ? child.name : null;
+                })
+                .filter(name => name)
+                .slice(0, 5); // 最多显示5个
+            
+            let message = `❌ 无法删除任务 "${task.name}"\n\n`;
+            message += `此任务包含 ${task.children.length} 个子任务：\n`;
+            childrenNames.forEach(name => {
+                message += `  • ${name}\n`;
+            });
+            if (task.children.length > 5) {
+                message += `  ... 等 ${task.children.length} 个子任务\n`;
+            }
+            message += `\n请先删除所有子任务，或将子任务移动到其他父任务下。`;
+            
+            alert(message);
+            addLog(`❌ 无法删除 "${task.name}"：包含 ${task.children.length} 个子任务`);
+            return;
+        }
+
+        // ⭐⭐⭐ 检查是否有其他任务依赖此任务 ⭐⭐⭐
+        const dependentTasks = this.tasks.filter(t => 
+            t.dependencies && t.dependencies.some(dep => 
+                (typeof dep === 'string' ? dep : dep.taskId) === task.id
+            )
+        );
+        
+        let confirmMessage = `确定删除任务 "${task.name}"？\n\n`;
+        
+        if (dependentTasks.length > 0) {
+            confirmMessage += `⚠️ 警告：有 ${dependentTasks.length} 个任务依赖此任务：\n`;
+            dependentTasks.slice(0, 3).forEach(t => {
+                confirmMessage += `  • ${t.name}\n`;
+            });
+            if (dependentTasks.length > 3) {
+                confirmMessage += `  ... 等 ${dependentTasks.length} 个任务\n`;
+            }
+            confirmMessage += `\n删除后，这些依赖关系将被移除。\n`;
+        }
+        
+        confirmMessage += `\n此操作不可撤销，是否继续？`;
+        
+        // ⭐⭐⭐ 二次确认 ⭐⭐⭐
+        if (!confirm(confirmMessage)) {
+            addLog(`❌ 已取消删除任务 "${task.name}"`);
+            return;
+        }
+
+        // 执行删除
+        const toDelete = [taskId]; // 仅删除当前任务（无子任务）
+
+        // 从父任务移除
+        if (task.parentId) {
+            const parent = this.tasks.find(t => t.id === task.parentId);
+            if (parent && parent.children) {
+                parent.children = parent.children.filter(cid => cid !== taskId);
+                
+                if (parent.children.length === 0) {
+                    parent.isSummary = false;
+                    addLog(`   "${parent.name}" 已自动取消汇总任务状态`);
+                } else {
+                    this.recalculateSummaryTask(parent.id);
+                }
+            }
+        }
+
+        // 删除任务
+        this.tasks = this.tasks.filter(t => t.id !== taskId);
+        
+        // 清理其他任务的依赖
+        let removedDepsCount = 0;
+        this.tasks.forEach(t => {
+            if (t.dependencies && t.dependencies.length > 0) {
+                const originalCount = t.dependencies.length;
+                
+                t.dependencies = t.dependencies.filter(dep => {
+                    const depId = typeof dep === 'string' ? dep : dep.taskId;
+                    return depId !== taskId;
+                });
+                
+                const removed = originalCount - t.dependencies.length;
+                if (removed > 0) {
+                    removedDepsCount += removed;
+                    addLog(`   "${t.name}" 移除了对 "${task.name}" 的依赖`);
+                }
+            }
+        });
+
+        // 取消选择
+        if (this.selectedTask === taskId) {
+            this.selectedTask = null;
+        }
+
+        // 重新生成所有 WBS
+        this.tasks.forEach(t => {
+            t.wbs = this.generateWBS(t.id);
+        });
+
+        this.calculateDateRange();
+        this.render();
+
+        addLog(`✅ 已删除任务 "${task.name}"${removedDepsCount > 0 ? `（清理了 ${removedDepsCount} 个依赖关系）` : ''}`);
     };
 
     /**

@@ -157,7 +157,7 @@
     };
 
     /**
-     * 处理快捷菜单操作（⭐ 添加工期类型）
+     * 处理快捷菜单操作
      */
     GanttChart.prototype.handleQuickMenuAction = function(action, taskId) {
         const task = this.tasks.find(t => t.id === taskId);
@@ -165,6 +165,7 @@
 
         switch (action) {
             case 'add':
+                // 添加同级任务
                 const currentIndex = this.tasks.findIndex(t => t.id === taskId);
                 
                 const newTask = {
@@ -172,8 +173,8 @@
                     uid: this.getNextUID(),
                     name: '新任务',
                     start: formatDate(addDays(new Date(task.end), 1)),
-                    duration: 4,
-                    durationType: task.durationType || 'workdays', // ⭐ 继承工期类型
+                    duration: 1, // ⭐ 默认1天
+                    durationType: 'days', // ⭐ 默认自然日
                     progress: 0,
                     isMilestone: false,
                     isSummary: false,
@@ -187,7 +188,7 @@
                     dependencies: [{taskId: taskId, type: 'FS', lag: 0}]
                 };
                 
-                // ⭐ 根据工期类型计算结束日期
+                // 计算结束日期
                 const startDate = new Date(newTask.start);
                 const endDate = calculateEndDate(startDate, newTask.duration, newTask.durationType);
                 newTask.end = formatDate(endDate);
@@ -209,11 +210,71 @@
                 setTimeout(() => {
                     this.selectTask(newTask.id);
                     this.showInlineTaskForm(newTask);
-                    addLog(`✅ 已在"${task.name}"下方添加新任务（${newTask.durationType === 'workdays' ? '工作日' : '自然日'}模式）`);
+                    addLog(`✅ 已在"${task.name}"下方添加新任务`);
                 }, 100);
                 break;
 
-            // ... 其他 case 保持不变
+            case 'edit':
+                this.selectTask(taskId);
+                this.showInlineTaskForm(task);
+                addLog(`✏️ 编辑任务 "${task.name}"`);
+                break;
+
+            case 'delete':
+                // ⭐⭐⭐ 新删除逻辑 ⭐⭐⭐
+                if (task.children && task.children.length > 0) {
+                    // 有子任务：禁止删除
+                    const childrenNames = task.children
+                        .map(childId => {
+                            const child = this.tasks.find(t => t.id === childId);
+                            return child ? child.name : null;
+                        })
+                        .filter(name => name);
+                    
+                    let message = `❌ 无法删除任务 "${task.name}"\n\n`;
+                    message += `此任务包含 ${task.children.length} 个子任务：\n`;
+                    childrenNames.slice(0, 5).forEach(name => {
+                        message += `  • ${name}\n`;
+                    });
+                    if (task.children.length > 5) {
+                        message += `  ... 等 ${task.children.length} 个子任务\n`;
+                    }
+                    message += `\n💡 建议操作：\n`;
+                    message += `  1. 先删除所有子任务\n`;
+                    message += `  2. 或将子任务移动到其他父任务下`;
+                    
+                    alert(message);
+                    addLog(`❌ 无法删除 "${task.name}"：包含 ${task.children.length} 个子任务`);
+                } else {
+                    // 无子任务：检查依赖并确认删除
+                    const dependentTasks = this.tasks.filter(t => 
+                        t.dependencies && t.dependencies.some(dep => 
+                            (typeof dep === 'string' ? dep : dep.taskId) === task.id
+                        )
+                    );
+                    
+                    let confirmMessage = `确定删除任务 "${task.name}"？\n\n`;
+                    
+                    if (dependentTasks.length > 0) {
+                        confirmMessage += `⚠️ 警告：有 ${dependentTasks.length} 个任务依赖此任务：\n`;
+                        dependentTasks.slice(0, 3).forEach(t => {
+                            confirmMessage += `  • ${t.name}\n`;
+                        });
+                        if (dependentTasks.length > 3) {
+                            confirmMessage += `  ... 等 ${dependentTasks.length} 个任务\n`;
+                        }
+                        confirmMessage += `\n删除后，这些依赖关系将被移除。\n`;
+                    }
+                    
+                    confirmMessage += `\n此操作不可撤销，是否继续？`;
+                    
+                    if (confirm(confirmMessage)) {
+                        this.deleteTaskWithChildren(task.id);
+                    } else {
+                        addLog(`❌ 已取消删除任务 "${task.name}"`);
+                    }
+                }
+                break;
         }
     };
 
