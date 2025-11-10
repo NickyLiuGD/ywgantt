@@ -254,3 +254,4 @@
     console.log('✅ gantt-core.js loaded successfully (Delta8 - 全貌视图修复版)');
 
 })(typeof window !== 'undefined' ? window : this);
+

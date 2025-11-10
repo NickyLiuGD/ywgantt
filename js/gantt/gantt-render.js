@@ -1,14 +1,14 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Epsilon5 - 支持里程碑/汇总任务/层级显示                  ▓▓
+// ▓▓ 版本: Epsilon15 - 支持里程碑/汇总任务/工期类型/依赖箭头        ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
     'use strict';
 
     /**
-     * 渲染甘特图（完整版 + 全貌视图）
+     * 渲染甘特图（完整版）
      */
     GanttChart.prototype.render = function() {
         if (!this.container) {
@@ -90,7 +90,11 @@
         }
 
         this.setupScrollSync();
+        
+        // ⭐ 渲染依赖箭头（添加调试）
+        console.log('🔄 开始渲染依赖箭头...');
         this.renderDependencies(dates);
+        
         this.attachEvents();
         this.attachQuickMenus();
         
@@ -102,7 +106,7 @@
     };
 
     /**
-     * 渲染任务名称列表（⭐ 支持层级和折叠）
+     * 渲染任务名称列表（支持层级和折叠）
      */
     GanttChart.prototype.renderTaskNames = function() {
         return this.tasks.map(task => {
@@ -207,7 +211,7 @@
     };
 
     /**
-     * 渲染单个任务行（⭐ 手柄颜色区分工期类型）
+     * 渲染单个任务行（⭐ 支持里程碑/汇总任务/工期类型）
      */
     GanttChart.prototype.renderRow = function(task, dates) {
         if (!task || !task.id) return '';
@@ -251,7 +255,7 @@
         const priorityAttr = task.priority ? `data-priority="${task.priority}"` : '';
         
         // ⭐ 工期类型标记
-        const durationType = task.durationType || 'workdays';
+        const durationType = task.durationType || 'days';
         const durationTypeAttr = `data-duration-type="${durationType}"`;
         const durationTypeIcon = durationType === 'workdays' ? '💼' : '📅';
         const durationTypeTitle = durationType === 'workdays' ? '工作日' : '自然日';
@@ -264,18 +268,18 @@
 
         return `
             <div class="gantt-row ${task.isSummary ? 'gantt-row-summary' : ''}" 
-                role="row" 
-                aria-label="任务行: ${this.escapeHtml(task.name)}">
+                 role="row" 
+                 aria-label="任务行: ${this.escapeHtml(task.name)}">
                 ${this.renderCells(dates)}
                 
                 <!-- 左侧双层时间标签 -->
                 <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
-                    data-task-id="${task.id}"
-                    style="right: calc(100% - ${left}px + 8px);"
-                    role="button"
-                    tabindex="0"
-                    title="${durationTypeTitle}"
-                    aria-label="时间范围: ${startTimeLabel} 至 ${endTimeLabel}">
+                     data-task-id="${task.id}"
+                     style="right: calc(100% - ${left}px + 8px);"
+                     role="button"
+                     tabindex="0"
+                     title="${durationTypeTitle}"
+                     aria-label="时间范围: ${startTimeLabel} 至 ${endTimeLabel}">
                     <div class="time-label-row time-start" title="开始时间">
                         ${this.escapeHtml(startTimeLabel)}
                     </div>
@@ -289,49 +293,49 @@
                 ${task.isMilestone ? `
                     <!-- 里程碑菱形 -->
                     <div class="gantt-milestone ${isSelected ? 'selected' : ''}" 
-                        data-task-id="${task.id}"
-                        style="left: ${left}px;"
-                        role="button"
-                        tabindex="0"
-                        title="${this.escapeHtml(task.name)}">
+                         data-task-id="${task.id}"
+                         style="left: ${left}px;"
+                         role="button"
+                         tabindex="0"
+                         title="${this.escapeHtml(task.name)}">
                         <div class="milestone-diamond">
                             <span class="milestone-icon">🎯</span>
                         </div>
                     </div>
                 ` : `
-                    <!-- 任务条（⭐ 添加工期类型属性） -->
+                    <!-- 任务条 -->
                     <div class="gantt-bar ${task.isSummary ? 'gantt-bar-summary' : ''} ${isSelected ? 'selected' : ''}" 
-                        data-task-id="${task.id}"
-                        ${priorityAttr}
-                        ${durationTypeAttr}
-                        style="left: ${left}px; width: ${width}px;"
-                        role="button"
-                        tabindex="0"
-                        title="${task.duration} ${durationTypeTitle}"
-                        aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
+                         data-task-id="${task.id}"
+                         ${priorityAttr}
+                         ${durationTypeAttr}
+                         style="left: ${left}px; width: ${width}px;"
+                         role="button"
+                         tabindex="0"
+                         title="${task.duration} ${durationTypeTitle}"
+                         aria-label="任务条: ${this.escapeHtml(task.name)}, 进度: ${progress}%">
                         <div class="gantt-bar-progress" style="width: ${progress}%" aria-hidden="true"></div>
                         ${this.options.enableResize && !task.isSummary ? `
                             <div class="gantt-bar-handle left" 
-                                role="button" 
-                                aria-label="调整开始日期"
-                                title="拖拽调整开始日期"></div>
+                                 role="button" 
+                                 aria-label="调整开始日期"
+                                 title="拖拽调整开始日期"></div>
                         ` : ''}
                         ${this.options.enableResize && !task.isSummary ? `
                             <div class="gantt-bar-handle right" 
-                                role="button" 
-                                aria-label="调整结束日期"
-                                title="拖拽调整结束日期"></div>
+                                 role="button" 
+                                 aria-label="调整结束日期"
+                                 title="拖拽调整结束日期"></div>
                         ` : ''}
                     </div>
                 `}
                 
                 <!-- 右侧任务名称标签 -->
                 <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
-                    data-task-id="${task.id}"
-                    style="left: ${left + width + 8}px;"
-                    role="button"
-                    tabindex="0"
-                    aria-label="任务标签: ${this.escapeHtml(task.name)}">
+                     data-task-id="${task.id}"
+                     style="left: ${left + width + 8}px;"
+                     role="button"
+                     tabindex="0"
+                     aria-label="任务标签: ${this.escapeHtml(task.name)}">
                     ${this.escapeHtml(displayName)} 
                     ${!task.isMilestone ? `<span class="task-progress-badge">${progress}%</span>` : ''}
                     ${collapseToggle}
@@ -470,6 +474,6 @@
         console.log('✅ 时间轴视图菜单事件已绑定');
     };
 
-    console.log('✅ gantt-render.js loaded successfully (Epsilon5 - 层级任务支持)');
+    console.log('✅ gantt-render.js loaded successfully (Epsilon15 - 完整版)');
 
 })();

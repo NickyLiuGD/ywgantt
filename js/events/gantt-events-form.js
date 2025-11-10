@@ -568,7 +568,7 @@
     };
 
     /**
-     * ⭐ 绑定依赖选择器事件
+     * 绑定依赖选择器事件
      */
     GanttChart.prototype.bindDependencySelectorEvents = function(modal, task, parentForm) {
         const closeDepsSelector = () => {
@@ -580,15 +580,12 @@
             }, 200);
         };
 
-        // 关闭按钮
         const closeBtn = modal.querySelector('#closeDepsSelector');
         if (closeBtn) closeBtn.onclick = closeDepsSelector;
 
-        // 取消按钮
         const cancelBtn = modal.querySelector('#cancelDeps');
         if (cancelBtn) cancelBtn.onclick = closeDepsSelector;
 
-        // 点击遮罩关闭
         const overlay = modal.querySelector('.dependency-selector-overlay');
         if (overlay) overlay.onclick = closeDepsSelector;
 
@@ -626,7 +623,7 @@
             };
         });
 
-        // 确定按钮
+        // ⭐⭐⭐ 确定按钮（修复版） ⭐⭐⭐
         const confirmBtn = modal.querySelector('#confirmDeps');
         if (confirmBtn) {
             confirmBtn.onclick = () => {
@@ -634,14 +631,18 @@
                     .filter(cb => cb.checked)
                     .map(cb => cb.value);
                 
-                // 更新任务的依赖关系
+                console.log('✅ 选中的依赖任务ID:', selectedIds);
+                
+                // ⭐ 更新任务的依赖关系（对象格式）
                 task.dependencies = selectedIds.map(depId => ({
                     taskId: depId,
                     type: 'FS',
                     lag: 0
                 }));
                 
-                // 更新父表单的依赖标签显示
+                console.log('✅ 任务依赖已更新:', task.dependencies);
+                
+                // ⭐ 更新父表单的依赖标签显示
                 this.updateDependencyTags(task, parentForm);
                 
                 addLog(`✅ 已更新 "${task.name}" 的依赖关系（${selectedIds.length} 个）`);
@@ -708,7 +709,7 @@
     };
 
     /**
-     * 保存任务表单
+     * 保存任务表单（⭐ 确保依赖关系正确保存和渲染）
      */
     GanttChart.prototype.saveTaskForm = function(form, task) {
         const newName = form.querySelector('#editName').value.trim();
@@ -738,8 +739,8 @@
             return;
         }
 
-        const oldParentId = task.parentId;
         const oldName = task.name;
+        const oldDepsCount = task.dependencies ? task.dependencies.length : 0;
 
         task.name = newName;
         task.priority = priority;
@@ -766,13 +767,31 @@
             }
         }
 
-        if (oldParentId !== newParentId) {
-            this.updateParentRelationship(task, oldParentId, newParentId);
+        if (task.parentId !== newParentId) {
+            this.updateParentRelationship(task, task.parentId, newParentId);
         }
 
         task.wbs = this.generateWBS(task.id);
 
-        // ⭐ 依赖关系已在编辑器中实时更新，这里不需要再处理
+        // ⭐⭐⭐ 依赖关系已在模态框中实时更新到 task.dependencies
+        // 这里只需要验证格式
+        if (!Array.isArray(task.dependencies)) {
+            task.dependencies = [];
+        }
+
+        // ⭐ 确保依赖格式统一为对象格式
+        task.dependencies = task.dependencies.map(dep => {
+            if (typeof dep === 'string') {
+                return { taskId: dep, type: 'FS', lag: 0 };
+            } else if (typeof dep === 'object' && dep.taskId) {
+                return dep;
+            }
+            return null;
+        }).filter(dep => dep);
+
+        const newDepsCount = task.dependencies.length;
+
+        console.log(`📊 任务 "${task.name}" 依赖关系:`, task.dependencies);
 
         if (hasChildren) {
             this.recalculateSummaryTask(task.id);
@@ -782,16 +801,26 @@
         this.sortTasksByWBS();
         this.cleanupForm(form);
         this.calculateDateRange();
+        
+        // ⭐⭐⭐ 关键：先渲染HTML，再渲染依赖箭头
         this.render();
         
-        const changeLog = [];
-        if (oldName !== newName) changeLog.push(`名称: ${oldName} → ${newName}`);
+        // ⭐ 延迟渲染依赖箭头（确保DOM已更新）
+        setTimeout(() => {
+            const dates = this.generateDates();
+            this.renderDependencies(dates);
+            console.log('🔄 依赖箭头已重新渲染');
+        }, 50);
         
         const typeLabel = isMilestone ? '（里程碑）' : 
-                         hasChildren ? '（汇总任务）' : 
-                         `（${task.duration}${durationType === 'workdays' ? '工作日' : '自然日'}）`;
+                        hasChildren ? '（汇总任务）' : 
+                        `（${task.duration}${durationType === 'workdays' ? '工作日' : '自然日'}）`;
         
         addLog(`✅ 任务已更新：${task.wbs ? '[' + task.wbs + '] ' : ''}${task.name}${typeLabel}`);
+        
+        if (oldDepsCount !== newDepsCount) {
+            addLog(`   依赖关系：${oldDepsCount} → ${newDepsCount} 个`);
+        }
         
         form.remove();
     };
