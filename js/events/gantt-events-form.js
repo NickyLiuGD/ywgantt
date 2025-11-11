@@ -8,9 +8,10 @@
     'use strict';
 
     /**
-     * 显示任务编辑表单
+     * 显示任务编辑表单（完整版 - 修复依赖编辑按钮）
      */
     GanttChart.prototype.showInlineTaskForm = function(task) {
+        // 移除旧表单
         const oldForm = this.container.querySelector('.inline-task-form');
         if (oldForm) oldForm.remove();
 
@@ -25,6 +26,7 @@
         form.className = 'inline-task-form';
         form.dataset.taskId = task.id;
 
+        // 计算可用父任务
         const availableParents = this.tasks.filter(t => 
             t.id !== task.id && 
             !this.isDescendantOf(t.id, task.id) &&
@@ -33,29 +35,30 @@
         
         const currentDuration = task.isMilestone ? 0 : (task.duration || 1);
         const currentDurationType = task.durationType || 'days';
-        
-        const currentParent = task.parentId ? this.tasks.find(t => t.id === task.parentId) : null;
-        
+        const hasChildren = task.children && task.children.length > 0;
+        const canDelete = !hasChildren;
+
+        // ⭐⭐⭐ 获取已选依赖任务（修复版）⭐⭐⭐
+        const selectedDeps = Array.isArray(task.dependencies) ? 
+            task.dependencies.map(dep => {
+                const depId = typeof dep === 'string' ? dep : dep.taskId;
+                const depTask = this.tasks.find(t => t.id === depId);
+                console.log('🔍 查找依赖任务:', depId, '→', depTask); // 调试日志
+                return depTask;
+            }).filter(t => t) : [];
+
+        console.log('📋 当前依赖任务列表:', selectedDeps); // 调试日志
+
+        // 工期下拉选项
+        const durationOptions = Array.from({length: 30}, (_, i) => i + 1)
+            .map(d => `<option value="${d}" ${currentDuration === d ? 'selected' : ''}>${d}</option>`)
+            .join('');
+
         const autoTaskType = task.isMilestone ? '里程碑' : 
                             (task.children && task.children.length > 0) ? '汇总任务' : 
                             '普通任务';
         const autoWBS = task.wbs || this.generateWBS(task.id);
         const autoOutlineLevel = task.outlineLevel || 1;
-        
-        const hasChildren = task.children && task.children.length > 0;
-        const canDelete = !hasChildren;
-
-        // ⭐ 生成工期下拉选项（1-30天 + 自定义）
-        const durationOptions = Array.from({length: 30}, (_, i) => i + 1)
-            .map(d => `<option value="${d}" ${currentDuration === d ? 'selected' : ''}>${d}</option>`)
-            .join('');
-
-        // ⭐ 获取已选依赖任务
-        const selectedDeps = Array.isArray(task.dependencies) ? 
-            task.dependencies.map(dep => {
-                const depId = typeof dep === 'string' ? dep : dep.taskId;
-                return this.tasks.find(t => t.id === depId);
-            }).filter(t => t) : [];
 
         form.innerHTML = `
             <!-- 顶部工具栏 -->
@@ -84,16 +87,16 @@
                 <div style="flex: 1;">
                     <label class="form-label-compact">任务名称</label>
                     <input type="text" class="form-control form-control-sm" id="editName" 
-                           value="${this.escapeHtml(task.name)}" 
-                           placeholder="输入任务名称"
-                           maxlength="100">
+                        value="${this.escapeHtml(task.name)}" 
+                        placeholder="输入任务名称"
+                        maxlength="100">
                 </div>
                 <div style="width: 120px; padding-left: 12px;">
                     <label class="form-label-compact" style="visibility: hidden;">占位</label>
                     <div class="form-check form-switch" style="padding-top: 6px;">
                         <input class="form-check-input" type="checkbox" id="editMilestone" 
-                               ${task.isMilestone ? 'checked' : ''}
-                               ${hasChildren ? 'disabled' : ''}>
+                            ${task.isMilestone ? 'checked' : ''}
+                            ${hasChildren ? 'disabled' : ''}>
                         <label class="form-check-label fw-semibold" for="editMilestone" style="font-size: 0.85rem;">
                             🎯 里程碑
                         </label>
@@ -128,8 +131,8 @@
                 <div style="flex: 1;">
                     <label class="form-label-compact">开始日期</label>
                     <input type="date" class="form-control form-control-sm" id="editStart" 
-                           value="${task.start}"
-                           ${hasChildren ? 'disabled' : ''}>
+                        value="${task.start}"
+                        ${hasChildren ? 'disabled' : ''}>
                 </div>
                 <div style="width: 80px; padding-left: 8px;">
                     <label class="form-label-compact">工期</label>
@@ -169,15 +172,15 @@
 
             <!-- 进度 + 优先级 -->
             <div class="form-row-compact mb-2" id="progressPrioritySection" 
-                 ${hasChildren || task.isMilestone ? 'style="display:none"' : ''}>
+                ${hasChildren || task.isMilestone ? 'style="display:none"' : ''}>
                 <div style="flex: 1;">
                     <label class="form-label-compact">
                         完成进度
                         <span id="progressVal" class="badge bg-primary ms-2" style="font-size: 0.7rem;">${task.progress || 0}%</span>
                     </label>
                     <input type="range" class="form-range" id="editProgress" 
-                           value="${task.progress || 0}" 
-                           min="0" max="100" step="5">
+                        value="${task.progress || 0}" 
+                        min="0" max="100" step="5">
                 </div>
                 <div style="width: 120px; padding-left: 12px;">
                     <label class="form-label-compact">优先级</label>
@@ -189,13 +192,15 @@
                 </div>
             </div>
 
-            <!-- ⭐⭐⭐ 依赖任务（标签式显示 + 编辑按钮） ⭐⭐⭐ -->
+            <!-- ⭐⭐⭐ 依赖任务（标签式显示 + 编辑按钮）⭐⭐⭐ -->
             <div class="mb-2">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <label class="form-label-compact mb-0">依赖任务（前置任务）</label>
-                    <button class="btn btn-sm btn-outline-primary" id="editDepsBtn" type="button" 
-                            style="padding: 2px 10px; font-size: 0.75rem;">
-                        <span>✏️</span> 编辑
+                    <button class="btn btn-sm btn-outline-primary edit-deps-btn" 
+                            id="editDepsBtn" 
+                            type="button" 
+                            style="padding: 3px 12px; font-size: 0.75rem; border-radius: 6px;">
+                        <span style="font-size: 0.9rem;">✏️</span> 编辑
                     </button>
                 </div>
                 <div class="deps-tags-container" id="depsTagsContainer">
@@ -215,10 +220,10 @@
             <div class="mb-2">
                 <label class="form-label-compact">任务备注</label>
                 <textarea class="form-control form-control-sm" id="editNotes" 
-                          rows="2" 
-                          placeholder="输入任务说明..."
-                          maxlength="500"
-                          style="font-size: 0.8rem;">${this.escapeHtml(task.notes || '')}</textarea>
+                        rows="2" 
+                        placeholder="输入任务说明..."
+                        maxlength="500"
+                        style="font-size: 0.8rem;">${this.escapeHtml(task.notes || '')}</textarea>
                 <small class="text-muted" id="notesCounter" style="font-size: 0.7rem;">${(task.notes || '').length}/500</small>
             </div>
 
@@ -234,19 +239,25 @@
         
         rowsContainer.appendChild(form);
         this.updateFormPosition(form, bar, rowsContainer);
+        
+        // ⭐⭐⭐ 关键：立即绑定事件 ⭐⭐⭐
         this.bindFormEvents(form, task, bar, rowsContainer);
+        
+        console.log('✅ 表单已创建，事件已绑定');
     };
 
     /**
-     * 绑定表单事件
+     * 绑定表单事件（完整版 - 修复依赖编辑按钮）
      */
     GanttChart.prototype.bindFormEvents = function(form, task, bar, rowsContainer) {
-        // 滚动监听
+        console.log('🔧 开始绑定表单事件...');
+        
+        // ==================== 滚动监听 ====================
         let rafId = null;
         const updatePosition = () => {
             rafId = null;
             const currentBar = this.container.querySelector(`.gantt-bar[data-task-id="${task.id}"]`) ||
-                              this.container.querySelector(`.gantt-milestone[data-task-id="${task.id}"]`);
+                            this.container.querySelector(`.gantt-milestone[data-task-id="${task.id}"]`);
             if (currentBar && form.parentElement) {
                 this.updateFormPosition(form, currentBar, rowsContainer);
             }
@@ -262,7 +273,7 @@
         form._scrollContainer = rowsContainer;
         form._rafId = rafId;
 
-        // 进度条同步
+        // ==================== 进度条同步 ====================
         const progressInput = form.querySelector('#editProgress');
         const progressVal = form.querySelector('#progressVal');
         if (progressInput && progressVal) {
@@ -271,7 +282,7 @@
             };
         }
 
-        // 备注字符计数
+        // ==================== 备注字符计数 ====================
         const notesInput = form.querySelector('#editNotes');
         const notesCounter = form.querySelector('#notesCounter');
         if (notesInput && notesCounter) {
@@ -282,7 +293,7 @@
             };
         }
 
-        // 里程碑开关
+        // ==================== 里程碑开关 ====================
         const milestoneSwitch = form.querySelector('#editMilestone');
         const durationSelect = form.querySelector('#editDuration');
         const durationTypeSelect = form.querySelector('#editDurationType');
@@ -319,7 +330,7 @@
             };
         }
 
-        // 父任务选择
+        // ==================== 父任务选择 ====================
         const parentSelect = form.querySelector('#editParent');
         const autoWBSDisplay = form.querySelector('#autoWBS');
         const autoLevelDisplay = form.querySelector('#autoLevel');
@@ -359,7 +370,7 @@
             };
         }
 
-        // 自动计算结束日期
+        // ==================== 自动计算结束日期 ====================
         const startInput = form.querySelector('#editStart');
         const endDateDisplay = form.querySelector('#calculatedEndDate');
         const durationTypeHint = form.querySelector('#durationTypeHint');
@@ -398,12 +409,34 @@
         if (durationSelect) durationSelect.addEventListener('change', updateEndDate);
         if (durationTypeSelect) durationTypeSelect.addEventListener('change', updateEndDate);
 
-        // ⭐⭐⭐ 编辑依赖按钮 ⭐⭐⭐
+        // ⭐⭐⭐ 关键：编辑依赖按钮事件绑定（修复版）⭐⭐⭐
         const editDepsBtn = form.querySelector('#editDepsBtn');
+        console.log('🔍 查找编辑依赖按钮:', editDepsBtn); // 调试日志
+        
         if (editDepsBtn) {
-            editDepsBtn.onclick = () => {
+            console.log('✅ 找到编辑依赖按钮，开始绑定事件');
+            
+            // 方式1：使用 onclick（推荐）
+            editDepsBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🖱️ 编辑依赖按钮被点击！');
+                console.log('📋 当前任务:', task);
+                console.log('📋 表单元素:', form);
                 this.showDependencySelector(task, form);
             };
+            
+            // 方式2：使用 addEventListener（备用）
+            editDepsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🖱️ 编辑依赖按钮被点击（addEventListener）！');
+            });
+            
+            console.log('✅ 编辑依赖按钮事件已绑定');
+        } else {
+            console.error('❌ 未找到编辑依赖按钮！');
+            console.log('🔍 表单内容:', form.innerHTML.substring(0, 500));
         }
 
         // ⭐ 依赖标签删除按钮
@@ -415,7 +448,7 @@
             };
         });
 
-        // 保存按钮
+        // ==================== 保存按钮 ====================
         const saveBtn = form.querySelector('#saveTask');
         if (saveBtn) {
             saveBtn.onclick = (e) => {
@@ -425,7 +458,7 @@
             };
         }
 
-        // 取消按钮
+        // ==================== 关闭按钮 ====================
         const cancelForm = () => {
             this.cleanupForm(form);
             form.remove();
@@ -434,7 +467,7 @@
         const closeBtn = form.querySelector('#closeForm');
         if (closeBtn) closeBtn.onclick = cancelForm;
 
-        // 添加子任务
+        // ==================== 添加子任务 ====================
         const addSubTaskBtn = form.querySelector('#addSubTask');
         if (addSubTaskBtn) {
             addSubTaskBtn.onclick = () => {
@@ -443,7 +476,7 @@
             };
         }
 
-        // 删除任务
+        // ==================== 删除任务 ====================
         const deleteTaskBtn = form.querySelector('#deleteTask');
         if (deleteTaskBtn) {
             deleteTaskBtn.onclick = () => {
@@ -474,7 +507,7 @@
             };
         }
 
-        // 点击外部关闭
+        // ==================== 点击外部关闭 ====================
         const clickOutside = (e) => {
             if (!form.contains(e.target) && !bar.contains(e.target)) {
                 this.cleanupForm(form);
@@ -483,70 +516,87 @@
             }
         };
         setTimeout(() => document.addEventListener('click', clickOutside), 0);
+        
+        console.log('✅ 所有表单事件绑定完成');
     };
 
     /**
-     * 显示依赖任务选择器（⭐ 禁用无效选项）
+     * ⭐⭐⭐ 显示依赖任务选择器（修复版 - 添加详细日志）⭐⭐⭐
      */
-    // 在 gantt-events-form.js 中的 showDependencySelector 函数
     GanttChart.prototype.showDependencySelector = function(task, parentForm) {
+        console.log('╔═══════════════════════════════════════════════════════════╗');
+        console.log('║  🔧 开始显示依赖任务选择器                                 ║');
+        console.log('╠═══════════════════════════════════════════════════════════╣');
+        console.log('  📋 任务ID:', task.id);
+        console.log('  📋 任务名称:', task.name);
+        console.log('  📋 当前依赖:', task.dependencies);
+        console.log('╚═══════════════════════════════════════════════════════════╝');
+        
+        // 移除旧选择器
         const oldSelector = document.querySelector('.dependency-selector-modal');
-        if (oldSelector) oldSelector.remove();
+        if (oldSelector) {
+            console.log('🗑️ 移除旧选择器');
+            oldSelector.remove();
+        }
 
         const modal = document.createElement('div');
         modal.className = 'dependency-selector-modal';
         
         const availableTasks = this.tasks.filter(t => t.id !== task.id);
+        console.log('📊 可选任务数量:', availableTasks.length);
+        
+        // 获取当前已选依赖
         const currentDeps = Array.isArray(task.dependencies) ? 
-            task.dependencies.map(dep => typeof dep === 'string' ? dep : dep.taskId) : [];
+            task.dependencies.map(dep => {
+                const depId = typeof dep === 'string' ? dep : dep.taskId;
+                console.log('  ✓ 依赖任务ID:', depId);
+                return depId;
+            }) : [];
+        
+        console.log('📌 已选依赖ID列表:', currentDeps);
 
         modal.innerHTML = `
             <div class="dependency-selector-overlay"></div>
-            <div class="popup-menu-base" style="width: 480px; max-width: 90vw;">
-                <!-- 统一工具栏 -->
-                <div class="popup-toolbar">
-                    <h6 class="popup-toolbar-title">选择依赖任务</h6>
-                    <button type="button" class="popup-close-btn" id="closeDepsSelector" aria-label="关闭">×</button>
+            <div class="dependency-selector-content">
+                <!-- 统一头部 -->
+                <div class="dependency-selector-header">
+                    <h6 class="mb-0 fw-bold">选择依赖任务</h6>
+                    <button type="button" class="btn-close" id="closeDepsSelector" aria-label="关闭"></button>
                 </div>
                 
                 <!-- 主体区域 -->
-                <div class="popup-body">
+                <div class="dependency-selector-body">
                     <!-- 搜索框 -->
-                    <div class="popup-search-box">
-                        <input type="text" 
-                            class="popup-search-input" 
-                            id="depsSearchInput" 
-                            placeholder="🔍 搜索任务名称或WBS...">
+                    <div class="mb-2">
+                        <input type="text" class="form-control form-control-sm" id="depsSearchInput" 
+                            placeholder="🔍 搜索任务名称或WBS..." style="font-size: 0.85rem;">
                     </div>
                     
                     <!-- 任务列表 -->
-                    <div class="popup-list" id="depsList">
+                    <div class="deps-list" id="depsList">
                         ${availableTasks.map(t => {
                             const isChecked = currentDeps.includes(t.id);
                             const indent = '　'.repeat((t.outlineLevel || 1) - 1);
                             const icon = t.isMilestone ? '🎯' : (t.children?.length > 0 ? '📁' : '📋');
                             
+                            // 验证是否可以添加此依赖
                             const validation = this.canAddDependency(t.id, task.id);
                             const isDisabled = !validation.canAdd;
                             
                             return `
-                                <div class="popup-list-item form-check ${isDisabled ? 'disabled' : ''}" 
+                                <div class="form-check deps-item ${isDisabled ? 'deps-item-disabled' : ''}" 
                                     data-task-name="${t.name.toLowerCase()}" 
                                     data-task-wbs="${t.wbs || ''}"
                                     ${isDisabled ? `title="禁用原因: ${validation.reason}"` : ''}>
-                                    <input class="form-check-input" 
-                                        type="checkbox" 
+                                    <input class="form-check-input" type="checkbox" 
                                         value="${t.id}" 
                                         id="depCheck_${t.id}"
                                         ${isChecked ? 'checked' : ''}
                                         ${isDisabled ? 'disabled' : ''}>
-                                    <label class="form-check-label ${isDisabled ? 'text-muted' : ''}" 
-                                        for="depCheck_${t.id}">
-                                        ${indent}${icon} 
-                                        ${t.wbs ? `<span class="popup-badge popup-badge-primary">${t.wbs}</span>` : ''} 
-                                        ${t.name}
-                                        ${t.isMilestone ? '<span class="popup-badge popup-badge-warning">里程碑</span>' : ''}
-                                        ${isDisabled ? `<span class="popup-badge popup-badge-secondary">${validation.reason}</span>` : ''}
+                                    <label class="form-check-label ${isDisabled ? 'text-muted' : ''}" for="depCheck_${t.id}">
+                                        ${indent}${icon} ${t.wbs ? '<span class="wbs-badge-small">[' + t.wbs + ']</span> ' : ''}${t.name}
+                                        ${t.isMilestone ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem">里程碑</span>' : ''}
+                                        ${isDisabled ? `<span class="badge bg-secondary ms-1" style="font-size:0.6rem">${validation.reason}</span>` : ''}
                                     </label>
                                 </div>
                             `;
@@ -555,16 +605,16 @@
                 </div>
                 
                 <!-- 底部操作区 -->
-                <div class="popup-footer">
-                    <div class="popup-footer-info">
-                        <span>已选择 <strong id="selectedCount" style="color: #667eea;">${currentDeps.length}</strong> 个任务</span>
-                        <span style="color: #6c757d; font-size: 0.7rem;">💡 灰色项为禁止依赖</span>
+                <div class="dependency-selector-footer">
+                    <div class="text-muted small mb-2">
+                        已选择 <strong id="selectedCount">${currentDeps.length}</strong> 个任务
+                        <span class="text-info ms-2" style="font-size: 0.7rem;">💡 灰色项为禁止依赖</span>
                     </div>
-                    <div class="popup-footer-actions">
-                        <button class="btn btn-primary btn-sm" id="confirmDeps" type="button">
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary btn-sm flex-fill" id="confirmDeps" type="button">
                             ✅ 确定
                         </button>
-                        <button class="btn btn-secondary btn-sm" id="cancelDeps" type="button">
+                        <button class="btn btn-secondary btn-sm flex-fill" id="cancelDeps" type="button">
                             ❌ 取消
                         </button>
                     </div>
@@ -573,18 +623,28 @@
         `;
 
         document.body.appendChild(modal);
+        console.log('✅ 模态框HTML已添加到 body');
+        
         this.bindDependencySelectorEvents(modal, task, parentForm);
+        console.log('✅ 依赖选择器事件已绑定');
 
+        // 显示动画
         requestAnimationFrame(() => {
             modal.classList.add('show');
+            console.log('✅ 模态框显示动画已触发');
         });
+        
+        addLog(`📝 打开依赖任务选择器（当前已选 ${currentDeps.length} 个）`);
     };
 
     /**
-     * 绑定依赖选择器事件（⭐ 添加禁用项提示）
+     * 绑定依赖选择器事件（完整版）
      */
     GanttChart.prototype.bindDependencySelectorEvents = function(modal, task, parentForm) {
+        console.log('🔧 开始绑定依赖选择器事件...');
+        
         const closeDepsSelector = () => {
+            console.log('🚪 关闭依赖选择器');
             modal.classList.remove('show');
             setTimeout(() => {
                 if (modal.parentElement) {
@@ -593,14 +653,26 @@
             }, 200);
         };
 
+        // 关闭按钮
         const closeBtn = modal.querySelector('#closeDepsSelector');
-        if (closeBtn) closeBtn.onclick = closeDepsSelector;
+        if (closeBtn) {
+            closeBtn.onclick = closeDepsSelector;
+            console.log('✅ 关闭按钮事件已绑定');
+        }
 
+        // 取消按钮
         const cancelBtn = modal.querySelector('#cancelDeps');
-        if (cancelBtn) cancelBtn.onclick = closeDepsSelector;
+        if (cancelBtn) {
+            cancelBtn.onclick = closeDepsSelector;
+            console.log('✅ 取消按钮事件已绑定');
+        }
 
+        // 遮罩层点击关闭
         const overlay = modal.querySelector('.dependency-selector-overlay');
-        if (overlay) overlay.onclick = closeDepsSelector;
+        if (overlay) {
+            overlay.onclick = closeDepsSelector;
+            console.log('✅ 遮罩层点击事件已绑定');
+        }
 
         // 搜索功能
         const searchInput = modal.querySelector('#depsSearchInput');
@@ -621,6 +693,7 @@
                     }
                 });
             };
+            console.log('✅ 搜索功能已绑定');
         }
 
         // 复选框计数
@@ -635,25 +708,28 @@
                 }
             };
         });
+        console.log('✅ 复选框计数已绑定');
 
-        // ⭐ 禁用项点击提示
+        // 禁用项点击提示
         depsItems.forEach(item => {
             if (item.classList.contains('deps-item-disabled')) {
                 item.onclick = (e) => {
                     e.preventDefault();
                     const reason = item.getAttribute('title');
                     if (reason) {
-                        // 显示提示气泡
                         showTooltip(item, reason.replace('禁用原因: ', ''));
                     }
                 };
             }
         });
+        console.log('✅ 禁用项提示已绑定');
 
-        // 确定按钮
+        // ⭐⭐⭐ 确定按钮（关键）⭐⭐⭐
         const confirmBtn = modal.querySelector('#confirmDeps');
         if (confirmBtn) {
             confirmBtn.onclick = () => {
+                console.log('🖱️ 确定按钮被点击');
+                
                 const selectedIds = Array.from(checkboxes)
                     .filter(cb => cb.checked && !cb.disabled)
                     .map(cb => cb.value);
@@ -681,11 +757,16 @@
                 
                 closeDepsSelector();
             };
+            console.log('✅ 确定按钮事件已绑定');
+        } else {
+            console.error('❌ 未找到确定按钮！');
         }
+        
+        console.log('✅ 依赖选择器所有事件绑定完成');
     };
 
     /**
-     * ⭐ 显示临时提示气泡
+     * ⭐ 显示临时提示气泡（独立函数）
      */
     function showTooltip(element, message) {
         const tooltip = document.createElement('div');
@@ -709,7 +790,6 @@
         tooltip.style.left = rect.right + 10 + 'px';
         tooltip.style.top = rect.top + (rect.height - tooltip.offsetHeight) / 2 + 'px';
         
-        // 3秒后自动消失
         setTimeout(() => {
             tooltip.style.opacity = '0';
             tooltip.style.transition = 'opacity 0.3s ease';
@@ -725,14 +805,21 @@
      * ⭐ 更新依赖标签显示
      */
     GanttChart.prototype.updateDependencyTags = function(task, form) {
+        console.log('🔄 更新依赖标签显示...');
+        
         const container = form.querySelector('#depsTagsContainer');
-        if (!container) return;
+        if (!container) {
+            console.error('❌ 未找到依赖标签容器');
+            return;
+        }
 
         const selectedDeps = Array.isArray(task.dependencies) ? 
             task.dependencies.map(dep => {
                 const depId = typeof dep === 'string' ? dep : dep.taskId;
                 return this.tasks.find(t => t.id === depId);
             }).filter(t => t) : [];
+
+        console.log('📊 更新后的依赖任务:', selectedDeps);
 
         if (selectedDeps.length > 0) {
             container.innerHTML = selectedDeps.map(dep => {
@@ -753,8 +840,11 @@
                     this.removeDependency(task, depId, form);
                 };
             });
+            
+            console.log('✅ 依赖标签已更新，删除按钮已绑定');
         } else {
             container.innerHTML = '<span class="text-muted small">无依赖任务</span>';
+            console.log('ℹ️ 无依赖任务');
         }
     };
 
@@ -762,6 +852,8 @@
      * ⭐ 移除单个依赖
      */
     GanttChart.prototype.removeDependency = function(task, depId, form) {
+        console.log('🗑️ 移除依赖:', depId);
+        
         if (!task.dependencies) return;
 
         const depTask = this.tasks.find(t => t.id === depId);
@@ -772,6 +864,8 @@
             return id !== depId;
         });
 
+        console.log('✅ 依赖已移除，剩余:', task.dependencies);
+        
         this.updateDependencyTags(task, form);
         
         addLog(`✅ 已移除依赖：${depName}`);
