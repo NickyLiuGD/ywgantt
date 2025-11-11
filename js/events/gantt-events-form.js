@@ -488,6 +488,7 @@
     /**
      * 显示依赖任务选择器（⭐ 禁用无效选项）
      */
+    // 在 gantt-events-form.js 中的 showDependencySelector 函数
     GanttChart.prototype.showDependencySelector = function(task, parentForm) {
         const oldSelector = document.querySelector('.dependency-selector-modal');
         if (oldSelector) oldSelector.remove();
@@ -496,51 +497,56 @@
         modal.className = 'dependency-selector-modal';
         
         const availableTasks = this.tasks.filter(t => t.id !== task.id);
-        
-        // 获取当前已选依赖
         const currentDeps = Array.isArray(task.dependencies) ? 
             task.dependencies.map(dep => typeof dep === 'string' ? dep : dep.taskId) : [];
 
         modal.innerHTML = `
             <div class="dependency-selector-overlay"></div>
-            <div class="dependency-selector-content">
-                <div class="dependency-selector-header">
-                    <h6 class="mb-0 fw-bold">选择依赖任务</h6>
-                    <button type="button" class="btn-close" id="closeDepsSelector"></button>
+            <div class="popup-menu-base" style="width: 480px; max-width: 90vw;">
+                <!-- 统一工具栏 -->
+                <div class="popup-toolbar">
+                    <h6 class="popup-toolbar-title">选择依赖任务</h6>
+                    <button type="button" class="popup-close-btn" id="closeDepsSelector" aria-label="关闭">×</button>
                 </div>
                 
-                <div class="dependency-selector-body">
+                <!-- 主体区域 -->
+                <div class="popup-body">
                     <!-- 搜索框 -->
-                    <div class="mb-2">
-                        <input type="text" class="form-control form-control-sm" id="depsSearchInput" 
-                            placeholder="🔍 搜索任务名称或WBS..." style="font-size: 0.85rem;">
+                    <div class="popup-search-box">
+                        <input type="text" 
+                            class="popup-search-input" 
+                            id="depsSearchInput" 
+                            placeholder="🔍 搜索任务名称或WBS...">
                     </div>
                     
                     <!-- 任务列表 -->
-                    <div class="deps-list" id="depsList">
+                    <div class="popup-list" id="depsList">
                         ${availableTasks.map(t => {
                             const isChecked = currentDeps.includes(t.id);
                             const indent = '　'.repeat((t.outlineLevel || 1) - 1);
                             const icon = t.isMilestone ? '🎯' : (t.children?.length > 0 ? '📁' : '📋');
                             
-                            // ⭐⭐⭐ 验证是否可以添加此依赖 ⭐⭐⭐
                             const validation = this.canAddDependency(t.id, task.id);
                             const isDisabled = !validation.canAdd;
                             
                             return `
-                                <div class="form-check deps-item ${isDisabled ? 'deps-item-disabled' : ''}" 
+                                <div class="popup-list-item form-check ${isDisabled ? 'disabled' : ''}" 
                                     data-task-name="${t.name.toLowerCase()}" 
                                     data-task-wbs="${t.wbs || ''}"
                                     ${isDisabled ? `title="禁用原因: ${validation.reason}"` : ''}>
-                                    <input class="form-check-input" type="checkbox" 
+                                    <input class="form-check-input" 
+                                        type="checkbox" 
                                         value="${t.id}" 
                                         id="depCheck_${t.id}"
                                         ${isChecked ? 'checked' : ''}
                                         ${isDisabled ? 'disabled' : ''}>
-                                    <label class="form-check-label ${isDisabled ? 'text-muted' : ''}" for="depCheck_${t.id}">
-                                        ${indent}${icon} ${t.wbs ? '<span class="wbs-badge-small">[' + t.wbs + ']</span> ' : ''}${t.name}
-                                        ${t.isMilestone ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem">里程碑</span>' : ''}
-                                        ${isDisabled ? `<span class="badge bg-secondary ms-1" style="font-size:0.6rem">${validation.reason}</span>` : ''}
+                                    <label class="form-check-label ${isDisabled ? 'text-muted' : ''}" 
+                                        for="depCheck_${t.id}">
+                                        ${indent}${icon} 
+                                        ${t.wbs ? `<span class="popup-badge popup-badge-primary">${t.wbs}</span>` : ''} 
+                                        ${t.name}
+                                        ${t.isMilestone ? '<span class="popup-badge popup-badge-warning">里程碑</span>' : ''}
+                                        ${isDisabled ? `<span class="popup-badge popup-badge-secondary">${validation.reason}</span>` : ''}
                                     </label>
                                 </div>
                             `;
@@ -548,16 +554,17 @@
                     </div>
                 </div>
                 
-                <div class="dependency-selector-footer">
-                    <div class="text-muted small mb-2">
-                        已选择 <strong id="selectedCount">${currentDeps.length}</strong> 个任务
-                        <span class="text-info ms-2" style="font-size: 0.7rem;">💡 灰色项为禁止依赖</span>
+                <!-- 底部操作区 -->
+                <div class="popup-footer">
+                    <div class="popup-footer-info">
+                        <span>已选择 <strong id="selectedCount" style="color: #667eea;">${currentDeps.length}</strong> 个任务</span>
+                        <span style="color: #6c757d; font-size: 0.7rem;">💡 灰色项为禁止依赖</span>
                     </div>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-primary btn-sm flex-fill" id="confirmDeps" type="button">
+                    <div class="popup-footer-actions">
+                        <button class="btn btn-primary btn-sm" id="confirmDeps" type="button">
                             ✅ 确定
                         </button>
-                        <button class="btn btn-secondary btn-sm flex-fill" id="cancelDeps" type="button">
+                        <button class="btn btn-secondary btn-sm" id="cancelDeps" type="button">
                             ❌ 取消
                         </button>
                     </div>
