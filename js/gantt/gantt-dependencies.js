@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图依赖关系管理中心                                          ▓▓
 // ▓▓ 路径: js/gantt/gantt-dependencies.js                           ▓▓
-// ▓▓ 版本: Epsilon17 - 修复折叠任务箭头错位问题                     ▓▓
+// ▓▓ 版本: Epsilon18 - 完整修复折叠任务依赖聚合                     ▓▓
 // ▓▓ 职责: 依赖关系的所有逻辑集中管理                               ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
@@ -12,8 +12,6 @@
 
     /**
      * 统一依赖格式（字符串 → 对象）
-     * @param {*} dep - 依赖数据（字符串或对象）
-     * @returns {Object|null} 统一的依赖对象
      */
     function normalizeDependency(dep) {
         if (typeof dep === 'string') {
@@ -30,8 +28,6 @@
 
     /**
      * 提取依赖任务ID
-     * @param {*} dep - 依赖数据
-     * @returns {string|null} 任务ID
      */
     function extractDependencyId(dep) {
         if (typeof dep === 'string') {
@@ -46,9 +42,6 @@
 
     /**
      * 获取任务的所有祖先ID（向上递归）
-     * @param {string} taskId - 任务ID
-     * @param {Array} allTasks - 所有任务数组
-     * @returns {Set<string>} 所有祖先ID集合
      */
     function getAllAncestors(taskId, allTasks) {
         const ancestors = new Set();
@@ -76,9 +69,6 @@
 
     /**
      * 获取任务的所有后代ID（向下递归）
-     * @param {string} taskId - 任务ID
-     * @param {Array} allTasks - 所有任务数组
-     * @returns {Set<string>} 所有后代ID集合
      */
     function getAllDescendants(taskId, allTasks) {
         const descendants = new Set();
@@ -128,31 +118,19 @@
 
     /**
      * 检查是否可以添加依赖关系
-     * @param {string} fromTaskId - 依赖任务ID（被依赖的任务）
-     * @param {string} toTaskId - 当前任务ID（要添加依赖的任务）
-     * @param {Array} allTasks - 所有任务数组
-     * @returns {Object} {canAdd: boolean, reason: string}
      */
     function canAddDependency(fromTaskId, toTaskId, allTasks) {
-        // 1. 不能依赖自己
         if (fromTaskId === toTaskId) {
-            return {
-                canAdd: false,
-                reason: '不能依赖自己'
-            };
+            return { canAdd: false, reason: '不能依赖自己' };
         }
         
         const fromTask = allTasks.find(t => t.id === fromTaskId);
         const toTask = allTasks.find(t => t.id === toTaskId);
         
         if (!fromTask || !toTask) {
-            return {
-                canAdd: false,
-                reason: '任务不存在'
-            };
+            return { canAdd: false, reason: '任务不存在' };
         }
         
-        // 2. 子任务不能依赖父任务（包括所有祖先）
         const toAncestors = getAllAncestors(toTaskId, allTasks);
         if (toAncestors.has(fromTaskId)) {
             const ancestorLevel = getRelationLevel(fromTaskId, toTaskId, allTasks);
@@ -162,7 +140,6 @@
             };
         }
         
-        // 3. 父任务不能依赖子任务（包括所有后代）
         const fromDescendants = getAllDescendants(fromTaskId, allTasks);
         if (fromDescendants.has(toTaskId)) {
             const descendantLevel = getRelationLevel(toTaskId, fromTaskId, allTasks);
@@ -172,18 +149,11 @@
             };
         }
         
-        // 4. 检查是否形成循环依赖
         if (wouldCreateCircularDependency(fromTaskId, toTaskId, allTasks)) {
-            return {
-                canAdd: false,
-                reason: `会形成循环依赖`
-            };
+            return { canAdd: false, reason: `会形成循环依赖` };
         }
         
-        return {
-            canAdd: true,
-            reason: ''
-        };
+        return { canAdd: true, reason: '' };
     }
 
     /**
@@ -464,7 +434,7 @@
         });
     }
 
-    // ==================== 第七部分：⭐ SVG 箭头渲染（修复版） ====================
+    // ==================== 第七部分：⭐ 可见任务处理 ====================
 
     /**
      * ⭐ 获取可见任务列表（排除折叠的子任务）
@@ -480,7 +450,7 @@
                 if (!parent) break;
                 
                 if (parent.isCollapsed) {
-                    return false; // 祖先折叠，此任务不可见
+                    return false;
                 }
                 
                 current = parent;
@@ -498,7 +468,7 @@
     }
 
     /**
-     * ⭐ 获取有效的依赖关系（处理折叠任务）
+     * ⭐⭐⭐ 获取有效的依赖关系（处理折叠任务 - 完整版）
      * 如果依赖的任务被折叠，则向上查找可见的父任务
      */
     function getEffectiveDependency(depId, allTasks, visibleTasks) {
@@ -516,7 +486,8 @@
             if (!parent) break;
             
             if (visibleTasks.find(t => t.id === parent.id)) {
-                return parent.id; // 返回可见的父任务
+                console.log(`📍 依赖任务 ${depId} 被折叠，使用父任务 ${parent.id} (${parent.name})`);
+                return parent.id;
             }
             
             depTask = parent;
@@ -526,9 +497,72 @@
     }
 
     /**
-     * 渲染依赖关系箭头（修复版）
+     * ⭐⭐⭐ 获取任务的聚合依赖（完整版 - 包括被折叠子任务的依赖）
      */
-    GanttChart.prototype.renderDependencies = function(dates) {
+    function getAggregatedDependencies(taskId, allTasks) {
+        const task = allTasks.find(t => t.id === taskId);
+        if (!task) return [];
+        
+        const aggregatedDeps = new Set();
+        
+        // 1. 添加自己的直接依赖
+        if (task.dependencies && task.dependencies.length > 0) {
+            task.dependencies.forEach(dep => {
+                const depId = extractDependencyId(dep);
+                if (depId) aggregatedDeps.add(depId);
+            });
+        }
+        
+        // 2. ⭐ 如果任务被折叠，收集所有子任务的外部依赖
+        if (task.isCollapsed && task.children && task.children.length > 0) {
+            const descendants = getAllDescendants(taskId, allTasks);
+            
+            descendants.forEach(descendantId => {
+                const descendant = allTasks.find(t => t.id === descendantId);
+                if (!descendant || !descendant.dependencies) return;
+                
+                descendant.dependencies.forEach(dep => {
+                    const depId = extractDependencyId(dep);
+                    if (!depId) return;
+                    
+                    // ⭐ 只添加外部依赖（不在折叠的子任务范围内）
+                    if (depId !== taskId && !descendants.has(depId)) {
+                        aggregatedDeps.add(depId);
+                        console.log(`📦 聚合依赖: ${task.name} ← ${descendant.name} ← ${depId}`);
+                    }
+                });
+            });
+        }
+        
+        return Array.from(aggregatedDeps);
+    }
+
+    /**
+     * ⭐⭐⭐ 查找依赖此任务的所有可见任务（完整版）
+     */
+    function getVisibleDependentTasks(taskId, allTasks, visibleTasks) {
+        const dependents = [];
+        const descendants = getAllDescendants(taskId, allTasks);
+        
+        visibleTasks.forEach(visibleTask => {
+            const aggregatedDeps = getAggregatedDependencies(visibleTask.id, allTasks);
+            
+            // 检查是否依赖此任务或其任何后代
+            if (aggregatedDeps.includes(taskId) || 
+                aggregatedDeps.some(depId => descendants.has(depId))) {
+                dependents.push(visibleTask.id);
+            }
+        });
+        
+        return dependents;
+    }
+
+    // ==================== 第八部分：⭐ SVG 箭头渲染（完整修复版） ====================
+
+    /**
+     * 渲染依赖关系箭头（完整修复版）
+     */
+    GanttChart.prototype.renderDependencies = function(dates, visibleTasks) {
         const depSVG = this.container.querySelector('.gantt-dependencies');
         
         if (!depSVG) {
@@ -538,8 +572,11 @@
 
         const totalWidth = calculateTotalWidth(dates, this.options.cellWidth);
         
-        // ⭐ 获取可见任务列表
-        const visibleTasks = getVisibleTasks(this.tasks);
+        // ⭐ 如果没有传入可见任务，自动计算
+        if (!visibleTasks) {
+            visibleTasks = getVisibleTasks(this.tasks);
+        }
+        
         const visibleTasksHeight = visibleTasks.length * ROW_HEIGHT;
 
         depSVG.style.width = `${totalWidth}px`;
@@ -566,24 +603,24 @@
         depSVG.innerHTML += paths;
         
         const arrowCount = paths.split('<path').length - 1;
-        console.log(`✅ 已渲染 ${arrowCount} 条依赖箭头（可见任务: ${visibleTasks.length}/${this.tasks.length}）`);
+        console.log(`✅ 已渲染 ${arrowCount} 条依赖箭头（可见: ${visibleTasks.length}/${this.tasks.length}）`);
     };
 
     /**
-     * 生成依赖路径（修复版 - 支持折叠任务）
+     * ⭐⭐⭐ 生成依赖路径（完整修复版 - 支持折叠任务依赖聚合）
      */
     GanttChart.prototype.generateDependencyPaths = function(visibleTasks) {
         const h = ROW_HEIGHT;
         const radius = 8;
         const paths = [];
 
-        // ⭐ 遍历可见任务
         visibleTasks.forEach((task, taskIndex) => {
-            if (!task.dependencies || task.dependencies.length === 0) return;
+            // ⭐ 使用聚合依赖（包括被折叠子任务的依赖）
+            const aggregatedDepIds = getAggregatedDependencies(task.id, this.tasks);
             
-            const depIds = task.dependencies.map(dep => extractDependencyId(dep)).filter(id => id);
+            if (aggregatedDepIds.length === 0) return;
 
-            depIds.forEach(depId => {
+            aggregatedDepIds.forEach(depId => {
                 // ⭐ 获取有效的依赖任务（处理折叠情况）
                 const effectiveDepId = getEffectiveDependency(depId, this.tasks, visibleTasks);
                 
@@ -634,7 +671,11 @@
 
                 const dPath = createRoundedPath(coords, radius, false);
                 
-                paths.push(`<path data-from="${effectiveDepId}" data-to="${task.id}" d="${dPath}" 
+                // ⭐ 标记原始依赖ID和有效依赖ID
+                paths.push(`<path data-from="${effectiveDepId}" 
+                                  data-to="${task.id}" 
+                                  data-original-from="${depId}"
+                                  d="${dPath}" 
                                   stroke="#dc3545" fill="none" stroke-width="2" 
                                   marker-end="url(#arrow)" 
                                   class="dependency-arrow" />`);
@@ -644,132 +685,28 @@
         return paths.join('');
     };
 
-    // ==================== 第八部分：⭐ 折叠任务的依赖聚合 ====================
-
-    /**
-     * ⭐ 获取任务的聚合依赖（包括被折叠的子任务的依赖）
-     * @param {string} taskId - 任务ID
-     * @param {Array} allTasks - 所有任务数组
-     * @returns {Array} 聚合后的依赖ID数组
-     */
-    function getAggregatedDependencies(taskId, allTasks) {
-        const task = allTasks.find(t => t.id === taskId);
-        if (!task) return [];
-        
-        const aggregatedDeps = new Set();
-        
-        // 添加自己的依赖
-        if (task.dependencies && task.dependencies.length > 0) {
-            task.dependencies.forEach(dep => {
-                const depId = extractDependencyId(dep);
-                if (depId) aggregatedDeps.add(depId);
-            });
-        }
-        
-        // 如果任务被折叠，添加所有子任务的依赖
-        if (task.isCollapsed && task.children && task.children.length > 0) {
-            const collectChildDeps = (childId) => {
-                const child = allTasks.find(t => t.id === childId);
-                if (!child) return;
-                
-                // 添加子任务的依赖
-                if (child.dependencies && child.dependencies.length > 0) {
-                    child.dependencies.forEach(dep => {
-                        const depId = extractDependencyId(dep);
-                        if (depId) {
-                            // 排除内部依赖（子任务之间的依赖）
-                            const depTask = allTasks.find(t => t.id === depId);
-                            if (depTask && depTask.parentId !== taskId) {
-                                aggregatedDeps.add(depId);
-                            }
-                        }
-                    });
-                }
-                
-                // 递归处理孙任务
-                if (child.children && child.children.length > 0) {
-                    child.children.forEach(grandchildId => {
-                        collectChildDeps(grandchildId);
-                    });
-                }
-            };
-            
-            task.children.forEach(childId => {
-                collectChildDeps(childId);
-            });
-        }
-        
-        return Array.from(aggregatedDeps);
-    }
-
-    /**
-     * ⭐ 查找依赖此任务的所有可见任务（包括通过被折叠子任务的间接依赖）
-     * @param {string} taskId - 任务ID
-     * @param {Array} allTasks - 所有任务数组
-     * @param {Array} visibleTasks - 可见任务数组
-     * @returns {Array} 依赖此任务的可见任务ID数组
-     */
-    function getVisibleDependentTasks(taskId, allTasks, visibleTasks) {
-        const dependents = [];
-        
-        visibleTasks.forEach(visibleTask => {
-            const aggregatedDeps = getAggregatedDependencies(visibleTask.id, allTasks);
-            
-            // 检查是否依赖此任务或其后代
-            if (aggregatedDeps.includes(taskId)) {
-                dependents.push(visibleTask.id);
-            } else {
-                // 检查是否依赖此任务的任何后代
-                const descendants = getAllDescendants(taskId, allTasks);
-                if (aggregatedDeps.some(depId => descendants.has(depId))) {
-                    dependents.push(visibleTask.id);
-                }
-            }
-        });
-        
-        return dependents;
-    }
-
     // ==================== 第九部分：GanttChart 类扩展 ====================
 
-    /**
-     * 获取任务的所有祖先（实例方法）
-     */
     GanttChart.prototype.getAllAncestors = function(taskId) {
         return getAllAncestors(taskId, this.tasks);
     };
 
-    /**
-     * 获取任务的所有后代（实例方法）
-     */
     GanttChart.prototype.getAllDescendants = function(taskId) {
         return getAllDescendants(taskId, this.tasks);
     };
 
-    /**
-     * 获取任务的所有依赖（实例方法）
-     */
     GanttChart.prototype.getAllDependencies = function(taskId) {
         return getAllDependencies(taskId, this.tasks);
     };
 
-    /**
-     * ⭐ 获取任务的聚合依赖（实例方法）
-     */
     GanttChart.prototype.getAggregatedDependencies = function(taskId) {
         return getAggregatedDependencies(taskId, this.tasks);
     };
 
-    /**
-     * 检查是否可以添加依赖（实例方法）
-     */
     GanttChart.prototype.canAddDependency = function(fromTaskId, toTaskId) {
         return canAddDependency(fromTaskId, toTaskId, this.tasks);
     };
 
-    /**
-     * 获取关系层级（实例方法）
-     */
     GanttChart.prototype.getRelationLevel = function(ancestorId, descendantId) {
         return getRelationLevel(ancestorId, descendantId, this.tasks);
     };
@@ -820,7 +757,6 @@
             fixResult.fixes.forEach(fix => {
                 addLog(`🔧 ${fix.message}`);
                 
-                // 更新父任务
                 const task = this.tasks.find(t => t.id === fix.taskId);
                 if (task && task.parentId && typeof this.updateParentTasks === 'function') {
                     this.updateParentTasks(task.id);
@@ -869,7 +805,7 @@
     global.getAllDependencies = getAllDependencies;
     global.getRelationLevel = getRelationLevel;
     
-    // ⭐ 新增函数
+    // 可见任务处理
     global.getVisibleTasks = getVisibleTasks;
     global.getVisibleTaskIndex = getVisibleTaskIndex;
     global.getEffectiveDependency = getEffectiveDependency;
@@ -889,6 +825,6 @@
     // 自动修复
     global.autoFixConflicts = autoFixConflicts;
 
-    console.log('✅ gantt-dependencies.js loaded successfully (Epsilon17 - 修复折叠任务箭头)');
+    console.log('✅ gantt-dependencies.js loaded successfully (Epsilon18 - 完整修复折叠依赖)');
 
 })(typeof window !== 'undefined' ? window : this);

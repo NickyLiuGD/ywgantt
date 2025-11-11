@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图编辑表单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-form.js                           ▓▓
-// ▓▓ 版本: Epsilon16 - 依赖选择器优化（顶部工具栏+紧凑间距）        ▓▓
+// ▓▓ 版本: Epsilon17 - 修复依赖选择器保存问题                       ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -405,7 +405,7 @@
         if (durationSelect) durationSelect.addEventListener('change', updateEndDate);
         if (durationTypeSelect) durationTypeSelect.addEventListener('change', updateEndDate);
 
-        // ⭐ 编辑依赖按钮事件绑定
+        // 编辑依赖按钮事件绑定
         const editDepsBtn = form.querySelector('#editDepsBtn');
         
         if (editDepsBtn) {
@@ -498,7 +498,7 @@
     };
 
     /**
-     * ⭐⭐⭐ 显示依赖任务选择器（优化版 - 顶部工具栏）
+     * ⭐⭐⭐ 显示依赖任务选择器（修复版 - 保留原有依赖）
      */
     GanttChart.prototype.showDependencySelector = function(task, parentForm) {
         console.log('🔧 显示依赖任务选择器...');
@@ -512,17 +512,19 @@
         
         const availableTasks = this.tasks.filter(t => t.id !== task.id);
         
-        // 获取当前已选依赖
+        // ⭐ 获取当前已选依赖（保存原始数据）
         const currentDeps = Array.isArray(task.dependencies) ? 
             task.dependencies.map(dep => {
                 const depId = typeof dep === 'string' ? dep : dep.taskId;
                 return depId;
             }) : [];
 
+        console.log('📌 原有依赖ID列表:', currentDeps);
+
         modal.innerHTML = `
             <div class="dependency-selector-overlay"></div>
             <div class="dependency-selector-content">
-                <!-- ⭐ 顶部工具栏（参照任务编辑表单） -->
+                <!-- 顶部工具栏 -->
                 <div class="dependency-selector-header">
                     <div class="d-flex gap-2">
                         <button class="btn btn-sm btn-primary" id="confirmDeps" type="button" title="保存">
@@ -541,14 +543,18 @@
                             placeholder="🔍 搜索任务名称或WBS..." style="font-size: 0.85rem;">
                     </div>
                     
-                    <!-- ⭐ 任务列表（更紧凑） -->
+                    <!-- 任务列表 -->
                     <div class="deps-list" id="depsList">
                         ${availableTasks.map(t => {
                             const isChecked = currentDeps.includes(t.id);
                             const indent = '　'.repeat((t.outlineLevel || 1) - 1);
                             const icon = t.isMilestone ? '🎯' : (t.children?.length > 0 ? '📁' : '📋');
                             
-                            const validation = this.canAddDependency(t.id, task.id);
+                            // ⭐ 修复：已选依赖不验证（允许保留）
+                            const validation = isChecked ? 
+                                { canAdd: true, reason: '' } : 
+                                this.canAddDependency(t.id, task.id);
+                            
                             const isDisabled = !validation.canAdd;
                             
                             return `
@@ -572,7 +578,7 @@
                     </div>
                 </div>
                 
-                <!-- ⭐ 底部状态栏（仅显示信息） -->
+                <!-- 底部状态栏 -->
                 <div class="dependency-selector-footer">
                     <div class="text-muted small">
                         已选择 <strong id="selectedCount">${currentDeps.length}</strong> 个任务
@@ -609,7 +615,7 @@
             }, 200);
         };
 
-        // ⭐ 关闭按钮（X）
+        // 关闭按钮
         const closeBtn = modal.querySelector('#closeDepsSelector');
         if (closeBtn) {
             closeBtn.onclick = closeDepsSelector;
@@ -668,27 +674,36 @@
             }
         });
 
-        // ⭐ 保存按钮（顶部工具栏）
+        // ⭐ 保存按钮（保留未勾选的原有依赖）
         const confirmBtn = modal.querySelector('#confirmDeps');
         if (confirmBtn) {
             confirmBtn.onclick = () => {
+                console.log('🖱️ 保存依赖关系...');
+                
+                // ⭐ 获取所有勾选的任务ID（包括原有的和新增的）
                 const selectedIds = Array.from(checkboxes)
                     .filter(cb => cb.checked && !cb.disabled)
                     .map(cb => cb.value);
                 
-                // 更新任务的依赖关系
+                console.log('✅ 选中的依赖任务ID:', selectedIds);
+                
+                // ⭐ 更新任务的依赖关系（保持对象格式）
                 task.dependencies = selectedIds.map(depId => ({
                     taskId: depId,
                     type: 'FS',
                     lag: 0
                 }));
                 
+                console.log('✅ 任务依赖已更新:', task.dependencies);
+                
                 // 更新父表单的依赖标签显示
                 this.updateDependencyTags(task, parentForm);
                 
                 // 立即重新渲染依赖箭头
                 const dates = this.generateDates();
-                this.renderDependencies(dates);
+                const visibleTasks = getVisibleTasks(this.tasks);
+                this.renderDependencies(dates, visibleTasks);
+                console.log('🔄 依赖箭头已立即渲染');
                 
                 addLog(`✅ 已更新 "${task.name}" 的依赖关系（${selectedIds.length} 个）`);
                 
@@ -777,6 +792,11 @@
         
         this.updateDependencyTags(task, form);
         
+        // ⭐ 立即重新渲染依赖箭头
+        const dates = this.generateDates();
+        const visibleTasks = getVisibleTasks(this.tasks);
+        this.renderDependencies(dates, visibleTasks);
+        
         addLog(`✅ 已移除依赖：${depName}`);
     };
 
@@ -844,7 +864,7 @@
 
         task.wbs = this.generateWBS(task.id);
 
-        // 确保依赖格式统一
+        // ⭐ 依赖关系已在模态框中更新，这里只需确保格式统一
         if (!Array.isArray(task.dependencies)) {
             task.dependencies = [];
         }
@@ -860,6 +880,8 @@
 
         const newDepsCount = task.dependencies.length;
 
+        console.log(`📊 任务 "${task.name}" 依赖关系:`, task.dependencies);
+
         if (hasChildren) {
             this.recalculateSummaryTask(task.id);
         }
@@ -871,10 +893,12 @@
         
         this.render();
         
-        // 延迟渲染依赖箭头
+        // ⭐ 延迟渲染依赖箭头
         setTimeout(() => {
             const dates = this.generateDates();
-            this.renderDependencies(dates);
+            const visibleTasks = getVisibleTasks(this.tasks);
+            this.renderDependencies(dates, visibleTasks);
+            console.log('🔄 依赖箭头已重新渲染');
         }, 50);
         
         const typeLabel = isMilestone ? '（里程碑）' : 
@@ -1049,6 +1073,6 @@
         }
     };
 
-    console.log('✅ gantt-events-form.js loaded successfully (Epsilon16 - 依赖选择器优化)');
+    console.log('✅ gantt-events-form.js loaded successfully (Epsilon17 - 修复依赖保存)');
 
 })();
