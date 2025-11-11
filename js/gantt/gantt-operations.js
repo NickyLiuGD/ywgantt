@@ -1,7 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图任务操作模块                                              ▓▓
 // ▓▓ 路径: js/gantt/gantt-operations.js                             ▓▓
-// ▓▓ 版本: Epsilon17 - 折叠/展开时重新渲染依赖箭头                  ▓▓
+// ▓▓ 版本: Epsilon17 - 修复折叠时依赖箭头重渲染                     ▓▓
+// ▓▓ 职责: 任务增删改查、层级管理、汇总任务计算                     ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -9,6 +10,9 @@
 
     // ==================== 任务选择与显示 ====================
 
+    /**
+     * 选中任务
+     */
     GanttChart.prototype.selectTask = function(taskId) {
         if (!taskId || this.selectedTask === taskId) return;
 
@@ -77,6 +81,9 @@
         addLog(`📌 已选择任务 "${task.name}"${deps.size > 0 ? ` (依赖${deps.size}个任务)` : ''}`);
     };
 
+    /**
+     * 取消选择
+     */
     GanttChart.prototype.deselect = function() {
         if (!this.selectedTask) return;
 
@@ -96,6 +103,9 @@
         addLog('✅ 已取消选择');
     };
 
+    /**
+     * 滚动使任务条居中显示
+     */
     GanttChart.prototype.scrollTaskToCenter = function(taskId) {
         if (!taskId || !this.container) return;
         
@@ -137,6 +147,9 @@
         }
     };
 
+    /**
+     * 更新甘特图高度
+     */
     GanttChart.prototype.updateHeight = function() {
         if (!this.container) return;
         
@@ -161,7 +174,9 @@
             ganttWrapper.style.height = finalHeight + 'px';
             ganttWrapper.style.maxHeight = finalHeight + 'px';
             
-            const contentHeight = this.tasks.length * ROW_HEIGHT;
+            // ⭐ 使用可见任务数量计算高度
+            const visibleTasks = getVisibleTasks(this.tasks);
+            const contentHeight = visibleTasks.length * ROW_HEIGHT;
             
             if (contentHeight > finalHeight - HEADER_HEIGHT) {
                 rowsContainer.style.overflowY = 'auto';
@@ -177,12 +192,16 @@
 
     // ==================== 任务增删改查 ====================
 
+    /**
+     * 添加任务
+     */
     GanttChart.prototype.addTask = function(task) {
         if (!task || typeof task !== 'object') {
             console.error('Invalid task object');
             return;
         }
 
+        // 自动补全所有必需字段
         if (!task.id) task.id = generateId();
         if (!task.uid) task.uid = this.getNextUID();
         if (!task.name) task.name = '新任务';
@@ -221,10 +240,16 @@
         addLog(`✅ 已添加任务 "${task.name}"（${task.duration}${typeLabel}）`);
     };
 
+    /**
+     * 删除任务
+     */
     GanttChart.prototype.deleteTask = function(taskId) {
         this.deleteTaskWithChildren(taskId);
     };
 
+    /**
+     * 删除任务（禁止删除有子任务的任务）
+     */
     GanttChart.prototype.deleteTaskWithChildren = function(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task) {
@@ -237,6 +262,7 @@
             return;
         }
 
+        // 从父任务移除
         if (task.parentId) {
             const parent = this.tasks.find(t => t.id === task.parentId);
             if (parent && parent.children) {
@@ -251,8 +277,10 @@
             }
         }
 
+        // 删除任务
         this.tasks = this.tasks.filter(t => t.id !== taskId);
         
+        // 清理其他任务的依赖
         let removedDepsCount = 0;
         this.tasks.forEach(t => {
             if (t.dependencies && t.dependencies.length > 0) {
@@ -271,10 +299,12 @@
             }
         });
 
+        // 取消选择
         if (this.selectedTask === taskId) {
             this.selectedTask = null;
         }
 
+        // 重新生成所有 WBS
         this.tasks.forEach(t => {
             t.wbs = this.generateWBS(t.id);
         });
@@ -287,6 +317,9 @@
 
     // ==================== 子任务管理 ====================
 
+    /**
+     * 添加子任务
+     */
     GanttChart.prototype.addChildTask = function(parentId) {
         const parent = this.tasks.find(t => t.id === parentId);
         if (!parent) return;
@@ -336,7 +369,11 @@
 
     // ==================== 父子关系管理 ====================
 
+    /**
+     * 更新父子关系
+     */
     GanttChart.prototype.updateParentRelationship = function(task, oldParentId, newParentId) {
+        // 从旧父任务移除
         if (oldParentId) {
             const oldParent = this.tasks.find(t => t.id === oldParentId);
             if (oldParent && oldParent.children) {
@@ -350,6 +387,7 @@
             }
         }
         
+        // 添加到新父任务
         if (newParentId) {
             const newParent = this.tasks.find(t => t.id === newParentId);
             if (newParent) {
@@ -373,6 +411,9 @@
         task.parentId = newParentId;
     };
 
+    /**
+     * 递归更新子任务的层级深度
+     */
     GanttChart.prototype.updateChildrenOutlineLevel = function(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task || !task.children || task.children.length === 0) return;
@@ -388,6 +429,9 @@
         });
     };
 
+    /**
+     * 判断任务A是否是任务B的后代
+     */
     GanttChart.prototype.isDescendantOf = function(taskAId, taskBId) {
         const taskA = this.tasks.find(t => t.id === taskAId);
         if (!taskA || !taskA.parentId) return false;
@@ -399,6 +443,9 @@
 
     // ==================== 汇总任务计算 ====================
 
+    /**
+     * 重新计算汇总任务的时间范围
+     */
     GanttChart.prototype.recalculateSummaryTask = function(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task || !task.isSummary || !task.children || task.children.length === 0) {
@@ -437,6 +484,9 @@
         }
     };
 
+    /**
+     * 更新所有父任务（递归向上）
+     */
     GanttChart.prototype.updateParentTasks = function(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task || !task.parentId) return;
@@ -447,6 +497,9 @@
 
     // ==================== WBS 管理 ====================
 
+    /**
+     * 自动生成 WBS 编号
+     */
     GanttChart.prototype.generateWBS = function(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task) return '';
@@ -467,6 +520,9 @@
         }
     };
 
+    /**
+     * 按 WBS 排序任务
+     */
     GanttChart.prototype.sortTasksByWBS = function() {
         this.tasks.sort((a, b) => {
             const wbsA = a.wbs || '';
@@ -489,52 +545,38 @@
         });
     };
 
-    // ==================== ⭐ 折叠/展开（重新渲染依赖箭头） ====================
+    // ==================== ⭐ 折叠/展开（修复版） ====================
 
     /**
-     * 切换任务折叠状态（优化版：自动重新渲染依赖箭头）
+     * ⭐ 切换任务折叠状态（修复版 - 正确重渲染依赖箭头）
      */
     GanttChart.prototype.toggleTaskCollapse = function(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task || !task.isSummary) return;
 
-        const oldState = task.isCollapsed;
         task.isCollapsed = !task.isCollapsed;
         
-        // ⭐ 重新渲染整个甘特图（包括依赖箭头）
-        this.render();
-
         const childrenCount = task.children ? task.children.length : 0;
-        const action = task.isCollapsed ? '折叠' : '展开';
-        const icon = task.isCollapsed ? '📂' : '📁';
+        addLog(`${task.isCollapsed ? '📂' : '📁'} 任务 "${task.name}" 已${task.isCollapsed ? '折叠' : '展开'}（${childrenCount}个子任务）`);
         
-        // ⭐ 计算衍生依赖数量
-        let derivedDepsInfo = '';
-        if (task.isCollapsed) {
-            const derivedDeps = calculateDerivedDependencies(task, this.tasks);
-            if (derivedDeps.length > 0) {
-                derivedDepsInfo = `，衍生 ${derivedDeps.length} 个依赖关系`;
-            }
-        }
-        
-        addLog(`${icon} 任务 "${task.name}" 已${action}（${childrenCount}个子任务${derivedDepsInfo}）`);
-        
-        // ⭐ 延迟重新渲染依赖箭头（确保DOM已更新）
-        setTimeout(() => {
-            const dates = this.generateDates();
-            this.renderDependencies(dates);
-            console.log(`🔄 依赖箭头已根据折叠状态重新渲染`);
-        }, 50);
+        // ⭐ 完整重新渲染（包括依赖箭头）
+        this.render();
     };
 
     // ==================== 工具函数 ====================
 
+    /**
+     * 获取下一个 UID
+     */
     GanttChart.prototype.getNextUID = function() {
         const maxUID = this.tasks.reduce((max, task) => 
             Math.max(max, task.uid || 0), 0);
         return maxUID + 1;
     };
 
+    /**
+     * 更新选项
+     */
     GanttChart.prototype.updateOptions = function(options) {
         if (!options || typeof options !== 'object') return;
         
@@ -548,10 +590,16 @@
         }
     };
 
+    /**
+     * 获取选中的任务
+     */
     GanttChart.prototype.getSelectedTask = function() {
         return this.tasks.find(t => t.id === this.selectedTask);
     };
 
+    /**
+     * 切换任务名称栏
+     */
     GanttChart.prototype.toggleSidebar = function(show) {
         if (!this.container) return;
         
@@ -573,6 +621,6 @@
         }
     };
 
-    console.log('✅ gantt-operations.js loaded (Epsilon17 - 折叠时重新渲染依赖)');
+    console.log('✅ gantt-operations.js loaded successfully (Epsilon17 - 修复折叠渲染)');
 
 })();

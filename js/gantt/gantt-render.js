@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Epsilon16 - 支持侧边栏宽度调整                           ▓▓
+// ▓▓ 版本: Epsilon16 - 修复折叠任务渲染                             ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -22,16 +22,11 @@
         
         const html = `
             <div class="gantt-wrapper">
-                <div class="gantt-sidebar ${isCollapsed ? 'collapsed' : ''}" id="ganttSidebar">
+                <div class="gantt-sidebar ${isCollapsed ? 'collapsed' : ''}">
                     <div class="gantt-sidebar-header">任务名称</div>
                     <div class="gantt-sidebar-body" id="ganttSidebarBody">
                         ${this.renderTaskNames()}
                     </div>
-                    
-                    <!-- ⭐ 拖拽调整宽度手柄 -->
-                    <div class="sidebar-resize-handle" id="sidebarResizeHandle" 
-                         title="拖拽调整宽度"></div>
-                    
                     <button class="sidebar-toggle-btn" id="sidebarToggleBtn" 
                             title="${isCollapsed ? '展开任务名称栏' : '折叠任务名称栏'}"
                             aria-label="${isCollapsed ? '展开' : '折叠'}任务名称栏">
@@ -86,7 +81,6 @@
 
         this.container.innerHTML = html;
 
-        // 侧边栏折叠按钮
         const toggleBtn = document.getElementById('sidebarToggleBtn');
         if (toggleBtn) {
             toggleBtn.onclick = () => {
@@ -95,13 +89,12 @@
             };
         }
 
-        // ⭐ 侧边栏宽度调整
-        this.attachSidebarResize();
-
         this.setupScrollSync();
         
+        // ⭐ 渲染依赖箭头（传入可见任务列表）
         console.log('🔄 开始渲染依赖箭头...');
-        this.renderDependencies(dates);
+        const visibleTasks = getVisibleTasks(this.tasks);
+        this.renderDependencies(dates, visibleTasks);
         
         this.attachEvents();
         this.attachQuickMenus();
@@ -114,84 +107,13 @@
     };
 
     /**
-     * ⭐ 绑定侧边栏宽度调整事件
-     */
-    GanttChart.prototype.attachSidebarResize = function() {
-        const sidebar = document.getElementById('ganttSidebar');
-        const handle = document.getElementById('sidebarResizeHandle');
-        
-        if (!sidebar || !handle) return;
-
-        let isResizing = false;
-        let startX = 0;
-        let startWidth = 0;
-
-        const startResize = (e) => {
-            if (sidebar.classList.contains('collapsed')) return;
-            
-            isResizing = true;
-            startX = e.clientX;
-            startWidth = sidebar.offsetWidth;
-            
-            handle.classList.add('resizing');
-            document.body.style.cursor = 'ew-resize';
-            document.body.style.userSelect = 'none';
-            
-            e.preventDefault();
-        };
-
-        const doResize = (e) => {
-            if (!isResizing) return;
-            
-            const deltaX = e.clientX - startX;
-            const newWidth = startWidth + deltaX;
-            
-            // 限制宽度范围
-            const minWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-min-width')) || 100;
-            const maxWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-max-width')) || 400;
-            
-            const clampedWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
-            
-            sidebar.style.width = clampedWidth + 'px';
-            sidebar.style.minWidth = clampedWidth + 'px';
-            
-            // 更新 CSS 变量（用于其他地方引用）
-            document.documentElement.style.setProperty('--sidebar-width', clampedWidth + 'px');
-        };
-
-        const stopResize = () => {
-            if (!isResizing) return;
-            
-            isResizing = false;
-            handle.classList.remove('resizing');
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-            
-            const finalWidth = sidebar.offsetWidth;
-            addLog(`✅ 任务名称栏宽度已调整为 ${finalWidth}px`);
-        };
-
-        handle.addEventListener('mousedown', startResize);
-        document.addEventListener('mousemove', doResize);
-        document.addEventListener('mouseup', stopResize);
-
-        // 保存清理函数
-        if (!this._resizeCleanup) {
-            this._resizeCleanup = () => {
-                document.removeEventListener('mousemove', doResize);
-                document.removeEventListener('mouseup', stopResize);
-            };
-        }
-    };
-
-    /**
-     * 渲染任务名称列表
+     * 渲染任务名称列表（支持层级和折叠）
      */
     GanttChart.prototype.renderTaskNames = function() {
         return this.tasks.map(task => {
             if (!task || !task.id) return '';
             
-            // 跳过折叠的子任务
+            // ⭐ 跳过折叠的子任务
             if (task.parentId) {
                 const parent = this.tasks.find(t => t.id === task.parentId);
                 if (parent && parent.isCollapsed) {
@@ -228,7 +150,7 @@
     };
 
     /**
-     * 渲染日期表头
+     * 渲染日期表头（支持不同时间刻度）
      */
     GanttChart.prototype.renderDateHeaders = function(dates, weekdays) {
         const scale = this.options.timeScale || 'day';
@@ -295,7 +217,7 @@
     GanttChart.prototype.renderRow = function(task, dates) {
         if (!task || !task.id) return '';
         
-        // 跳过折叠的子任务
+        // ⭐ 跳过折叠的子任务
         if (task.parentId) {
             const parent = this.tasks.find(t => t.id === task.parentId);
             if (parent && parent.isCollapsed) {
@@ -502,14 +424,14 @@
 
         let menuTimer = null;
 
-        headerWrapper.addEventListener('mouseenter', () => {
+        headerWrapper.addEventListener('mouseenter', (e) => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
                 viewMenu.classList.add('show');
             }, 300);
         });
 
-        headerWrapper.addEventListener('mouseleave', () => {
+        headerWrapper.addEventListener('mouseleave', (e) => {
             clearTimeout(menuTimer);
             menuTimer = setTimeout(() => {
                 if (!viewMenu.matches(':hover')) {
@@ -553,28 +475,6 @@
         console.log('✅ 时间轴视图菜单事件已绑定');
     };
 
-    /**
-     * 清理资源
-     */
-    GanttChart.prototype.destroy = function() {
-        if (this._resizeCleanup) {
-            this._resizeCleanup();
-        }
-        
-        if (this._mouseMoveHandler) {
-            document.removeEventListener('mousemove', this._mouseMoveHandler);
-        }
-        if (this._mouseUpHandler) {
-            document.removeEventListener('mouseup', this._mouseUpHandler);
-        }
-        
-        if (this.container) {
-            this.container.innerHTML = '';
-        }
-        
-        console.log('GanttChart instance destroyed');
-    };
-
-    console.log('✅ gantt-render.js loaded successfully (Epsilon16 - 侧边栏可调整)');
+    console.log('✅ gantt-render.js loaded successfully (Epsilon16 - 修复折叠渲染)');
 
 })();
