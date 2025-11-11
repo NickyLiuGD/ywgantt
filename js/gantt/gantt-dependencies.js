@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图依赖关系管理中心                                          ▓▓
 // ▓▓ 路径: js/gantt/gantt-dependencies.js                           ▓▓
-// ▓▓ 版本: Epsilon18 - 深度优化版（精简35%，性能提升40%）           ▓▓
+// ▓▓ 版本: Epsilon19 - 箭头精准对齐版                               ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -350,7 +350,7 @@
         });
     }
 
-    // ==================== SVG 箭头渲染（优化版） ====================
+    // ==================== SVG 箭头渲染（优化版 - 精准对齐） ====================
 
     /**
      * 渲染依赖箭头（优化：减少DOM操作）
@@ -362,13 +362,13 @@
         const totalWidth = calculateTotalWidth(dates, this.options.cellWidth);
         depSVG.style.cssText = `width: ${totalWidth}px; height: ${this.tasks.length * ROW_HEIGHT}px;`;
 
-        // 箭头标记定义（优化尺寸）
+        // ⭐ 箭头标记定义（优化尺寸，refX调整为10确保箭头尖接触边缘）
         const defs = `
             <defs>
-                <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto">
+                <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4" markerHeight="4" orient="auto">
                     <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc3545"/>
                 </marker>
-                <marker id="arrow-highlight" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <marker id="arrow-highlight" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto">
                     <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981"/>
                 </marker>
             </defs>
@@ -386,12 +386,11 @@
     };
 
     /**
-     * 生成依赖路径（优化：减少变量声明）
+     * ⭐ 生成依赖路径（优化：箭头尖直接接触任务条左边缘）
      */
     GanttChart.prototype.generateDependencyPaths = function() {
         const h = ROW_HEIGHT;
         const r = 8; // radius
-        const gap = 5;
         const hLen = 30; // horizontal length
         const cw = this.options.cellWidth;
         const paths = [];
@@ -406,15 +405,19 @@
                 
                 const di = this.tasks.indexOf(depTask);
                 
+                // 起点：依赖任务右边缘
                 const x1 = (daysBetween(this.startDate, new Date(depTask.start)) + 
                            daysBetween(depTask.start, depTask.end) + 1) * cw;
                 const y1 = di * h + h / 2;
+                
+                // ⭐ 终点：目标任务左边缘（移除gap，箭头尖直接接触）
                 const x2 = daysBetween(this.startDate, new Date(task.start)) * cw;
                 const y2 = ti * h + h / 2;
                 
+                // 生成路径坐标
                 const coords = di === ti ? 
-                    [{x: x1, y: y1}, {x: x2 - gap, y: y2}] :
-                    [{x: x1, y: y1}, {x: x1 + hLen, y: y1}, {x: x2 - hLen, y: y2}, {x: x2 - gap, y: y2}];
+                    [{x: x1, y: y1}, {x: x2, y: y2}] : // ⭐ 同行：直线连接
+                    [{x: x1, y: y1}, {x: x1 + hLen, y: y1}, {x: x2 - hLen, y: y2}, {x: x2, y: y2}]; // ⭐ 不同行：折线连接
 
                 paths.push(
                     `<path data-from="${depId}" data-to="${task.id}" ` +
@@ -524,6 +527,6 @@
         autoFixConflicts
     });
 
-    console.log('✅ gantt-dependencies.js loaded (Epsilon18 - 深度优化版)');
+    console.log('✅ gantt-dependencies.js loaded (Epsilon19 - 箭头精准对齐版)');
 
 })(typeof window !== 'undefined' ? window : this);
