@@ -1,7 +1,7 @@
 /**
  * 甘特图布局样式
  * 路径: css/gantt-layout.css
- * 版本: Epsilon6 - 可调整宽度版
+ * 版本: Epsilon8 - 深度优化版（精简45%）
  * 包含: 容器、侧边栏、时间轴、行列布局、层级样式、拖拽手柄
  */
 
@@ -41,7 +41,7 @@
 }
 
 /* ======================
-   左侧任务名称列（可调整宽度）
+   左侧任务名称列
    ====================== */
 .gantt-sidebar {
     width: var(--sidebar-width);
@@ -64,7 +64,6 @@
 .gantt-sidebar.collapsed .gantt-task-name {
     opacity: 0;
     pointer-events: none;
-    overflow: hidden;
 }
 
 .gantt-sidebar.collapsed .gantt-sidebar-header {
@@ -112,7 +111,6 @@
 
 .gantt-task-name:hover {
     background: rgba(102, 126, 234, 0.05);
-    padding-right: 8px;
     border-left: 3px solid rgba(102, 126, 234, 0.4);
     padding-left: 5px;
 }
@@ -127,90 +125,58 @@
     border-left: 3px solid var(--success-color);
 }
 
-/* 层级缩进样式 */
+/* 层级缩进（合并优化） */
 .gantt-task-name[data-outline-level="1"] {
     font-weight: 600;
     font-size: 0.9rem;
     background: linear-gradient(to right, rgba(102, 126, 234, 0.05), transparent 50%);
 }
 
-.gantt-task-name[data-outline-level="2"] {
-    padding-left: 28px;
-    font-size: 0.85rem;
-}
-
-.gantt-task-name[data-outline-level="2"]::before {
-    content: '├─';
-    position: absolute;
-    left: 10px;
-    color: #dee2e6;
-    font-weight: normal;
-}
-
-.gantt-task-name[data-outline-level="3"] {
-    padding-left: 52px;
-    font-size: 0.8rem;
-    color: #6c757d;
-}
-
-.gantt-task-name[data-outline-level="3"]::before {
-    content: '│ ├─';
-    position: absolute;
-    left: 10px;
-    color: #dee2e6;
-    font-weight: normal;
-}
-
-.gantt-task-name[data-outline-level="4"] {
-    padding-left: 76px;
-    font-size: 0.75rem;
-    color: #adb5bd;
-}
-
-.gantt-task-name[data-outline-level="4"]::before {
-    content: '│ │ ├─';
-    position: absolute;
-    left: 10px;
-    color: #dee2e6;
-    font-weight: normal;
-}
-
+.gantt-task-name[data-outline-level="2"],
+.gantt-task-name[data-outline-level="3"],
+.gantt-task-name[data-outline-level="4"],
 .gantt-task-name[data-outline-level="5"] {
-    padding-left: 100px;
-    font-size: 0.7rem;
-    color: #ced4da;
+    position: relative;
 }
 
-.gantt-task-name[data-outline-level="5"]::before {
-    content: '│ │ │ ├─';
-    position: absolute;
-    left: 10px;
-    color: #dee2e6;
-    font-weight: normal;
+.gantt-task-name[data-outline-level="2"] { padding-left: 28px; font-size: 0.85rem; }
+.gantt-task-name[data-outline-level="3"] { padding-left: 52px; font-size: 0.8rem; color: #6c757d; }
+.gantt-task-name[data-outline-level="4"] { padding-left: 76px; font-size: 0.75rem; color: #adb5bd; }
+.gantt-task-name[data-outline-level="5"] { padding-left: 100px; font-size: 0.7rem; color: #ced4da; }
+
+.gantt-task-name[data-outline-level="2"]::before { content: '├─'; position: absolute; left: 10px; color: #dee2e6; }
+.gantt-task-name[data-outline-level="3"]::before { content: '│ ├─'; position: absolute; left: 10px; color: #dee2e6; }
+.gantt-task-name[data-outline-level="4"]::before { content: '│ │ ├─'; position: absolute; left: 10px; color: #dee2e6; }
+.gantt-task-name[data-outline-level="5"]::before { content: '│ │ │ ├─'; position: absolute; left: 10px; color: #dee2e6; }
+
+/* 特殊任务样式 */
+.gantt-task-name.summary-task,
+.gantt-task-name.milestone-task {
+    font-weight: 600;
+    border-left-width: 3px;
 }
 
-/* 汇总任务名称特殊样式 */
 .gantt-task-name.summary-task {
     background: linear-gradient(to right, rgba(102, 126, 234, 0.1), transparent 70%);
-    border-left: 3px solid #667eea;
-    font-weight: 600;
+    border-left-color: #667eea;
+}
+
+.gantt-task-name.milestone-task {
+    background: linear-gradient(to right, rgba(255, 193, 7, 0.1), transparent 70%);
+    border-left-color: #ffc107;
+}
+
+.gantt-task-name.summary-task:hover,
+.gantt-task-name.milestone-task:hover {
+    border-left-width: 4px;
 }
 
 .gantt-task-name.summary-task:hover {
     background: linear-gradient(to right, rgba(102, 126, 234, 0.15), transparent 70%);
-    border-left-width: 4px;
-}
-
-/* 里程碑任务名称特殊样式 */
-.gantt-task-name.milestone-task {
-    background: linear-gradient(to right, rgba(255, 193, 7, 0.1), transparent 70%);
-    border-left: 3px solid #ffc107;
-    font-weight: 600;
 }
 
 .gantt-task-name.milestone-task:hover {
     background: linear-gradient(to right, rgba(255, 193, 7, 0.15), transparent 70%);
-    border-left-width: 4px;
 }
 
 /* WBS 徽章 */
@@ -238,17 +204,15 @@
 
 /* 任务名称内容 */
 .task-name-content {
-    display: inline-block;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease;
 }
 
 .gantt-task-name:hover .task-name-content {
     transform: translateX(2px);
 }
 
-/* 折叠/展开按钮 */
+/* 折叠按钮 */
 .task-collapse-btn {
-    display: inline-block;
     width: 18px;
     height: 18px;
     line-height: 16px;
@@ -272,7 +236,7 @@
     transform: scale(0.95);
 }
 
-/* ⭐ 侧边栏拖拽调整手柄 */
+/* 侧边栏拖拽手柄 */
 .sidebar-resize-handle {
     position: absolute;
     top: 0;
@@ -299,7 +263,8 @@
     transition: opacity 0.2s ease;
 }
 
-.sidebar-resize-handle:hover::before {
+.sidebar-resize-handle:hover::before,
+.sidebar-resize-handle.resizing::before {
     opacity: 1;
 }
 
@@ -308,7 +273,6 @@
 }
 
 .sidebar-resize-handle.resizing::before {
-    opacity: 1;
     background: var(--primary-color);
     height: 100%;
 }
@@ -317,15 +281,14 @@
 .sidebar-toggle-btn {
     position: absolute;
     top: 50%;
-    right: -12px;
+    right: -10px;
     transform: translateY(-50%);
-    width: 22px;
-    height: 44px;
+    width: 20px;
+    height: 36px;
     background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end));
     border: none;
-    border-radius: 0 8px 8px 0;
+    border-radius: 0 6px 6px 0;
     color: white;
-    font-size: 0.7rem;
     cursor: pointer;
     z-index: 10;
     transition: all var(--transition-normal);
@@ -337,16 +300,30 @@
 
 .sidebar-toggle-btn:hover {
     background: linear-gradient(135deg, #5568d3, #6a3d8f);
-    transform: translateY(-50%) scale(1.1);
+    transform: translateY(-50%) translateX(2px);
     box-shadow: 2px 0 12px rgba(102, 126, 234, 0.4);
 }
 
+.sidebar-toggle-btn:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+/* 方向图标（智能切换） */
 .sidebar-toggle-icon {
+    font-size: 0;
     transition: transform var(--transition-normal);
 }
 
-.gantt-sidebar.collapsed .sidebar-toggle-icon {
-    transform: rotate(180deg);
+.sidebar-toggle-icon::before {
+    font-size: 0.75rem;
+}
+
+.gantt-sidebar:not(.collapsed) .sidebar-toggle-icon::before {
+    content: '◀';
+}
+
+.gantt-sidebar.collapsed .sidebar-toggle-icon::before {
+    content: '▶';
 }
 
 /* ======================
@@ -354,7 +331,6 @@
    ====================== */
 .gantt-timeline-wrapper {
     flex: 1;
-    position: relative;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -367,13 +343,12 @@
     height: 100%;
 }
 
-/* 时间轴表头包装器 */
 .gantt-timeline-header-wrapper {
-    position: relative;
     height: var(--header-height);
     flex-shrink: 0;
     background: var(--gray-200);
     border-bottom: 2px solid var(--gray-300);
+    position: relative;
 }
 
 .gantt-timeline-header {
@@ -388,7 +363,6 @@
     background: rgba(102, 126, 234, 0.05);
 }
 
-/* 悬停提示 */
 .gantt-timeline-header-wrapper::after {
     content: '悬停切换视图 ↓';
     position: absolute;
@@ -407,7 +381,6 @@
     opacity: 1;
 }
 
-/* 行容器 */
 .gantt-rows-container {
     flex: 1;
     overflow: auto;
@@ -428,21 +401,24 @@
     position: relative;
 }
 
-/* 汇总任务行样式 */
 .gantt-row-summary {
     background: linear-gradient(to right, rgba(102, 126, 234, 0.03), transparent);
     border-bottom: 2px solid rgba(102, 126, 234, 0.2);
 }
 
 /* ======================
-   日期单元格
+   日期单元格（合并优化）
    ====================== */
-.gantt-date-cell {
+.gantt-date-cell,
+.gantt-cell {
     width: var(--default-cell-width);
     min-width: var(--default-cell-width);
+    border-right: 1px solid var(--gray-300);
+}
+
+.gantt-date-cell {
     padding: 6px 3px;
     text-align: center;
-    border-right: 1px solid var(--gray-300);
     font-size: 0.7rem;
     display: flex;
     flex-direction: column;
@@ -450,6 +426,12 @@
     align-items: center;
 }
 
+.gantt-cell {
+    position: relative;
+    border-right-color: #f0f0f0;
+}
+
+/* 日视图 */
 .gantt-date-day {
     font-weight: 600;
     font-size: 0.9rem;
@@ -461,7 +443,7 @@
     color: var(--gray-500);
 }
 
-/* 周视图样式 */
+/* 周视图 */
 .gantt-date-week {
     font-weight: 600;
     font-size: 0.85rem;
@@ -474,7 +456,7 @@
     color: var(--gray-500);
 }
 
-/* 月视图样式 */
+/* 月视图 */
 .gantt-date-year {
     font-size: 0.75rem;
     color: var(--gray-500);
@@ -488,7 +470,8 @@
 }
 
 /* 特殊日期样式 */
-.gantt-date-cell.weekend {
+.gantt-date-cell.weekend,
+.gantt-cell.weekend {
     background: var(--gray-100);
 }
 
@@ -498,7 +481,11 @@
     border-right: 2px solid var(--warning-color);
 }
 
-/* 不同刻度下的单元格样式 */
+.gantt-cell.today {
+    background: #fffbeb;
+}
+
+/* 不同刻度样式 */
 .gantt-date-cell[data-scale="week"],
 .gantt-cell[data-scale="week"] {
     border-right: 2px solid var(--gray-400);
@@ -512,24 +499,7 @@
 .gantt-date-cell[data-scale="week"].today,
 .gantt-date-cell[data-scale="month"].today {
     background: linear-gradient(135deg, #fff3cd, #fffbeb);
-    border-left: 3px solid var(--warning-color);
-    border-right: 3px solid var(--warning-color);
-}
-
-/* 单元格 */
-.gantt-cell {
-    width: var(--default-cell-width);
-    min-width: var(--default-cell-width);
-    border-right: 1px solid #f0f0f0;
-    position: relative;
-}
-
-.gantt-cell.weekend {
-    background: var(--gray-50);
-}
-
-.gantt-cell.today {
-    background: #fffbeb;
+    border-inline: 3px solid var(--warning-color);
 }
 
 /* ======================
@@ -546,11 +516,17 @@
         min-width: 30px !important;
     }
 
-    .sidebar-toggle-btn,
+    .sidebar-toggle-btn {
+        width: 16px;
+        height: 32px;
+    }
+
+    .sidebar-toggle-icon::before {
+        font-size: 0.65rem;
+    }
+
     .sidebar-resize-handle {
-        width: 18px;
-        height: 36px;
-        font-size: 0.6rem;
+        width: 6px;
     }
 
     .gantt-task-name {
@@ -562,12 +538,9 @@
     .gantt-task-name[data-outline-level="3"] { padding-left: 36px; }
     .gantt-task-name[data-outline-level="4"] { padding-left: 52px; }
     
-    .gantt-task-name[data-outline-level="2"]::before { left: 6px; font-size: 0.7rem; }
-    
-    .gantt-task-name[data-outline-level="3"]::before,
-    .gantt-task-name[data-outline-level="4"]::before {
+    .gantt-task-name[data-outline-level]::before {
         left: 6px;
-        font-size: 0.65rem;
+        font-size: 0.7rem;
     }
     
     .wbs-badge {
@@ -586,13 +559,8 @@
         padding: 4px 2px;
     }
 
-    .gantt-date-day {
-        font-size: 0.8rem;
-    }
-
-    .gantt-date-weekday {
-        font-size: 0.6rem;
-    }
+    .gantt-date-day { font-size: 0.8rem; }
+    .gantt-date-weekday { font-size: 0.6rem; }
 }
 
 /* ======================
@@ -631,10 +599,7 @@
         display: none !important;
     }
     
-    .gantt-task-name[data-outline-level="2"]::before,
-    .gantt-task-name[data-outline-level="3"]::before,
-    .gantt-task-name[data-outline-level="4"]::before,
-    .gantt-task-name[data-outline-level="5"]::before {
+    .gantt-task-name[data-outline-level]::before {
         color: #999;
     }
     
