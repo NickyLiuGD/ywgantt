@@ -1,8 +1,8 @@
 /**
  * 甘特图交互样式
  * 路径: css/gantt-interactive.css
- * 版本: Delta9 - 无损优化版（精简40%）
- * 包含: 任务条、标签、依赖箭头、视图菜单、里程碑、汇总任务
+ * 版本: Delta10 - 衍生依赖样式版
+ * 包含: 任务条、标签、依赖箭头（原生/衍生）、视图菜单、里程碑、汇总任务
  */
 
 /* ======================
@@ -319,7 +319,7 @@
 }
 
 /* ======================
-   依赖关系箭头
+   ⭐ 依赖关系箭头（区分原生/衍生）
    ====================== */
 .gantt-dependencies {
     position: absolute;
@@ -327,6 +327,7 @@
     pointer-events: none;
 }
 
+/* 原生依赖箭头（实线，红色） */
 .gantt-dependencies path.dependency-arrow {
     stroke: var(--danger-color);
     stroke-width: 2;
@@ -342,9 +343,25 @@
     filter: drop-shadow(0 0 6px rgba(220, 53, 69, 0.6));
 }
 
+/* ⭐ 衍生依赖箭头（虚线，紫色） */
+.gantt-dependencies path.derived-arrow {
+    stroke: #8b5cf6 !important;
+    stroke-dasharray: 4, 2;
+    opacity: 0.8;
+}
+
+.gantt-dependencies path.derived-arrow:hover {
+    stroke: #7c3aed !important;
+    stroke-width: 3;
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.6));
+}
+
+/* 高亮箭头 */
 .gantt-dependencies path.dep-highlight-arrow {
     stroke: var(--success-color) !important;
     stroke-width: 3 !important;
+    stroke-dasharray: none !important;
     filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.7));
     animation: arrowPulse 2s ease-in-out infinite;
 }
@@ -498,7 +515,6 @@
     font-weight: 600;
 }
 
-/* 菜单箭头 */
 .timeline-view-menu::before {
     content: '';
     position: absolute;
@@ -513,7 +529,6 @@
     backdrop-filter: blur(20px);
 }
 
-/* 菜单分隔线 */
 .view-menu-divider {
     height: 1px;
     background: linear-gradient(to right, transparent, var(--gray-300) 20%, var(--gray-300) 80%, transparent);
@@ -915,6 +930,12 @@
     .task-progress-badge {
         background: #f0f0f0;
         color: #333;
+    }
+    
+    /* ⭐ 打印时显示所有依赖（包括衍生） */
+    .gantt-dependencies path.derived-arrow {
+        stroke: #8b5cf6 !important;
+        stroke-dasharray: 2, 1;
     }
 }
 

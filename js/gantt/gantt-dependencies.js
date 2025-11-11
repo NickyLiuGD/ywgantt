@@ -1,7 +1,11 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图依赖关系管理中心                                          ▓▓
 // ▓▓ 路径: js/gantt/gantt-dependencies.js                           ▓▓
-// ▓▓ 版本: Epsilon19 - 箭头精准对齐版                               ▓▓
+// ▓▓ 版本: Epsilon20 - 原生/衍生依赖智能管理版                      ▓▓
+// ▓▓ 核心原则：                                                      ▓▓
+// ▓▓   1. 只有原子任务之间才有原生依赖关系                          ▓▓
+// ▓▓   2. 汇总任务的依赖关系从子任务衍生                            ▓▓
+// ▓▓   3. 展开时显示子任务依赖，折叠时显示汇总任务依赖              ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -9,24 +13,15 @@
 
     // ==================== 依赖格式处理 ====================
 
-    /**
-     * 统一依赖格式
-     */
     const normalizeDependency = dep => 
         typeof dep === 'string' ? { taskId: dep, type: 'FS', lag: 0 } :
         (dep?.taskId ? { taskId: dep.taskId, type: dep.type || 'FS', lag: dep.lag || 0 } : null);
 
-    /**
-     * 提取依赖ID
-     */
     const extractDependencyId = dep => 
         typeof dep === 'string' ? dep : dep?.taskId || null;
 
-    // ==================== 祖先/后代查找（优化版） ====================
+    // ==================== 祖先/后代查找 ====================
 
-    /**
-     * 获取所有祖先ID（优化：提前终止）
-     */
     function getAllAncestors(taskId, allTasks) {
         const ancestors = new Set();
         let current = allTasks.find(t => t.id === taskId);
@@ -40,9 +35,6 @@
         return ancestors;
     }
 
-    /**
-     * 获取所有后代ID（优化：迭代替代递归）
-     */
     function getAllDescendants(taskId, allTasks) {
         const descendants = new Set();
         const queue = [taskId];
@@ -64,9 +56,6 @@
         return descendants;
     }
 
-    /**
-     * 获取关系层级
-     */
     function getRelationLevel(ancestorId, descendantId, allTasks) {
         let level = 0;
         let current = allTasks.find(t => t.id === descendantId);
@@ -81,11 +70,140 @@
         return levels[level] || `${level}级`;
     }
 
-    // ==================== 依赖验证（优化版） ====================
+    // ==================== ⭐ 衍生依赖计算（核心新功能） ====================
 
     /**
-     * 检查是否可添加依赖（优化：提前返回）
+     * 计算汇总任务的衍生依赖关系
+     * @param {Object} summaryTask - 汇总任务
+     * @param {Array} allTasks - 所有任务
+     * @returns {Array} 衍生的依赖关系数组
      */
+    function calculateDerivedDependencies(summaryTask, allTasks) {
+        if (!summaryTask.isSummary || !summaryTask.children?.length) {
+            return [];
+        }
+
+        const derivedDeps = new Set();
+        
+        // 递归收集所有子任务的依赖
+        const collectChildDependencies = (taskId) => {
+            const task = allTasks.find(t => t.id === taskId);
+            if (!task) return;
+            
+            // 如果是原子任务，收集其依赖
+            if (!task.isSummary && task.dependencies?.length) {
+                task.dependencies.forEach(dep => {
+                    const depId = extractDependencyId(dep);
+                    if (!depId) return;
+                    
+                    // 检查依赖任务是否在汇总任务外部
+                    const depTask = allTasks.find(t => t.id === depId);
+                    if (depTask && !isDescendantOf(depId, summaryTask.id, allTasks)) {
+                        // 外部依赖：需要衍生到汇总任务
+                        derivedDeps.add(depId);
+                    }
+                });
+            }
+            
+            // 如果是子汇总任务，递归收集
+            if (task.children?.length) {
+                task.children.forEach(childId => {
+                    collectChildDependencies(childId);
+                });
+            }
+        };
+        
+        summaryTask.children.forEach(childId => {
+            collectChildDependencies(childId);
+        });
+        
+        return Array.from(derivedDeps).map(depId => ({
+            taskId: depId,
+            type: 'FS',
+            lag: 0,
+            isDerived: true // ⭐ 标记为衍生依赖
+        }));
+    }
+
+    /**
+     * 判断任务A是否是任务B的后代
+     */
+    function isDescendantOf(taskAId, taskBId, allTasks) {
+        const descendants = getAllDescendants(taskBId, allTasks);
+        return descendants.has(taskAId);
+    }
+
+    /**
+     * ⭐ 获取任务的有效依赖关系（根据折叠状态）
+     * @param {Object} task - 任务对象
+     * @param {Array} allTasks - 所有任务
+     * @returns {Array} 有效的依赖关系数组
+     */
+    function getEffectiveDependencies(task, allTasks) {
+        // 原子任务：直接返回原生依赖
+        if (!task.isSummary) {
+            return task.dependencies || [];
+        }
+        
+        // 汇总任务展开：不显示依赖（由子任务表达）
+        if (!task.isCollapsed) {
+            return [];
+        }
+        
+        // 汇总任务折叠：返回衍生依赖
+        return calculateDerivedDependencies(task, allTasks);
+    }
+
+    /**
+     * ⭐ 获取所有可见任务的有效依赖关系
+     * @param {Array} allTasks - 所有任务
+     * @returns {Array} [{task, dependencies}] 任务及其有效依赖
+     */
+    function getVisibleTaskDependencies(allTasks) {
+        const visibleDeps = [];
+        
+        allTasks.forEach(task => {
+            // 跳过被折叠的子任务
+            if (isTaskHidden(task, allTasks)) {
+                return;
+            }
+            
+            const effectiveDeps = getEffectiveDependencies(task, allTasks);
+            
+            if (effectiveDeps.length > 0) {
+                visibleDeps.push({
+                    task: task,
+                    dependencies: effectiveDeps
+                });
+            }
+        });
+        
+        return visibleDeps;
+    }
+
+    /**
+     * 判断任务是否被父任务折叠隐藏
+     */
+    function isTaskHidden(task, allTasks) {
+        if (!task.parentId) return false;
+        
+        let current = task;
+        while (current.parentId) {
+            const parent = allTasks.find(t => t.id === current.parentId);
+            if (!parent) break;
+            
+            if (parent.isCollapsed) {
+                return true;
+            }
+            
+            current = parent;
+        }
+        
+        return false;
+    }
+
+    // ==================== 依赖验证 ====================
+
     function canAddDependency(fromTaskId, toTaskId, allTasks) {
         if (fromTaskId === toTaskId) {
             return { canAdd: false, reason: '不能依赖自己' };
@@ -96,6 +214,11 @@
         
         if (!fromTask || !toTask) {
             return { canAdd: false, reason: '任务不存在' };
+        }
+        
+        // ⭐ 禁止汇总任务之间建立依赖
+        if (fromTask.isSummary || toTask.isSummary) {
+            return { canAdd: false, reason: '汇总任务不能直接建立依赖关系' };
         }
         
         const toAncestors = getAllAncestors(toTaskId, allTasks);
@@ -121,9 +244,6 @@
         return { canAdd: true, reason: '' };
     }
 
-    /**
-     * 获取所有依赖（优化：迭代+Set）
-     */
     function getAllDependencies(taskId, allTasks) {
         const deps = new Set();
         const visited = new Set();
@@ -150,11 +270,8 @@
         return deps;
     }
 
-    // ==================== 冲突检测（优化版） ====================
+    // ==================== 冲突检测 ====================
 
-    /**
-     * 检测单个任务冲突（优化：减少对象创建）
-     */
     function detectTaskConflicts(task, allTasks) {
         if (!task.dependencies?.length) return [];
         
@@ -202,9 +319,6 @@
         return conflicts;
     }
 
-    /**
-     * 检测所有冲突（优化：单次遍历）
-     */
     function detectAllConflicts(tasks) {
         const allConflicts = [];
         const conflictTasks = new Set();
@@ -226,11 +340,8 @@
         };
     }
 
-    // ==================== 自动修复（优化版） ====================
+    // ==================== 自动修复 ====================
 
-    /**
-     * 自动修复冲突（优化：减少重复计算）
-     */
     function autoFixConflicts(tasks) {
         const fixes = [];
         
@@ -241,7 +352,6 @@
             const taskDuration = task.duration || daysBetween(task.start, task.end);
             const taskDurationType = task.durationType || 'days';
             
-            // 找最晚依赖结束时间
             let latestDepEnd = null;
             let latestDepName = '';
             
@@ -286,11 +396,8 @@
         return { fixCount: fixes.length, fixes };
     }
 
-    // ==================== 冲突报告（优化版） ====================
+    // ==================== 冲突报告 ====================
 
-    /**
-     * 生成冲突报告（优化：模板字符串简化）
-     */
     function generateConflictReport(result) {
         if (!result.hasConflicts) {
             return '<div class="alert alert-success"><strong>✅ 无时间冲突</strong><br>所有任务的依赖关系时间安排合理</div>';
@@ -333,15 +440,10 @@
         `;
     }
 
-    /**
-     * 高亮冲突任务（优化：批量操作）
-     */
     function highlightConflictTasks(conflictTaskIds, container) {
-        // 一次性清除所有
         container.querySelectorAll('.gantt-bar.conflict, .gantt-milestone.conflict')
             .forEach(bar => bar.classList.remove('conflict'));
         
-        // 批量添加
         conflictTaskIds.forEach(taskId => {
             const bar = container.querySelector(
                 `.gantt-bar[data-task-id="${taskId}"], .gantt-milestone[data-task-id="${taskId}"]`
@@ -350,10 +452,10 @@
         });
     }
 
-    // ==================== SVG 箭头渲染（优化版 - 精准对齐） ====================
+    // ==================== ⭐ SVG 箭头渲染（智能依赖版） ====================
 
     /**
-     * 渲染依赖箭头（优化：减少DOM操作）
+     * 渲染依赖箭头（智能版：根据折叠状态）
      */
     GanttChart.prototype.renderDependencies = function(dates) {
         const depSVG = this.container.querySelector('.gantt-dependencies');
@@ -362,7 +464,6 @@
         const totalWidth = calculateTotalWidth(dates, this.options.cellWidth);
         depSVG.style.cssText = `width: ${totalWidth}px; height: ${this.tasks.length * ROW_HEIGHT}px;`;
 
-        // ⭐ 箭头标记定义（优化尺寸，refX调整为10确保箭头尖接触边缘）
         const defs = `
             <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4" markerHeight="4" orient="auto">
@@ -370,6 +471,9 @@
                 </marker>
                 <marker id="arrow-highlight" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto">
                     <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981"/>
+                </marker>
+                <marker id="arrow-derived" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4" markerHeight="4" orient="auto">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b5cf6"/>
                 </marker>
             </defs>
         `;
@@ -382,48 +486,72 @@
         const paths = this.generateDependencyPaths();
         depSVG.innerHTML = defs + paths;
         
-        console.log(`✅ 已渲染 ${paths.split('<path').length - 1} 条依赖箭头`);
+        const arrowCount = paths.split('<path').length - 1;
+        const derivedCount = paths.split('arrow-derived').length - 1;
+        
+        if (derivedCount > 0) {
+            console.log(`✅ 已渲染 ${arrowCount} 条箭头（${derivedCount} 条衍生依赖）`);
+        } else {
+            console.log(`✅ 已渲染 ${arrowCount} 条依赖箭头`);
+        }
     };
 
     /**
-     * ⭐ 生成依赖路径（优化：箭头尖直接接触任务条左边缘）
+     * ⭐ 生成依赖路径（智能版：区分原生/衍生依赖）
      */
     GanttChart.prototype.generateDependencyPaths = function() {
         const h = ROW_HEIGHT;
-        const r = 8; // radius
-        const hLen = 30; // horizontal length
+        const r = 8;
+        const hLen = 30;
         const cw = this.options.cellWidth;
         const paths = [];
 
-        this.tasks.forEach((task, ti) => {
-            if (!task.dependencies?.length) return;
-            
-            task.dependencies.forEach(dep => {
+        // ⭐ 获取所有可见任务的有效依赖
+        const visibleDeps = getVisibleTaskDependencies(this.tasks);
+
+        visibleDeps.forEach(({task, dependencies}) => {
+            const ti = this.tasks.indexOf(task);
+            if (ti === -1) return;
+
+            dependencies.forEach(dep => {
                 const depId = extractDependencyId(dep);
                 const depTask = this.tasks.find(t => t.id === depId);
                 if (!depTask) return;
                 
+                // ⭐ 跳过被折叠隐藏的依赖任务
+                if (isTaskHidden(depTask, this.tasks)) return;
+                
                 const di = this.tasks.indexOf(depTask);
+                if (di === -1) return;
                 
                 // 起点：依赖任务右边缘
                 const x1 = (daysBetween(this.startDate, new Date(depTask.start)) + 
                            daysBetween(depTask.start, depTask.end) + 1) * cw;
                 const y1 = di * h + h / 2;
                 
-                // ⭐ 终点：目标任务左边缘（移除gap，箭头尖直接接触）
+                // 终点：目标任务左边缘
                 const x2 = daysBetween(this.startDate, new Date(task.start)) * cw;
                 const y2 = ti * h + h / 2;
                 
                 // 生成路径坐标
                 const coords = di === ti ? 
-                    [{x: x1, y: y1}, {x: x2, y: y2}] : // ⭐ 同行：直线连接
-                    [{x: x1, y: y1}, {x: x1 + hLen, y: y1}, {x: x2 - hLen, y: y2}, {x: x2, y: y2}]; // ⭐ 不同行：折线连接
+                    [{x: x1, y: y1}, {x: x2, y: y2}] :
+                    [{x: x1, y: y1}, {x: x1 + hLen, y: y1}, {x: x2 - hLen, y: y2}, {x: x2, y: y2}];
+
+                // ⭐ 区分原生依赖和衍生依赖
+                const isDerived = dep.isDerived === true;
+                const markerType = isDerived ? 'arrow-derived' : 'arrow';
+                const strokeColor = isDerived ? '#8b5cf6' : '#dc3545';
+                const strokeDasharray = isDerived ? '4,2' : 'none'; // 衍生依赖使用虚线
 
                 paths.push(
                     `<path data-from="${depId}" data-to="${task.id}" ` +
+                    `data-derived="${isDerived}" ` +
                     `d="${createRoundedPath(coords, r)}" ` +
-                    `stroke="#dc3545" fill="none" stroke-width="2" ` +
-                    `marker-end="url(#arrow)" class="dependency-arrow"/>`
+                    `stroke="${strokeColor}" fill="none" stroke-width="2" ` +
+                    `stroke-dasharray="${strokeDasharray}" ` +
+                    `marker-end="url(#${markerType})" ` +
+                    `class="dependency-arrow ${isDerived ? 'derived-arrow' : ''}"/>`
                 );
             });
         });
@@ -431,7 +559,7 @@
         return paths.join('');
     };
 
-    // ==================== 实例方法扩展（简化版） ====================
+    // ==================== 实例方法扩展 ====================
 
     Object.assign(GanttChart.prototype, {
         getAllAncestors(taskId) { return getAllAncestors(taskId, this.tasks); },
@@ -439,6 +567,22 @@
         getAllDependencies(taskId) { return getAllDependencies(taskId, this.tasks); },
         canAddDependency(fromId, toId) { return canAddDependency(fromId, toId, this.tasks); },
         getRelationLevel(ancId, descId) { return getRelationLevel(ancId, descId, this.tasks); },
+        
+        // ⭐ 新增方法
+        calculateDerivedDependencies(taskId) { 
+            const task = this.tasks.find(t => t.id === taskId);
+            return task ? calculateDerivedDependencies(task, this.tasks) : [];
+        },
+        
+        getEffectiveDependencies(taskId) {
+            const task = this.tasks.find(t => t.id === taskId);
+            return task ? getEffectiveDependencies(task, this.tasks) : [];
+        },
+        
+        isTaskHidden(taskId) {
+            const task = this.tasks.find(t => t.id === taskId);
+            return task ? isTaskHidden(task, this.tasks) : false;
+        },
         
         /**
          * 检测冲突
@@ -524,9 +668,15 @@
         detectAllConflicts,
         generateConflictReport,
         highlightConflictTasks,
-        autoFixConflicts
+        autoFixConflicts,
+        // ⭐ 新增导出
+        calculateDerivedDependencies,
+        getEffectiveDependencies,
+        getVisibleTaskDependencies,
+        isTaskHidden,
+        isDescendantOf
     });
 
-    console.log('✅ gantt-dependencies.js loaded (Epsilon19 - 箭头精准对齐版)');
+    console.log('✅ gantt-dependencies.js loaded (Epsilon20 - 原生/衍生依赖智能管理)');
 
 })(typeof window !== 'undefined' ? window : this);
