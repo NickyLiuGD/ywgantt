@@ -1,8 +1,8 @@
 /**
  * 甘特图布局样式
  * 路径: css/gantt-layout.css
- * 版本: Epsilon5 - 完整版
- * 包含: 容器、侧边栏、时间轴、行列布局、层级样式
+ * 版本: Epsilon6 - 可调整宽度版
+ * 包含: 容器、侧边栏、时间轴、行列布局、层级样式、拖拽手柄
  */
 
 /* ======================
@@ -41,19 +41,19 @@
 }
 
 /* ======================
-   左侧任务名称列
+   左侧任务名称列（可调整宽度）
    ====================== */
 .gantt-sidebar {
     width: var(--sidebar-width);
-    min-width: var(--sidebar-width);
+    min-width: var(--sidebar-min-width);
+    max-width: var(--sidebar-max-width);
     border-right: 2px solid var(--gray-300);
     background: var(--gray-50);
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     position: relative;
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-                min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.3s ease;
 }
 
 .gantt-sidebar.collapsed {
@@ -102,8 +102,7 @@
     display: flex;
     align-items: center;
     cursor: pointer;
-    transition: background var(--transition-fast), 
-                opacity var(--transition-normal);
+    transition: background var(--transition-fast);
     font-size: 0.85rem;
     white-space: nowrap;
     overflow: hidden;
@@ -128,11 +127,11 @@
     border-left: 3px solid var(--success-color);
 }
 
-/* ⭐ 层级缩进样式 */
+/* 层级缩进样式 */
 .gantt-task-name[data-outline-level="1"] {
     font-weight: 600;
     font-size: 0.9rem;
-    background: linear-gradient(to right, rgba(102, 126, 234, 0.05) 0%, transparent 50%);
+    background: linear-gradient(to right, rgba(102, 126, 234, 0.05), transparent 50%);
 }
 
 .gantt-task-name[data-outline-level="2"] {
@@ -190,31 +189,31 @@
     font-weight: normal;
 }
 
-/* ⭐ 汇总任务名称特殊样式 */
+/* 汇总任务名称特殊样式 */
 .gantt-task-name.summary-task {
-    background: linear-gradient(to right, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+    background: linear-gradient(to right, rgba(102, 126, 234, 0.1), transparent 70%);
     border-left: 3px solid #667eea;
     font-weight: 600;
 }
 
 .gantt-task-name.summary-task:hover {
-    background: linear-gradient(to right, rgba(102, 126, 234, 0.15) 0%, transparent 70%);
+    background: linear-gradient(to right, rgba(102, 126, 234, 0.15), transparent 70%);
     border-left-width: 4px;
 }
 
-/* ⭐ 里程碑任务名称特殊样式 */
+/* 里程碑任务名称特殊样式 */
 .gantt-task-name.milestone-task {
-    background: linear-gradient(to right, rgba(255, 193, 7, 0.1) 0%, transparent 70%);
+    background: linear-gradient(to right, rgba(255, 193, 7, 0.1), transparent 70%);
     border-left: 3px solid #ffc107;
     font-weight: 600;
 }
 
 .gantt-task-name.milestone-task:hover {
-    background: linear-gradient(to right, rgba(255, 193, 7, 0.15) 0%, transparent 70%);
+    background: linear-gradient(to right, rgba(255, 193, 7, 0.15), transparent 70%);
     border-left-width: 4px;
 }
 
-/* ⭐ WBS 徽章 */
+/* WBS 徽章 */
 .gantt-task-name .wbs-badge {
     display: inline-block;
     padding: 2px 6px;
@@ -237,7 +236,7 @@
     color: #5568d3;
 }
 
-/* ⭐ 任务名称内容 */
+/* 任务名称内容 */
 .task-name-content {
     display: inline-block;
     transition: all 0.2s ease;
@@ -247,7 +246,7 @@
     transform: translateX(2px);
 }
 
-/* ⭐ 折叠/展开按钮 */
+/* 折叠/展开按钮 */
 .task-collapse-btn {
     display: inline-block;
     width: 18px;
@@ -273,6 +272,47 @@
     transform: scale(0.95);
 }
 
+/* ⭐ 侧边栏拖拽调整手柄 */
+.sidebar-resize-handle {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    width: 8px;
+    height: 100%;
+    cursor: ew-resize;
+    z-index: var(--z-resize-handle);
+    background: transparent;
+    transition: background 0.2s ease;
+}
+
+.sidebar-resize-handle::before {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 60px;
+    background: rgba(102, 126, 234, 0.3);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.sidebar-resize-handle:hover::before {
+    opacity: 1;
+}
+
+.sidebar-resize-handle.resizing {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.sidebar-resize-handle.resizing::before {
+    opacity: 1;
+    background: var(--primary-color);
+    height: 100%;
+}
+
 /* 侧边栏折叠按钮 */
 .sidebar-toggle-btn {
     position: absolute;
@@ -281,7 +321,7 @@
     transform: translateY(-50%);
     width: 22px;
     height: 44px;
-    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+    background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end));
     border: none;
     border-radius: 0 8px 8px 0;
     color: white;
@@ -296,7 +336,7 @@
 }
 
 .sidebar-toggle-btn:hover {
-    background: linear-gradient(135deg, #5568d3 0%, #6a3d8f 100%);
+    background: linear-gradient(135deg, #5568d3, #6a3d8f);
     transform: translateY(-50%) scale(1.1);
     box-shadow: 2px 0 12px rgba(102, 126, 234, 0.4);
 }
@@ -370,8 +410,7 @@
 /* 行容器 */
 .gantt-rows-container {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: auto;
+    overflow: auto;
     position: relative;
     scroll-behavior: smooth;
     min-height: 0;
@@ -389,9 +428,9 @@
     position: relative;
 }
 
-/* ⭐ 汇总任务行样式 */
+/* 汇总任务行样式 */
 .gantt-row-summary {
-    background: linear-gradient(to right, rgba(102, 126, 234, 0.03) 0%, transparent 100%);
+    background: linear-gradient(to right, rgba(102, 126, 234, 0.03), transparent);
     border-bottom: 2px solid rgba(102, 126, 234, 0.2);
 }
 
@@ -472,7 +511,7 @@
 
 .gantt-date-cell[data-scale="week"].today,
 .gantt-date-cell[data-scale="month"].today {
-    background: linear-gradient(135deg, #fff3cd 0%, #fffbeb 100%);
+    background: linear-gradient(135deg, #fff3cd, #fffbeb);
     border-left: 3px solid var(--warning-color);
     border-right: 3px solid var(--warning-color);
 }
@@ -507,7 +546,8 @@
         min-width: 30px !important;
     }
 
-    .sidebar-toggle-btn {
+    .sidebar-toggle-btn,
+    .sidebar-resize-handle {
         width: 18px;
         height: 36px;
         font-size: 0.6rem;
@@ -518,22 +558,11 @@
         padding: 8px 6px;
     }
     
-    .gantt-task-name[data-outline-level="2"] {
-        padding-left: 20px;
-    }
+    .gantt-task-name[data-outline-level="2"] { padding-left: 20px; }
+    .gantt-task-name[data-outline-level="3"] { padding-left: 36px; }
+    .gantt-task-name[data-outline-level="4"] { padding-left: 52px; }
     
-    .gantt-task-name[data-outline-level="3"] {
-        padding-left: 36px;
-    }
-    
-    .gantt-task-name[data-outline-level="4"] {
-        padding-left: 52px;
-    }
-    
-    .gantt-task-name[data-outline-level="2"]::before {
-        left: 6px;
-        font-size: 0.7rem;
-    }
+    .gantt-task-name[data-outline-level="2"]::before { left: 6px; font-size: 0.7rem; }
     
     .gantt-task-name[data-outline-level="3"]::before,
     .gantt-task-name[data-outline-level="4"]::before {
@@ -580,7 +609,8 @@
         height: auto;
     }
 
-    .sidebar-toggle-btn {
+    .sidebar-toggle-btn,
+    .sidebar-resize-handle {
         display: none !important;
     }
 

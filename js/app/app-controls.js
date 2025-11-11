@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 应用控制按钮模块                                                ▓▓
 // ▓▓ 路径: js/app/app-controls.js                                   ▓▓
-// ▓▓ 版本: Delta8 - 添加全貌视图按钮                                ▓▓
+// ▓▓ 版本: Epsilon16 - UI重构版（精简工具栏+独立文件操作）          ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -9,7 +9,7 @@
 
     const today = new Date();
 
-    // ==================== 添加任务（⭐ 默认工期类型） ====================
+    // ==================== 添加任务 ====================
     const addTaskBtn = document.getElementById('addTask');
     if (addTaskBtn) {
         addTaskBtn.onclick = () => {
@@ -17,14 +17,14 @@
                 id: generateId(),
                 name: '新任务',
                 start: formatDate(today),
-                duration: 4,
-                durationType: 'workdays', // ⭐ 默认工作日
+                duration: 1,
+                durationType: 'days',
                 progress: 0,
                 dependencies: []
             };
             gantt.addTask(newTask);
             gantt.selectTask(newTask.id);
-            addLog('✅ 已添加新任务（工作日模式）');
+            addLog('✅ 已添加新任务');
         };
     }
 
@@ -42,11 +42,10 @@
         };
     }
 
-    // ==================== 导出文件（支持模板格式） ====================
+    // ==================== 导出文件 ====================
     const saveDataBtn = document.getElementById('saveData');
     if (saveDataBtn) {
         saveDataBtn.onclick = () => {
-            // 询问导出格式
             const exportTemplate = confirm(
                 '选择导出格式：\n\n' +
                 '✅ 确定 → JSON模板格式（包含项目信息，使用时间偏移）\n' +
@@ -56,14 +55,12 @@
             const timestamp = formatDate(new Date()).replace(/-/g, '');
             
             if (exportTemplate) {
-                // 导出为JSON模板格式
                 const baseDate = new Date();
                 const jsonData = convertTasksToTemplate(gantt.tasks, baseDate);
                 const filename = `gantt-template-${timestamp}.json`;
                 downloadJSON(jsonData, filename);
                 addLog(`✅ 已导出JSON模板：${filename}`);
             } else {
-                // 导出为简单格式
                 const filename = `gantt-${timestamp}.json`;
                 downloadJSON(gantt.tasks, filename);
                 addLog(`✅ 已导出简单格式：${filename}`);
@@ -88,6 +85,7 @@
                 name: task.name,
                 startOffset: startOffset,
                 duration: task.duration || 0,
+                durationType: task.durationType || 'days',
                 progress: task.progress || 0,
                 isMilestone: task.isMilestone || false,
                 isSummary: task.isSummary || false,
@@ -181,75 +179,6 @@
         clearHighlightsBtn.onclick = () => gantt.clearConflictHighlights();
     }
 
-    // ⭐ 时间刻度切换
-    const timeScaleDayBtn = document.getElementById('timeScaleDay');
-    const timeScaleWeekBtn = document.getElementById('timeScaleWeek');
-    const timeScaleMonthBtn = document.getElementById('timeScaleMonth');
-
-    if (timeScaleDayBtn) {
-        timeScaleDayBtn.onclick = () => {
-            gantt.options.isOverviewMode = false;
-            gantt.options.timeScale = 'day';
-            gantt.options.cellWidth = getRecommendedCellWidth('day');
-            gantt.calculateDateRange();
-            gantt.render();
-            addLog('✅ 已切换到日视图');
-            updateTimeScaleButtons('day');
-        };
-    }
-
-    if (timeScaleWeekBtn) {
-        timeScaleWeekBtn.onclick = () => {
-            gantt.options.isOverviewMode = false;
-            gantt.options.timeScale = 'week';
-            gantt.options.cellWidth = getRecommendedCellWidth('week');
-            gantt.calculateDateRange();
-            gantt.render();
-            addLog('✅ 已切换到周视图');
-            updateTimeScaleButtons('week');
-        };
-    }
-
-    if (timeScaleMonthBtn) {
-        timeScaleMonthBtn.onclick = () => {
-            gantt.options.isOverviewMode = false;
-            gantt.options.timeScale = 'month';
-            gantt.options.cellWidth = getRecommendedCellWidth('month');
-            gantt.calculateDateRange();
-            gantt.render();
-            addLog('✅ 已切换到月视图');
-            updateTimeScaleButtons('month');
-        };
-    }
-
-    /**
-     * 更新时间刻度按钮的激活状态
-     * @param {string} activeScale - 当前激活的刻度
-     */
-    function updateTimeScaleButtons(activeScale) {
-        const buttons = {
-            'day': timeScaleDayBtn,
-            'week': timeScaleWeekBtn,
-            'month': timeScaleMonthBtn
-        };
-        
-        Object.keys(buttons).forEach(scale => {
-            const btn = buttons[scale];
-            if (btn) {
-                if (scale === activeScale) {
-                    btn.classList.add('active');
-                    btn.style.background = 'rgba(102, 126, 234, 0.2)';
-                } else {
-                    btn.classList.remove('active');
-                    btn.style.background = '';
-                }
-            }
-        });
-    }
-
-    // 初始化按钮状态
-    updateTimeScaleButtons('day');
-
     // 工具栏悬停展开
     const toolbarCollapsed = document.getElementById('toolbarCollapsed');
     const toolbarExpanded = document.getElementById('floatingToolbarExpanded');
@@ -287,6 +216,6 @@
         });
     }
 
-    console.log('✅ app-controls.js loaded successfully (Delta8 - 全貌视图)');
+    console.log('✅ app-controls.js loaded successfully (Epsilon16 - UI重构版)');
 
 })();
