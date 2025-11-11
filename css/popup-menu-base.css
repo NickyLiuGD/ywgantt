@@ -1,7 +1,7 @@
 /**
  * 统一弹出菜单基础样式
  * 路径: css/popup-menu-base.css
- * 版本: Unified-1.0
+ * 版本: Unified-2.0 - 优化版（顶部工具栏+紧凑间距）
  * 包含: 模态框、列表、搜索框、标签、徽章
  */
 
@@ -78,7 +78,7 @@
 }
 
 /* ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-   第三部分：统一的头部工具栏
+   第三部分：⭐ 统一的头部工具栏（新样式）
    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ */
 
 .dependency-selector-header {
@@ -91,6 +91,12 @@
     border-radius: 12px 12px 0 0;
 }
 
+.dependency-selector-header .d-flex {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 .dependency-selector-header h6 {
     font-size: 0.9rem;
     font-weight: 700;
@@ -98,6 +104,26 @@
     margin: 0;
 }
 
+/* ⭐ 保存按钮（参照任务编辑表单） */
+.dependency-selector-header .btn-primary {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+}
+
+.dependency-selector-header .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* ⭐ 关闭按钮（X样式） */
 .dependency-selector-header .btn-close {
     background: rgba(102, 126, 234, 0.1);
     border: none;
@@ -162,7 +188,7 @@
     outline: none;
 }
 
-/* 任务列表 */
+/* ⭐ 任务列表（更紧凑的间距） */
 .deps-list {
     max-height: 300px;
     overflow-y: auto;
@@ -178,8 +204,8 @@
 }
 
 .deps-item {
-    padding: 8px 12px;
-    margin-bottom: 4px;
+    padding: 6px 12px; /* ⭐ 从 8px 减少到 6px */
+    margin-bottom: 2px; /* ⭐ 从 4px 减少到 2px */
     border-radius: 6px;
     transition: all 0.2s ease;
     cursor: pointer;
@@ -198,7 +224,7 @@
     cursor: pointer;
     user-select: none;
     font-size: 0.85rem;
-    line-height: 1.6;
+    line-height: 1.4; /* ⭐ 从 1.6 减少到 1.4 */
 }
 
 .deps-item .form-check-input:checked ~ .form-check-label {
@@ -248,11 +274,11 @@
 }
 
 /* ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-   第五部分：底部操作区
+   第五部分：⭐ 底部状态栏（移除操作按钮）
    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ */
 
 .dependency-selector-footer {
-    padding: 12px 16px;
+    padding: 10px 16px; /* ⭐ 从 12px 减少到 10px */
     background: #f8f9fa;
     border-top: 2px solid #dee2e6;
     border-radius: 0 0 12px 12px;
@@ -262,7 +288,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 0; /* ⭐ 移除底部间距 */
     font-size: 0.8rem;
     color: #6c757d;
 }
@@ -276,42 +302,6 @@
 .dependency-selector-footer .text-info {
     font-size: 0.7rem;
     color: #6c757d;
-}
-
-.dependency-selector-footer .d-flex {
-    display: flex;
-    gap: 8px;
-}
-
-.dependency-selector-footer .btn {
-    flex: 1;
-    font-size: 0.85rem;
-    padding: 8px 16px;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-    font-weight: 500;
-}
-
-.dependency-selector-footer .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border: none;
-}
-
-.dependency-selector-footer .btn-primary:hover {
-    background: linear-gradient(135deg, #5568d3 0%, #6a3d8f 100%);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-}
-
-.dependency-selector-footer .btn-secondary {
-    background: #6c757d;
-    border: none;
-}
-
-.dependency-selector-footer .btn-secondary:hover {
-    background: #5a6268;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
 }
 
 /* ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
@@ -384,7 +374,7 @@
     }
     
     .deps-item {
-        padding: 6px 10px;
+        padding: 5px 10px; /* ⭐ 移动端更紧凑 */
     }
     
     .deps-item .form-check-label {
