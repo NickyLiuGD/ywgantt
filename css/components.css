@@ -1,15 +1,18 @@
 /**
  * 通用组件样式文件
  * 路径: css/components.css
- * 版本: Epsilon17 - UI重构版（文件操作独立+工具栏精简）
+ * 版本: Epsilon17 - 统一圆形按钮风格 + 优化工具栏展开
  * 包含: 工具栏、设置面板、日志面板、快捷菜单、编辑表单
  */
 
 /* ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-   第一部分：折叠工具按钮（缩小版）
+   第一部分：⭐ 圆形呼吸灯按钮（统一样式）
    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ */
 
 .toolbar-collapsed {
+    position: absolute;
+    left: 20px;
+    top: 20px;
     width: var(--toolbar-collapsed-size);
     height: var(--toolbar-collapsed-size);
     background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end));
@@ -18,8 +21,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 1.5rem;
     cursor: pointer;
     box-shadow: var(--shadow-lg);
     transition: all var(--transition-slow);
@@ -67,31 +69,34 @@
 }
 
 /* ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-   第二部分：展开工具栏（精简版）
+   第二部分：⭐ 展开工具栏（从左向右展开）
    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ */
 
 .floating-toolbar-expanded {
-    position: fixed;
-    left: 50%;
-    top: 80px;
-    transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.95);
+    position: absolute;
+    left: 20px; /* ⭐ 与折叠按钮对齐 */
+    top: 20px;
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(20px);
     border-radius: var(--toolbar-border-radius);
-    padding: 12px 16px;
+    padding: 12px 12px 12px 68px; /* ⭐ 左侧为圆形按钮预留空间 */
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.6);
     display: flex;
     align-items: center;
     gap: 10px;
+    max-width: 68px;
     opacity: 0;
-    transition: opacity 0.3s ease;
+    overflow: hidden;
+    transition: max-width 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease;
     z-index: var(--z-toolbar-expanded);
     pointer-events: none;
     white-space: nowrap;
+    will-change: max-width, opacity;
 }
 
 .floating-toolbar-expanded.active {
+    max-width: 1200px;
     opacity: 1;
     pointer-events: auto;
 }
@@ -100,7 +105,20 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity var(--transition-slow), transform var(--transition-slow);
 }
+
+.floating-toolbar-expanded.active .toolbar-section {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.floating-toolbar-expanded.active .toolbar-section:nth-child(1) { transition-delay: 0.2s; }
+.floating-toolbar-expanded.active .toolbar-section:nth-child(3) { transition-delay: 0.3s; }
+.floating-toolbar-expanded.active .toolbar-section:nth-child(5) { transition-delay: 0.4s; }
+.floating-toolbar-expanded.active .settings-trigger { transition-delay: 0.5s; }
 
 .toolbar-btn {
     background: transparent;
@@ -111,7 +129,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    overflow: visible;
     transition: all var(--transition-normal);
+    white-space: nowrap;
     cursor: pointer;
 }
 
@@ -138,6 +158,8 @@
 /* 图标颜色 */
 .toolbar-btn:nth-child(1) .btn-icon { color: var(--success-color); }
 .toolbar-btn:nth-child(2) .btn-icon { color: var(--danger-color); }
+.toolbar-section:nth-child(1) .toolbar-btn:nth-child(3) .btn-icon { color: var(--info-color); }
+.toolbar-section:nth-child(1) .toolbar-btn:nth-child(4) .btn-icon { color: #8b5cf6; }
 .toolbar-section:nth-child(3) .toolbar-btn:nth-child(1) .btn-icon { color: #f59e0b; }
 .toolbar-section:nth-child(3) .toolbar-btn:nth-child(2) .btn-icon { color: #06b6d4; }
 .toolbar-section:nth-child(3) .toolbar-btn:nth-child(3) .btn-icon { color: var(--gray-500); }
@@ -149,14 +171,25 @@
 }
 
 .toolbar-btn .btn-text {
+    opacity: 0;
+    transform: translateX(-10px);
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--gray-600);
     transition: all var(--transition-normal);
+    pointer-events: none;
+    max-width: 0;
 }
 
 .toolbar-btn:hover {
     background: rgba(102, 126, 234, 0.08);
+    padding-right: 16px;
+}
+
+.toolbar-btn:hover .btn-text {
+    opacity: 1;
+    transform: translateX(0);
+    max-width: 100px;
 }
 
 .toolbar-btn:active { transform: scale(0.95); }
@@ -177,6 +210,7 @@
 
 .settings-trigger {
     margin-left: 8px;
+    position: relative;
 }
 
 .settings-trigger .btn-icon { color: var(--primary-color) !important; }
@@ -666,7 +700,7 @@ input:checked + .switch-slider:before {
     font-weight: 600;
 }
 
-/* 表单元素样式 */
+/* 表单元素样式（合并优化） */
 #editDuration,
 #editDurationType,
 #editPriority {
@@ -791,30 +825,26 @@ input:checked + .switch-slider:before {
 
 @media (max-width: 768px) {
     .floating-toolbar-expanded {
-        left: 50%;
-        transform: translateX(-50%);
+        left: 20px;
+        top: 90px;
         flex-wrap: wrap;
         max-width: calc(100% - 40px);
     }
 
-    .floating-toolbar-expanded.active {
+    h1 {
+        margin-left: 0 !important;
+        text-align: center;
+        font-size: 1.3rem;
+    }
+
+    .toolbar-collapsed {
+        left: 50%;
         transform: translateX(-50%);
     }
 
-    .top-controls {
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .file-operations {
+    .settings-panel {
         width: 100%;
-        justify-content: center;
-    }
-
-    h1 {
-        font-size: 1.3rem;
-        width: 100%;
-        text-align: center;
+        right: -100%;
     }
     
     .quick-menu {
@@ -861,13 +891,13 @@ input:checked + .switch-slider:before {
    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ */
 
 @media print {
-    .top-controls,
     .toolbar-collapsed,
     .floating-toolbar-expanded,
     .settings-panel,
     .log-panel,
     .quick-menu,
-    .inline-task-form {
+    .inline-task-form,
+    .sidebar-resize-handle {
         display: none !important;
     }
 }

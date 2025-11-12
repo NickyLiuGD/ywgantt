@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Epsilon16 - 修复折叠任务渲染                             ▓▓
+// ▓▓ 版本: Epsilon17 - 拖拽调整侧边栏宽度                           ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -18,20 +18,18 @@
 
         const dates = this.generateDates();
         const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-        const isCollapsed = !this.options.showTaskNames;
         
         const html = `
             <div class="gantt-wrapper">
-                <div class="gantt-sidebar ${isCollapsed ? 'collapsed' : ''}">
+                <div class="gantt-sidebar" id="ganttSidebar">
                     <div class="gantt-sidebar-header">任务名称</div>
                     <div class="gantt-sidebar-body" id="ganttSidebarBody">
                         ${this.renderTaskNames()}
                     </div>
-                    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" 
-                            title="${isCollapsed ? '展开任务名称栏' : '折叠任务名称栏'}"
-                            aria-label="${isCollapsed ? '展开' : '折叠'}任务名称栏">
-                        <span class="sidebar-toggle-icon">${isCollapsed ? '▶' : '◀'}</span>
-                    </button>
+                    <!-- ⭐ 拖拽调整宽度手柄 -->
+                    <div class="sidebar-resize-handle" id="sidebarResizeHandle" 
+                         title="拖拽调整宽度" 
+                         aria-label="调整侧边栏宽度"></div>
                 </div>
                 <div class="gantt-timeline-wrapper">
                     <div class="gantt-timeline">
@@ -81,17 +79,11 @@
 
         this.container.innerHTML = html;
 
-        const toggleBtn = document.getElementById('sidebarToggleBtn');
-        if (toggleBtn) {
-            toggleBtn.onclick = () => {
-                this.toggleSidebar(isCollapsed);
-                this.render();
-            };
-        }
+        // ⭐ 绑定侧边栏拖拽事件
+        this.attachSidebarResize();
 
         this.setupScrollSync();
         
-        // ⭐ 渲染依赖箭头（传入可见任务列表）
         console.log('🔄 开始渲染依赖箭头...');
         const visibleTasks = getVisibleTasks(this.tasks);
         this.renderDependencies(dates, visibleTasks);
@@ -107,13 +99,62 @@
     };
 
     /**
+     * ⭐ 绑定侧边栏拖拽调整宽度事件
+     */
+    GanttChart.prototype.attachSidebarResize = function() {
+        const handle = document.getElementById('sidebarResizeHandle');
+        const sidebar = document.getElementById('ganttSidebar');
+        
+        if (!handle || !sidebar) return;
+
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+
+        const onMouseDown = (e) => {
+            isResizing = true;
+            startX = e.clientX;
+            startWidth = sidebar.offsetWidth;
+            sidebar.classList.add('resizing');
+            document.body.style.cursor = 'ew-resize';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        };
+
+        const onMouseMove = (e) => {
+            if (!isResizing) return;
+            
+            const deltaX = e.clientX - startX;
+            const newWidth = Math.max(100, Math.min(400, startWidth + deltaX));
+            
+            sidebar.style.width = newWidth + 'px';
+            sidebar.style.minWidth = newWidth + 'px';
+        };
+
+        const onMouseUp = () => {
+            if (!isResizing) return;
+            
+            isResizing = false;
+            sidebar.classList.remove('resizing');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            
+            const finalWidth = sidebar.offsetWidth;
+            addLog(`✅ 任务名称栏宽度已调整为 ${finalWidth}px`);
+        };
+
+        handle.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    };
+
+    /**
      * 渲染任务名称列表（支持层级和折叠）
      */
     GanttChart.prototype.renderTaskNames = function() {
         return this.tasks.map(task => {
             if (!task || !task.id) return '';
             
-            // ⭐ 跳过折叠的子任务
             if (task.parentId) {
                 const parent = this.tasks.find(t => t.id === task.parentId);
                 if (parent && parent.isCollapsed) {
@@ -150,7 +191,7 @@
     };
 
     /**
-     * 渲染日期表头（支持不同时间刻度）
+     * 渲染日期表头
      */
     GanttChart.prototype.renderDateHeaders = function(dates, weekdays) {
         const scale = this.options.timeScale || 'day';
@@ -217,7 +258,6 @@
     GanttChart.prototype.renderRow = function(task, dates) {
         if (!task || !task.id) return '';
         
-        // ⭐ 跳过折叠的子任务
         if (task.parentId) {
             const parent = this.tasks.find(t => t.id === task.parentId);
             if (parent && parent.isCollapsed) {
@@ -245,23 +285,19 @@
         const startTimeLabel = formatDate(start);
         const endTimeLabel = formatDate(end);
 
-        // 任务名称显示
         const outlineLevel = task.outlineLevel || 1;
         const indent = '　'.repeat(outlineLevel - 1);
         const icon = task.isMilestone ? '🎯' : (task.isSummary ? '📁' : '📋');
         const wbsPrefix = task.wbs ? `[${task.wbs}] ` : '';
         const displayName = `${indent}${icon} ${wbsPrefix}${task.name}`;
 
-        // 优先级标记
         const priorityAttr = task.priority ? `data-priority="${task.priority}"` : '';
         
-        // 工期类型标记
         const durationType = task.durationType || 'days';
         const durationTypeAttr = `data-duration-type="${durationType}"`;
         const durationTypeIcon = durationType === 'workdays' ? '💼' : '📅';
         const durationTypeTitle = durationType === 'workdays' ? '工作日' : '自然日';
 
-        // 折叠按钮
         const collapseToggle = (task.isSummary && task.children && task.children.length > 0) ? 
             `<span class="collapse-toggle" data-task-id="${task.id}" title="${task.isCollapsed ? '展开' : '折叠'}子任务">
                 ${task.isCollapsed ? '▶' : '▼'}
@@ -273,7 +309,6 @@
                  aria-label="任务行: ${this.escapeHtml(task.name)}">
                 ${this.renderCells(dates)}
                 
-                <!-- 左侧双层时间标签 -->
                 <div class="gantt-bar-label-start ${isSelected ? 'selected' : ''}" 
                      data-task-id="${task.id}"
                      style="right: calc(100% - ${left}px + 8px);"
@@ -292,7 +327,6 @@
                 </div>
                 
                 ${task.isMilestone ? `
-                    <!-- 里程碑菱形 -->
                     <div class="gantt-milestone ${isSelected ? 'selected' : ''}" 
                          data-task-id="${task.id}"
                          style="left: ${left}px;"
@@ -304,7 +338,6 @@
                         </div>
                     </div>
                 ` : `
-                    <!-- 任务条 -->
                     <div class="gantt-bar ${task.isSummary ? 'gantt-bar-summary' : ''} ${isSelected ? 'selected' : ''}" 
                          data-task-id="${task.id}"
                          ${priorityAttr}
@@ -330,7 +363,6 @@
                     </div>
                 `}
                 
-                <!-- 右侧任务名称标签 -->
                 <div class="gantt-bar-label-external ${isSelected ? 'selected' : ''}" 
                      data-task-id="${task.id}"
                      style="left: ${left + width + 8}px;"
@@ -475,6 +507,6 @@
         console.log('✅ 时间轴视图菜单事件已绑定');
     };
 
-    console.log('✅ gantt-render.js loaded successfully (Epsilon16 - 修复折叠渲染)');
+    console.log('✅ gantt-render.js loaded successfully (Epsilon17 - 拖拽调整宽度)');
 
 })();

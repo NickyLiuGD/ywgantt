@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 应用设置面板模块                                                ▓▓
 // ▓▓ 路径: js/app/app-settings.js                                   ▓▓
-// ▓▓ 版本: Epsilon1 - 精简版（仅设置面板逻辑）                      ▓▓
+// ▓▓ 版本: Epsilon2 - 移除任务名称栏开关                            ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -122,16 +122,6 @@
         };
     }
 
-    const showTaskNamesSwitch = document.getElementById('showTaskNames');
-    if (showTaskNamesSwitch) {
-        showTaskNamesSwitch.checked = true;
-        
-        showTaskNamesSwitch.onchange = (e) => {
-            gantt.toggleSidebar(e.target.checked);
-            gantt.render();
-        };
-    }
-
     // ==================== 时间轴密度控制 ====================
     
     const cellWidthSlider = document.getElementById('cellWidth');
@@ -151,6 +141,6 @@
         };
     }
 
-    console.log('✅ app-settings.js loaded successfully (Epsilon1 - 精简版)');
+    console.log('✅ app-settings.js loaded successfully (Epsilon2 - 拖拽调整宽度)');
 
 })(typeof window !== 'undefined' ? window : this);

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测、时间刻度缩放、PERT视图">
     <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图,时间刻度,项目全貌">
-    <title>在线项目甘特图Zeta2</title>
+    <title>在线项目甘特图Zeta3</title>
     
     <!-- Preconnect to CDN -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -13,7 +13,7 @@
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" integrity="sha512-b2QcS5SsA8tZodcDtGRELiGv5SaKSk1vDHDaQRda0htPYWZ6046lr3kJ5bAAQdpV2mmA/4v0wQF9MyU6/pDIAg==" crossorigin="anonymous">
     
-    <!-- ⭐ CSS 动态加载 -->
+    <!-- CSS 动态加载 -->
     <script>
         (function() {
             const timestamp = Date.now();
@@ -37,13 +37,11 @@
     </script>
 
     <style>
-        /* 图标字体样式 */
         .icon {
             font-style: normal;
             font-size: inherit;
         }
         
-        /* 页面加载优化 */
         body {
             opacity: 0;
             transition: opacity 0.3s ease-in;
@@ -53,7 +51,6 @@
             opacity: 1;
         }
         
-        /* 防止未加载完成时的闪烁 */
         .gantt-container,
         .floating-toolbar-expanded,
         .settings-panel {
@@ -65,87 +62,22 @@
         body.loaded .settings-panel {
             visibility: visible;
         }
-
-        /* ⭐ 顶部操作区样式 */
-        .top-controls {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 15px;
-            padding: 12px 16px;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(102, 126, 234, 0.15);
-        }
-
-        .file-operations {
-            display: flex;
-            gap: 8px;
-        }
-
-        .file-btn {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: #495057;
-        }
-
-        .file-btn:hover {
-            background: rgba(102, 126, 234, 0.08);
-            border-color: rgba(102, 126, 234, 0.3);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-        }
-
-        .file-btn .file-icon {
-            font-size: 1.2rem;
-        }
-
-        .divider-vertical {
-            width: 1px;
-            height: 32px;
-            background: linear-gradient(to bottom, transparent, #dee2e6 50%, transparent);
-        }
     </style>
 </head>
 <body>
     <div class="container-fluid">
-        <!-- ⭐ 顶部操作区（文件操作 + 标题 + 工具按钮） -->
-        <div class="top-controls">
-            <!-- 文件操作 -->
-            <div class="file-operations">
-                <button class="file-btn" id="loadData" title="加载项目文件">
-                    <span class="file-icon">📂</span>
-                    <span>加载</span>
-                </button>
-                <button class="file-btn" id="saveData" title="导出项目文件">
-                    <span class="file-icon">💾</span>
-                    <span>保存</span>
-                </button>
-            </div>
-
-            <div class="divider-vertical"></div>
-
-            <!-- 折叠工具按钮 -->
+        <!-- 标题 + 折叠工具按钮 -->
+        <div class="d-flex align-items-center mb-4 position-relative">
+            <!-- ⭐ 折叠工具按钮（圆形呼吸灯） -->
             <div class="toolbar-collapsed" id="toolbarCollapsed" title="工具" role="button" aria-label="打开工具栏" tabindex="0">
                 <span class="toolbar-icon" aria-hidden="true">⚙️</span>
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300; margin-left: 0 !important;">在线项目甘特图Zeta2</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Zeta3</h1>
         </div>
         
-        <!-- 展开的浮动工具栏 -->
+        <!-- ⭐ 展开的浮动工具栏（从左向右展开） -->
         <div class="floating-toolbar-expanded" id="floatingToolbarExpanded" role="toolbar" aria-label="主工具栏">
             <div class="toolbar-section">
                 <button class="toolbar-btn" id="addTask" title="添加新任务">
@@ -155,6 +87,14 @@
                 <button class="toolbar-btn" id="deleteTask" title="删除选中任务">
                     <span class="btn-icon icon">🗑️</span>
                     <span class="btn-text">删除任务</span>
+                </button>
+                <button class="toolbar-btn" id="saveData" title="导出Json文件">
+                    <span class="btn-icon icon">💾</span>
+                    <span class="btn-text">导出文件</span>
+                </button>
+                <button class="toolbar-btn" id="loadData" title="加载Json文件">
+                    <span class="btn-icon icon">📂</span>
+                    <span class="btn-text">加载文件</span>
                 </button>
             </div>
             
@@ -181,6 +121,18 @@
                 <button class="toolbar-btn" id="toggleView" title="切换PERT视图">
                     <span class="btn-icon icon">🔄</span>
                     <span class="btn-text">PERT视图</span>
+                </button>
+                <button class="toolbar-btn active" id="timeScaleDay" title="按天显示">
+                    <span class="btn-icon icon">📅</span>
+                    <span class="btn-text">日视图</span>
+                </button>
+                <button class="toolbar-btn" id="timeScaleWeek" title="按周显示">
+                    <span class="btn-icon icon">📆</span>
+                    <span class="btn-text">周视图</span>
+                </button>
+                <button class="toolbar-btn" id="timeScaleMonth" title="按月显示">
+                    <span class="btn-icon icon">🗓️</span>
+                    <span class="btn-text">月视图</span>
                 </button>
             </div>
             
@@ -227,13 +179,6 @@
                     </label>
                 </div>
                 <div class="setting-item">
-                    <span class="setting-text">显示任务名称栏</span>
-                    <label class="switch-label">
-                        <input type="checkbox" id="showTaskNames" checked>
-                        <span class="switch-slider"></span>
-                    </label>
-                </div>
-                <div class="setting-item">
                     <span class="setting-text">显示操作日志</span>
                     <label class="switch-label">
                         <input type="checkbox" id="showLogPanel">
@@ -268,9 +213,7 @@
         <div id="pertContainer" style="display: none; height: 600px;" role="region" aria-label="PERT网络图"></div>
     </div>
     
-    <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-         JavaScript 模块化动态加载
-         ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
+    <!-- JavaScript 模块化动态加载 -->
     <script>
         (function() {
             'use strict';
@@ -278,30 +221,25 @@
             const timestamp = Date.now();
             
             const scripts = [
-                // 第一层：工具函数（5个）
                 'js/utils/date-utils.js',
                 'js/utils/log-utils.js',
                 'js/utils/data-utils.js',
                 'js/utils/time-scale-utils.js',
                 'js/utils/common-utils.js',
                 
-                // 第二层：甘特图核心（4个）
                 'js/gantt/gantt-core.js',
                 'js/gantt/gantt-render.js',
                 'js/gantt/gantt-dependencies.js',
                 'js/gantt/gantt-operations.js',
                 
-                // 第三层：事件处理（4个）
                 'js/events/gantt-events-binding.js',
                 'js/events/gantt-events-drag.js',
                 'js/events/gantt-events-form.js',
                 'js/events/gantt-events-quickmenu.js',
        
-                // 第四层：PERT 模块（2个）
                 'js/pert-chart.js',
                 'js/pert-interactive.js',
                 
-                // 第五层：应用初始化（4个）
                 'js/app/app-init.js',
                 'js/app/app-controls.js',
                 'js/app/app-view-switcher.js',
@@ -342,7 +280,7 @@
                 console.log('║  🎉 所有模块加载完成！                                    ║');
                 console.log('╠═══════════════════════════════════════════════════════════╣');
                 console.log(`  总计: ${loadedCount}/${totalScripts} 个模块`);
-                console.log('  版本: Epsilon16 - UI优化版');
+                console.log('  版本: Epsilon17 - 拖拽调整宽度版');
                 console.log('╚═══════════════════════════════════════════════════════════╝');
                 
                 document.body.classList.add('loaded');
