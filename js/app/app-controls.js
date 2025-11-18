@@ -42,28 +42,65 @@
         };
     }
 
-    // ==================== 导出文件 ====================
+    // ==================== 保存到云端 ====================
     const saveDataBtn = document.getElementById('saveData');
     if (saveDataBtn) {
-        saveDataBtn.onclick = () => {
+        saveDataBtn.onclick = async () => {
             const exportTemplate = confirm(
                 '选择导出格式：\n\n' +
-                '✅ 确定 → JSON模板格式（包含项目信息，使用时间偏移）\n' +
-                '❌ 取消 → 简单格式（仅任务数据，绝对日期）'
+                '✅ 确定 → JSON模板格式（包含项目信息）\n' +
+                '❌ 取消 → 简单格式（仅任务数据）'
             );
             
-            const timestamp = formatDate(new Date()).replace(/-/g, '');
+            // 让用户输入文件名
+            const defaultName = `gantt-${formatDate(new Date()).replace(/-/g, '')}`;
+            const userFilename = prompt('请输入文件名（不含.json）:', defaultName);
             
+            if (!userFilename) {
+                addLog('❌ 已取消保存');
+                return;
+            }
+            
+            const filename = userFilename.endsWith('.json') ? userFilename : `${userFilename}.json`;
+            
+            let jsonData;
             if (exportTemplate) {
                 const baseDate = new Date();
-                const jsonData = convertTasksToTemplate(gantt.tasks, baseDate);
-                const filename = `gantt-template-${timestamp}.json`;
-                downloadJSON(jsonData, filename);
-                addLog(`✅ 已导出JSON模板：${filename}`);
+                jsonData = convertTasksToTemplate(gantt.tasks, baseDate);
             } else {
-                const filename = `gantt-${timestamp}.json`;
-                downloadJSON(gantt.tasks, filename);
-                addLog(`✅ 已导出简单格式：${filename}`);
+                jsonData = gantt.tasks;
+            }
+            
+            // 保存到 KV
+            try {
+                saveDataBtn.disabled = true;
+                const btnIcon = saveDataBtn.querySelector('.btn-icon');
+                const btnText = saveDataBtn.querySelector('.btn-text');
+                
+                if (btnIcon) btnIcon.textContent = '⏳';
+                if (btnText) btnText.textContent = '保存中...';
+                
+                await saveToKV(filename, jsonData);
+                
+                addLog(`✅ 已保存到云端：${filename}`);
+                alert(`✅ 保存成功！\n\n文件名：${filename}\n\n可通过"加载文件"按钮读取`);
+                
+            } catch (error) {
+                console.error('保存失败:', error);
+                addLog(`❌ 云端保存失败：${error.message}`);
+                
+                // 降级：下载到本地
+                if (confirm('云端保存失败，是否下载到本地？')) {
+                    downloadJSON(jsonData, filename);
+                    addLog(`✅ 已下载到本地：${filename}`);
+                }
+                
+            } finally {
+                saveDataBtn.disabled = false;
+                const btnIcon = saveDataBtn.querySelector('.btn-icon');
+                const btnText = saveDataBtn.querySelector('.btn-text');
+                if (btnIcon) btnIcon.textContent = '💾';
+                if (btnText) btnText.textContent = '导出文件';
             }
         };
     }
@@ -118,49 +155,143 @@
         };
     }
 
-    // 加载文件
+    // ==================== 从云端加载 ====================
     const loadDataBtn = document.getElementById('loadData');
     if (loadDataBtn) {
-        loadDataBtn.onclick = () => {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
+        loadDataBtn.onclick = async () => {
+            try {
+                loadDataBtn.disabled = true;
+                const btnIcon = loadDataBtn.querySelector('.btn-icon');
+                const btnText = loadDataBtn.querySelector('.btn-text');
                 
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    try {
-                        const tasks = JSON.parse(ev.target.result);
-                        if (!Array.isArray(tasks)) {
-                            alert('文件格式错误：期望JSON数组');
-                            return;
-                        }
-                        tasks.forEach(t => {
-                            t.id = t.id || generateId();
-                            if (!t.dependencies) t.dependencies = [];
-                        });
-                        gantt.tasks = tasks;
-                        gantt.calculateDateRange();
-                        gantt.render();
-
-                        if (typeof refreshPertViewIfActive === 'function') {
-                            refreshPertViewIfActive();
-                        }
-                        
-                        addLog(`✅ 已从 ${file.name} 加载 ${tasks.length} 个任务`);
-                    } catch (err) {
-                        console.error('Load error:', err);
-                        alert('加载失败：' + err.message);
-                    }
-                };
-                reader.readAsText(file);
-            };
-            input.click();
+                if (btnIcon) btnIcon.textContent = '⏳';
+                if (btnText) btnText.textContent = '加载中...';
+                
+                // 获取文件列表
+                const files = await listKVFiles();
+                
+                if (!files || files.length === 0) {
+                    throw new Error('云端暂无文件');
+                }
+                
+                // 生成文件选择列表
+                const fileList = files.map((file, i) => {
+                    const date = new Date(file.timestamp).toLocaleString('zh-CN');
+                    const size = `${(file.size / 1024).toFixed(1)}KB`;
+                    const tasks = file.taskCount > 0 ? `${file.taskCount}个任务` : '';
+                    return `${i + 1}. ${file.name}\n   ${date} | ${size} ${tasks ? '| ' + tasks : ''}`;
+                }).join('\n\n');
+                
+                const choice = prompt(
+                    `📁 云端文件列表（共${files.length}个）：\n\n${fileList}\n\n` +
+                    `请输入序号（1-${files.length}），或输入 0 从本地加载`,
+                    '1'
+                );
+                
+                if (!choice) {
+                    addLog('❌ 已取消加载');
+                    return;
+                }
+                
+                const index = parseInt(choice) - 1;
+                
+                // 从本地加载
+                if (index === -1) {
+                    loadFromLocalFile();
+                    return;
+                }
+                
+                if (index < 0 || index >= files.length) {
+                    alert('❌ 无效的序号');
+                    return;
+                }
+                
+                const selectedFile = files[index];
+                
+                // 从 KV 加载
+                const data = await loadFromKV(selectedFile.name);
+                
+                const tasks = Array.isArray(data) ? data : data.tasks;
+                
+                if (!Array.isArray(tasks)) {
+                    throw new Error('数据格式错误');
+                }
+                
+                // 补全任务数据
+                tasks.forEach(t => {
+                    t.id = t.id || generateId();
+                    if (!t.dependencies) t.dependencies = [];
+                });
+                
+                gantt.tasks = tasks;
+                gantt.calculateDateRange();
+                gantt.render();
+                
+                if (typeof refreshPertViewIfActive === 'function') {
+                    refreshPertViewIfActive();
+                }
+                
+                addLog(`✅ 已从云端加载：${selectedFile.name}（${tasks.length} 个任务）`);
+                
+            } catch (error) {
+                console.error('加载失败:', error);
+                addLog(`❌ 云端加载失败：${error.message}`);
+                
+                if (confirm('云端加载失败，是否从本地文件加载？')) {
+                    loadFromLocalFile();
+                }
+                
+            } finally {
+                loadDataBtn.disabled = false;
+                const btnIcon = loadDataBtn.querySelector('.btn-icon');
+                const btnText = loadDataBtn.querySelector('.btn-text');
+                if (btnIcon) btnIcon.textContent = '📂';
+                if (btnText) btnText.textContent = '加载文件';
+            }
         };
     }
 
+    /**
+     * 从本地文件加载（降级方案）
+     */
+    function loadFromLocalFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    const tasks = Array.isArray(data) ? data : data.tasks;
+                    
+                    tasks.forEach(t => {
+                        t.id = t.id || generateId();
+                        if (!t.dependencies) t.dependencies = [];
+                    });
+                    
+                    gantt.tasks = tasks;
+                    gantt.calculateDateRange();
+                    gantt.render();
+                    
+                    if (typeof refreshPertViewIfActive === 'function') {
+                        refreshPertViewIfActive();
+                    }
+                    
+                    addLog(`✅ 已从本地加载：${file.name}（${tasks.length} 个任务）`);
+                } catch (err) {
+                    console.error('Load error:', err);
+                    alert('加载失败：' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
+    
     // 冲突检测
     const checkConflictsBtn = document.getElementById('checkConflicts');
     if (checkConflictsBtn) {
