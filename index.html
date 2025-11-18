@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测、时间刻度缩放、PERT视图">
     <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图,时间刻度,项目全貌">
-    <title>在线项目甘特图Alpha</title>
+    <title>在线项目甘特图AlphaNew</title>
     
     <!-- Preconnect to CDN -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -74,12 +74,16 @@
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图Alpha</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">在线项目甘特图AlphaNew</h1>
         </div>
         
         <!-- ⭐ 展开的浮动工具栏（从左向右展开） -->
         <div class="floating-toolbar-expanded" id="floatingToolbarExpanded" role="toolbar" aria-label="主工具栏">
             <div class="toolbar-section">
+                <button class="toolbar-btn" id="manageFiles" title="管理云端文件">
+                    <span class="btn-icon icon">📁</span>
+                    <span class="btn-text">文件管理</span>
+                </button>
                 <button class="toolbar-btn" id="addTask" title="添加新任务">
                     <span class="btn-icon icon">➕</span>
                     <span class="btn-text">添加任务</span>
@@ -243,6 +247,7 @@
                 
                 'js/app/app-init.js',
                 'js/app/app-controls.js',
+                'js/app/app-file-manager.js',
                 'js/app/app-view-switcher.js',
                 'js/app/app-settings.js'
             ];
