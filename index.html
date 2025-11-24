@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="在线项目甘特图管理工具 - 支持任务拖拽、依赖管理、冲突检测、时间刻度缩放、PERT视图">
-    <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图,时间刻度,项目全貌">
-    <title>云端项目甘特图Alpha2</title>
+    <meta name="keywords" content="甘特图,项目管理,任务管理,PERT图,时间刻度,项目全貌,Cloudflare">
+    <title>云端项目甘特图 AlphaNew</title>
     
     <!-- Preconnect to CDN -->
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -13,147 +13,124 @@
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" integrity="sha512-b2QcS5SsA8tZodcDtGRELiGv5SaKSk1vDHDaQRda0htPYWZ6046lr3kJ5bAAQdpV2mmA/4v0wQF9MyU6/pDIAg==" crossorigin="anonymous">
     
-    <!-- CSS 动态加载 -->
-    <script>
-        (function() {
-            const timestamp = Date.now();
-            const cssFiles = [
-                'css/base.css',
-                'css/utilities.css',
-                'css/components.css',
-                'css/popup-menu-base.css',
-                'css/gantt-layout.css',
-                'css/gantt-interactive.css',
-                'css/pert-styles.css'
-            ];
-            
-            cssFiles.forEach(file => {
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = file + '?t=' + timestamp;
-                document.head.appendChild(link);
-            });
-        })();
-    </script>
+    <!-- 静态 CSS (并行下载，利用缓存) -->New
+    <link rel="stylesheet" href="css/base.css?v=1.0">
+    <link rel="stylesheet" href="css/utilities.css?v=1.0">
+    <link rel="stylesheet" href="css/components.css?v=1.0">
+    <link rel="stylesheet" href="css/popup-menu-base.css?v=1.0">
+    <link rel="stylesheet" href="css/gantt-layout.css?v=1.0">
+    <link rel="stylesheet" href="css/gantt-interactive.css?v=1.0">
+    <link rel="stylesheet" href="css/pert-styles.css?v=1.0">
 
     <style>
-        .icon {
-            font-style: normal;
-            font-size: inherit;
-        }
+        .icon { font-style: normal; font-size: inherit; }
         
-        body {
-            opacity: 0;
-            transition: opacity 0.3s ease-in;
+        /* 初始加载遮罩 */
+        #app-loader {
+            position: fixed; inset: 0; background: #f8f9fa; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.4s ease;
         }
-        
-        body.loaded {
-            opacity: 1;
+        .loader-spinner {
+            width: 40px; height: 40px; border: 4px solid #e0e0e0;
+            border-top: 4px solid #667eea; border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
-        
-        .gantt-container,
-        .floating-toolbar-expanded,
-        .settings-panel {
-            visibility: hidden;
-        }
-        
-        body.loaded .gantt-container,
-        body.loaded .floating-toolbar-expanded,
-        body.loaded .settings-panel {
-            visibility: visible;
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* 内容区域控制 */
+        body { opacity: 0; transition: opacity 0.3s ease-in; }
+        body.loaded { opacity: 1; }
     </style>
 </head>
 <body>
+    <!-- 加载动画 -->
+    <div id="app-loader">
+        <div class="loader-spinner"></div>
+        <div style="margin-top: 15px; color: #666; font-size: 0.9rem;">正在连接云端引擎...</div>
+    </div>
+
     <div class="container-fluid">
         <!-- 标题 + 折叠工具按钮 -->
         <div class="d-flex align-items-center mb-4 position-relative">
-            <!-- ⭐ 折叠工具按钮（圆形呼吸灯） -->
+            <!-- ⭐ 折叠工具按钮 -->
             <div class="toolbar-collapsed" id="toolbarCollapsed" title="工具" role="button" aria-label="打开工具栏" tabindex="0">
                 <span class="toolbar-icon" aria-hidden="true">⚙️</span>
             </div>
 
             <!-- 标题 -->
-            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">云端项目甘特图Alpha2</h1>
+            <h1 class="text-center mb-0 flex-grow-1" style="font-weight:300;">云端项目甘特图 AlphaNew</h1>
         </div>
         
-        <!-- ⭐ 展开的浮动工具栏（从左向右展开） -->
+        <!-- ⭐ 展开的浮动工具栏 -->
         <div class="floating-toolbar-expanded" id="floatingToolbarExpanded" role="toolbar" aria-label="主工具栏">
             <div class="toolbar-section">
+                <!-- 文件管理组 (新增上传和云保存) -->
                 <button class="toolbar-btn" id="manageFiles" title="管理云端文件">
-                    <span class="btn-icon icon">📁</span>
-                    <span class="btn-text">文件管理</span>
+                    <span class="btn-icon icon">📁</span><span class="btn-text">文件管理</span>
                 </button>
-                <!-- ⭐ 新增：全局上传按钮 -->
-                <button class="toolbar-btn" id="uploadToCloud" title="上传本地文件到云端并加载">
-                    <span class="btn-icon icon">📤</span>
-                    <span class="btn-text">上传云端</span>
-                </button>                
-                <!-- ⭐ 新增：一键云保存按钮 -->
+                <button class="toolbar-btn" id="uploadToCloud" title="上传本地文件到云端">
+                    <span class="btn-icon icon">📤</span><span class="btn-text">上传云端</span>
+                </button>
                 <button class="toolbar-btn" id="quickCloudSave" title="保存为最新版本 (时间戳)">
-                    <span class="btn-icon icon">☁️</span>
-                    <span class="btn-text">云保存</span>
-                </button>                
+                    <span class="btn-icon icon">☁️</span><span class="btn-text">云保存</span>
+                </button>
+            </div>
+            
+            <div class="toolbar-divider" role="separator"></div>
+
+            <div class="toolbar-section">
+                <!-- 任务操作组 -->
                 <button class="toolbar-btn" id="addTask" title="添加新任务">
-                    <span class="btn-icon icon">➕</span>
-                    <span class="btn-text">添加任务</span>
+                    <span class="btn-icon icon">➕</span><span class="btn-text">添加任务</span>
                 </button>
                 <button class="toolbar-btn" id="deleteTask" title="删除选中任务">
-                    <span class="btn-icon icon">🗑️</span>
-                    <span class="btn-text">删除任务</span>
+                    <span class="btn-icon icon">🗑️</span><span class="btn-text">删除任务</span>
                 </button>
                 <button class="toolbar-btn" id="saveData" title="导出Json文件">
-                    <span class="btn-icon icon">💾</span>
-                    <span class="btn-text">导出文件</span>
+                    <span class="btn-icon icon">💾</span><span class="btn-text">导出文件</span>
                 </button>
                 <button class="toolbar-btn" id="loadData" title="加载Json文件">
-                    <span class="btn-icon icon">📂</span>
-                    <span class="btn-text">加载文件</span>
+                    <span class="btn-icon icon">📂</span><span class="btn-text">加载文件</span>
                 </button>
             </div>
             
             <div class="toolbar-divider" role="separator"></div>
             
             <div class="toolbar-section">
+                <!-- 智能工具组 -->
                 <button class="toolbar-btn" id="checkConflicts" title="检测时间冲突">
-                    <span class="btn-icon icon">🔍</span>
-                    <span class="btn-text">检测冲突</span>
+                    <span class="btn-icon icon">🔍</span><span class="btn-text">检测冲突</span>
                 </button>
                 <button class="toolbar-btn" id="autoFixConflicts" title="自动修复冲突">
-                    <span class="btn-icon icon">🔧</span>
-                    <span class="btn-text">自动修复</span>
+                    <span class="btn-icon icon">🔧</span><span class="btn-text">自动修复</span>
                 </button>
                 <button class="toolbar-btn" id="clearHighlights" title="清除高亮">
-                    <span class="btn-icon icon">🧹</span>
-                    <span class="btn-text">清除高亮</span>
+                    <span class="btn-icon icon">🧹</span><span class="btn-text">清除高亮</span>
                 </button>
             </div>
             
             <div class="toolbar-divider" role="separator"></div>
             
             <div class="toolbar-section">
+                <!-- 视图切换组 -->
                 <button class="toolbar-btn" id="toggleView" title="切换PERT视图">
-                    <span class="btn-icon icon">🔄</span>
-                    <span class="btn-text">PERT视图</span>
+                    <span class="btn-icon icon">🔄</span><span class="btn-text">PERT视图</span>
                 </button>
                 <button class="toolbar-btn active" id="timeScaleDay" title="按天显示">
-                    <span class="btn-icon icon">📅</span>
-                    <span class="btn-text">日视图</span>
+                    <span class="btn-icon icon">📅</span><span class="btn-text">日视图</span>
                 </button>
                 <button class="toolbar-btn" id="timeScaleWeek" title="按周显示">
-                    <span class="btn-icon icon">📆</span>
-                    <span class="btn-text">周视图</span>
+                    <span class="btn-icon icon">📆</span><span class="btn-text">周视图</span>
                 </button>
                 <button class="toolbar-btn" id="timeScaleMonth" title="按月显示">
-                    <span class="btn-icon icon">🗓️</span>
-                    <span class="btn-text">月视图</span>
+                    <span class="btn-icon icon">🗓️</span><span class="btn-text">月视图</span>
                 </button>
             </div>
             
             <!-- 设置按钮 -->
             <button class="toolbar-btn settings-trigger" id="settingsTrigger" title="设置">
-                <span class="btn-icon icon">⚙️</span>
-                <span class="btn-text">设置</span>
+                <span class="btn-icon icon">⚙️</span><span class="btn-text">设置</span>
             </button>
         </div>
         
@@ -166,38 +143,23 @@
             <div class="settings-body">
                 <div class="setting-item">
                     <span class="setting-text">拖拽移动任务</span>
-                    <label class="switch-label">
-                        <input type="checkbox" id="enableEdit" checked>
-                        <span class="switch-slider"></span>
-                    </label>
+                    <label class="switch-label"><input type="checkbox" id="enableEdit" checked><span class="switch-slider"></span></label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">拖拽调整时长</span>
-                    <label class="switch-label">
-                        <input type="checkbox" id="enableResize" checked>
-                        <span class="switch-slider"></span>
-                    </label>
+                    <label class="switch-label"><input type="checkbox" id="enableResize" checked><span class="switch-slider"></span></label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">显示周末</span>
-                    <label class="switch-label">
-                        <input type="checkbox" id="showWeekends" checked>
-                        <span class="switch-slider"></span>
-                    </label>
+                    <label class="switch-label"><input type="checkbox" id="showWeekends" checked><span class="switch-slider"></span></label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">显示依赖箭头</span>
-                    <label class="switch-label">
-                        <input type="checkbox" id="showDependencies" checked>
-                        <span class="switch-slider"></span>
-                    </label>
+                    <label class="switch-label"><input type="checkbox" id="showDependencies" checked><span class="switch-slider"></span></label>
                 </div>
                 <div class="setting-item">
                     <span class="setting-text">显示操作日志</span>
-                    <label class="switch-label">
-                        <input type="checkbox" id="showLogPanel">
-                        <span class="switch-slider"></span>
-                    </label>
+                    <label class="switch-label"><input type="checkbox" id="showLogPanel"><span class="switch-slider"></span></label>
                 </div>
                 <div class="setting-item slider-item">
                     <label for="cellWidth" class="setting-text">时间轴密度</label>
@@ -227,118 +189,82 @@
         <div id="pertContainer" style="display: none; height: 600px;" role="region" aria-label="PERT网络图"></div>
     </div>
     
-    <!-- JavaScript 模块化动态加载 -->
-    <script>
-        (function() {
-            'use strict';
-            
-            const timestamp = Date.now();
-            
-            const scripts = [
-                'js/utils/date-utils.js',
-                'js/utils/log-utils.js',
-                'js/utils/data-utils.js',
-                'js/utils/kv-storage.js', 
-                'js/utils/time-scale-utils.js',
-                'js/utils/common-utils.js',
-                
-                'js/gantt/gantt-core.js',
-                'js/gantt/gantt-render.js',
-                'js/gantt/gantt-dependencies.js',
-                'js/gantt/gantt-operations.js',
-                
-                'js/events/gantt-events-binding.js',
-                'js/events/gantt-events-drag.js',
-                'js/events/gantt-events-form.js',
-                'js/events/gantt-events-quickmenu.js',
-       
-                'js/pert-chart.js',
-                'js/pert-interactive.js',
-                
-                'js/app/app-init.js',
-                'js/app/app-controls.js',
-                'js/app/app-file-manager.js',
-                'js/app/app-view-switcher.js',
-                'js/app/app-settings.js'
-            ];
-            
-            let loadedCount = 0;
-            const totalScripts = scripts.length;
-            
-            function loadScript(index) {
-                if (index >= totalScripts) {
-                    onAllScriptsLoaded();
-                    return;
-                }
-                
-                const script = document.createElement('script');
-                script.src = scripts[index] + '?t=' + timestamp;
-                script.async = false;
-                
-                script.onload = function() {
-                    loadedCount++;
-                    const progress = Math.round((loadedCount / totalScripts) * 100);
-                    console.log(`✅ [${loadedCount}/${totalScripts}] ${scripts[index]} (${progress}%)`);
-                    loadScript(index + 1);
-                };
-                
-                script.onerror = function() {
-                    console.error(`❌ 加载失败: ${scripts[index]}`);
-                    alert(`模块加载失败：${scripts[index]}`);
-                    loadScript(index + 1);
-                };
-                
-                document.body.appendChild(script);
-            }
-            
-            function onAllScriptsLoaded() {
-                console.log('╔═══════════════════════════════════════════════════════════╗');
-                console.log('║  🎉 所有模块加载完成！                                    ║');
-                console.log('╠═══════════════════════════════════════════════════════════╣');
-                console.log(`  总计: ${loadedCount}/${totalScripts} 个模块`);
-                console.log('  版本: Epsilon17 - 拖拽调整宽度版');
-                console.log('╚═══════════════════════════════════════════════════════════╝');
-                
-                document.body.classList.add('loaded');
-                setTimeout(checkModulesLoaded, 500);
-            }
-            
-            function checkModulesLoaded() {
-                const checks = {
-                    '日期工具': typeof formatDate !== 'undefined',
-                    '日志工具': typeof addLog !== 'undefined',
-                    '数据工具': typeof generateId !== 'undefined',
-                    '时间刻度': typeof TimeScale !== 'undefined',
-                    'GanttChart': typeof GanttChart !== 'undefined',
-                    'gantt实例': typeof gantt !== 'undefined',
-                    '冲突检测': typeof detectAllConflicts !== 'undefined'
-                };
-                
-                const failed = Object.keys(checks).filter(key => !checks[key]);
-                
-                if (failed.length > 0) {
-                    console.error('❌ 模块验证失败:', failed.join(', '));
-                    alert('部分模块加载失败:\n' + failed.join('\n'));
-                } else {
-                    console.log('✅ 所有模块验证通过');
-                }
-            }
-            
-            loadScript(0);
-        })();
-    </script>
+    <!-- JS 模块并行加载 (defer 保证顺序) -->
+    <!-- 
+         优化说明：移除了原有的 loadScript 递归加载器，改用原生 defer。
+         这能让浏览器同时下载所有文件，但严格按照顺序执行，大幅缩短首屏时间。
+    -->
+    <script src="js/utils/date-utils.js?v=1.0" defer></script>
+    <script src="js/utils/log-utils.js?v=1.0" defer></script>
+    <script src="js/utils/data-utils.js?v=1.0" defer></script>
+    <script src="js/utils/kv-storage.js?v=1.0" defer></script>
+    <script src="js/utils/time-scale-utils.js?v=1.0" defer></script>
+    <script src="js/utils/common-utils.js?v=1.0" defer></script>
+    <script src="js/utils/data-loader.js?v=1.0" defer></script>
     
+    <script src="js/gantt/gantt-core.js?v=1.0" defer></script>
+    <script src="js/gantt/gantt-render.js?v=1.0" defer></script>
+    <script src="js/gantt/gantt-dependencies.js?v=1.0" defer></script>
+    <script src="js/gantt/gantt-operations.js?v=1.0" defer></script>
+    
+    <script src="js/events/gantt-events-binding.js?v=1.0" defer></script>
+    <script src="js/events/gantt-events-drag.js?v=1.0" defer></script>
+    <script src="js/events/gantt-events-form.js?v=1.0" defer></script>
+    <script src="js/events/gantt-events-quickmenu.js?v=1.0" defer></script>
+    
+    <script src="js/pert-chart.js?v=1.0" defer></script>
+    <script src="js/pert-interactive.js?v=1.0" defer></script>
+    
+    <script src="js/app/app-init.js?v=1.0" defer></script>
+    <script src="js/app/app-controls.js?v=1.0" defer></script>
+    <script src="js/app/app-file-manager.js?v=1.0" defer></script>
+    <script src="js/app/app-view-switcher.js?v=1.0" defer></script>
+    <script src="js/app/app-settings.js?v=1.0" defer></script>
+
     <!-- Bootstrap JS -->
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js" integrity="sha512-X/YkDZyjTf4wyc2Vy16YGCPHwAY8rZJY+POgokZjQB2mhIRFJCckEGc6YyX9eNsPfn0PzThEuNs+uaomE5CO6A==" crossorigin="anonymous"></script>
     
-    <!-- 全局错误处理 -->
-    <script>
+    <!-- 全局错误处理与加载完成检测 -->
+    <script defer>
         window.addEventListener('error', function(e) {
             console.error('⚠️ 全局错误:', e.message, e.filename, e.lineno);
         });
         
         window.addEventListener('unhandledrejection', function(e) {
             console.error('⚠️ 未处理的Promise拒绝:', e.reason);
+        });
+
+        // 模块加载自检逻辑 (复原)
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('✅ DOMContentLoaded - 模块下载完成');
+            
+            // 移除加载遮罩
+            const loader = document.getElementById('app-loader');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 500);
+            }
+            document.body.classList.add('loaded');
+
+            // 延时检查关键模块是否挂载到 global/window
+            setTimeout(() => {
+                const checks = {
+                    '日期工具': typeof formatDate !== 'undefined',
+                    '数据工具': typeof generateId !== 'undefined',
+                    'KV存储': typeof saveToKV !== 'undefined',
+                    'GanttChart': typeof GanttChart !== 'undefined',
+                    'gantt实例': typeof gantt !== 'undefined'
+                };
+                
+                const failed = Object.keys(checks).filter(key => !checks[key]);
+                
+                if (failed.length > 0) {
+                    console.error('❌ 模块验证失败:', failed.join(', '));
+                    alert('严重错误：部分核心模块加载失败，请刷新页面。\n' + failed.join('\n'));
+                } else {
+                    console.log('✅ 核心模块完整性验证通过');
+                }
+            }, 1000);
         });
     </script>
 </body>

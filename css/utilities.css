@@ -444,3 +444,23 @@
 .skip-link:focus {
     top: 0;
 }
+
+/* 骨架屏加载动画 */
+.skeleton {
+    background: #f0f0f0;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.skeleton-text { height: 1em; margin-bottom: 0.5em; }
+.skeleton-title { height: 1.2em; width: 60%; margin-bottom: 0.5em; }
+.skeleton-badge { height: 20px; width: 50px; border-radius: 10px; }
+.skeleton-btn { height: 28px; width: 60px; border-radius: 4px; }
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
