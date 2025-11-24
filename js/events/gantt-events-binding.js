@@ -1,44 +1,45 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-// ▓▓ 甘特图事件绑定模块                                              ▓▓
+// ▓▓ 甘特图事件绑定模块 (企业级完整版)                                  ▓▓
 // ▓▓ 路径: js/events/gantt-events-binding.js                        ▓▓
-// ▓▓ 版本: Epsilon4 - 支持里程碑/汇总任务/折叠按钮                  ▓▓
+// ▓▓ 版本: Epsilon32 - 补全 Touch 支持与右键处理                     ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
     'use strict';
 
-    /**
-     * 绑定所有事件
-     */
     GanttChart.prototype.attachEvents = function() {
-        // ==================== 左侧任务名称事件 ====================
+        if (!this.container) return;
+
+        // ==================== 1. 任务名称栏事件 ====================
         this.container.querySelectorAll('.gantt-task-name').forEach(el => {
-            // ⭐ 折叠按钮事件（优先处理，阻止冒泡）
+            const taskId = el.dataset.taskId;
+            const task = this.tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            // 折叠按钮
             const collapseBtn = el.querySelector('.task-collapse-btn');
             if (collapseBtn) {
                 collapseBtn.onclick = (e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    const taskId = collapseBtn.dataset.taskId;
+                    this.toggleTaskCollapse(taskId);
+                };
+                // 移动端触摸支持
+                collapseBtn.ontouchend = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
                     this.toggleTaskCollapse(taskId);
                 };
             }
 
-            // 单击：选中任务并打开编辑表单
+            // 单击选中
             el.onclick = (e) => {
-                // 如果点击的是折叠按钮，不触发选择
-                if (e.target.classList.contains('task-collapse-btn')) return;
-                
-                if (el.classList.contains('editing')) return;
-                const taskId = el.dataset.taskId;
-                const task = this.tasks.find(t => t.id === taskId);
-                if (!task) return;
-
+                if (el.classList.contains('editing') || e.target.classList.contains('task-collapse-btn')) return;
                 this.selectTask(taskId);
                 this.showInlineTaskForm(task);
             };
 
-            // 双击：编辑任务名称
+            // 双击编辑
             el.ondblclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -46,293 +47,163 @@
             };
         });
 
-        // ==================== 右侧任务名称标签事件 ====================
-        this.container.querySelectorAll('.gantt-bar-label-external').forEach(label => {
-            // ⭐ 折叠按钮事件
-            const collapseToggle = label.querySelector('.collapse-toggle');
-            if (collapseToggle) {
-                collapseToggle.onclick = (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    const taskId = collapseToggle.dataset.taskId;
-                    this.toggleTaskCollapse(taskId);
-                };
-            }
-
-            // 单击：选中任务并打开编辑表单
-            label.onclick = (e) => {
-                // 如果点击的是折叠按钮，不触发选择
-                if (e.target.classList.contains('collapse-toggle')) return;
-                
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const taskId = label.dataset.taskId;
-                const task = this.tasks.find(t => t.id === taskId);
-                if (!task) return;
-
-                this.selectTask(taskId);
-                this.showInlineTaskForm(task);
-            };
-
-            // 双击：编辑任务名称
-            label.ondblclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const taskId = label.dataset.taskId;
-                const taskNameEl = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
-                if (taskNameEl) this.editTaskName(taskNameEl);
-            };
-        });
-
-        // ==================== 左侧双层时间标签事件 ====================
-        this.container.querySelectorAll('.gantt-bar-label-start').forEach(label => {
-            // 单击：选中任务并打开编辑表单
-            label.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const taskId = label.dataset.taskId;
-                const task = this.tasks.find(t => t.id === taskId);
-                if (!task) return;
-
-                this.selectTask(taskId);
-                this.showInlineTaskForm(task);
-            };
-
-            // 双击：快速修改开始或结束日期
-            label.ondblclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const taskId = label.dataset.taskId;
-                const task = this.tasks.find(t => t.id === taskId);
-                if (!task) return;
-                
-                // ⭐ 汇总任务不允许手动修改时间
-                if (task.isSummary) {
-                    alert('汇总任务的时间由子任务自动计算，无法手动修改');
-                    return;
-                }
-                
-                // ⭐ 里程碑不允许修改结束日期
-                if (task.isMilestone) {
-                    alert('里程碑的工期为0，无法修改结束日期');
-                    return;
-                }
-                
-                const clickedElement = e.target;
-                const isStartTime = clickedElement.classList.contains('time-start');
-                
-                if (isStartTime) {
-                    // 修改开始日期
-                    const newDate = prompt('修改开始日期 (YYYY-MM-DD):', task.start);
-                    if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-                        const duration = task.duration || daysBetween(task.start, task.end);
-                        task.start = newDate;
-                        task.end = formatDate(addDays(new Date(newDate), duration));
-                        
-                        // ⭐ 更新父任务
-                        this.updateParentTasks(taskId);
-                        
-                        this.calculateDateRange();
-                        this.render();
-                        addLog(`✅ 已修改任务"${task.name}"的开始日期为 ${newDate}`);
-                    }
-                } else {
-                    // 修改结束日期
-                    const newDate = prompt('修改结束日期 (YYYY-MM-DD):', task.end);
-                    if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-                        const newEndDate = new Date(newDate);
-                        const startDate = new Date(task.start);
-                        if (newEndDate >= startDate) {
-                            task.end = newDate;
-                            task.duration = daysBetween(task.start, task.end) + 1;
-                            
-                            // ⭐ 更新父任务
-                            this.updateParentTasks(taskId);
-                            
-                            this.calculateDateRange();
-                            this.render();
-                            addLog(`✅ 已修改任务"${task.name}"的结束日期为 ${newDate}`);
-                        } else {
-                            alert('结束日期不能早于开始日期！');
-                        }
-                    }
-                }
-            };
-        });
-
-        // ==================== 甘特图任务条/里程碑事件 ====================
+        // ==================== 2. 任务条交互 (Mouse & Touch) ====================
         this.container.querySelectorAll('.gantt-bar, .gantt-milestone').forEach(bar => {
             const taskId = bar.dataset.taskId;
             const task = this.tasks.find(t => t.id === taskId);
+            if (!task) return;
 
-            // 单击：切换依赖（仅在表单打开时）
-            bar.onclick = (e) => {
+            // --- 通用点击处理 ---
+            const handleClick = (e) => {
                 if (e.target.classList.contains('gantt-bar-handle')) return;
-
-                const formOpen = !!this.container.querySelector('.inline-task-form');
-                if (formOpen) {
-                    const selectedTask = this.getSelectedTask();
-                    if (selectedTask && selectedTask.id !== taskId) {
-                        const depInput = document.getElementById(`dep_${taskId}`);
-                        if (depInput) {
-                            depInput.checked = !depInput.checked;
-                            addLog(`${depInput.checked ? '添加' : '移除'}依赖：${task.name}`);
-                        }
-                    }
-                    e.stopPropagation();
-                    return;
-                }
+                if (bar.classList.contains('dragging') || this.isDragging) return;
+                
+                e.stopPropagation();
+                this.selectTask(taskId);
+                this.showInlineTaskForm(task);
             };
+            
+            bar.onclick = handleClick;
 
-            // 鼠标按下：开始拖拽或调整大小
+            // --- 鼠标按下 (Desktop) ---
             bar.onmousedown = (e) => {
-                // ⭐ 里程碑和汇总任务不可拖拽
-                if (task && (task.isMilestone || task.isSummary)) {
-                    addLog(`⚠️ ${task.isMilestone ? '里程碑' : '汇总任务'}不可拖拽，时间${task.isSummary ? '由子任务自动计算' : '固定为0'}`);
-                    return;
-                }
-                
-                const target = e.target;
-                
-                // 如果点击的是调整手柄
-                if (target.classList.contains('gantt-bar-handle')) {
-                    if (!this.options.enableResize) return;
-                    const isRight = target.classList.contains('right');
-                    this.startResize(e, task, bar, isRight);
-                } else {
-                    // 点击任务条主体，开始拖拽
-                    if (!this.options.enableEdit) return;
-                    this.startDrag(e, task, bar);
-                }
-                e.preventDefault();
-                e.stopPropagation();
+                if (e.button !== 0) return; // 仅左键
+                this.handleInputStart(e, task, bar);
             };
 
-            // 双击：编辑任务名称
+            // --- 触摸开始 (Mobile) ---
+            bar.ontouchstart = (e) => {
+                if (e.touches.length > 1) return; // 忽略多指触控
+                const touch = e.touches[0];
+                // 模拟鼠标事件对象
+                const mockEvent = {
+                    target: e.target,
+                    clientX: touch.clientX,
+                    clientY: touch.clientY,
+                    preventDefault: () => e.preventDefault(),
+                    stopPropagation: () => e.stopPropagation(),
+                    type: 'touchstart'
+                };
+                this.handleInputStart(mockEvent, task, bar);
+            };
+
+            // 双击编辑
             bar.ondblclick = (e) => {
-                if (e.target.classList.contains('gantt-bar-handle')) return;
                 e.preventDefault();
                 e.stopPropagation();
-                const taskNameEl = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
-                if (taskNameEl) this.editTaskName(taskNameEl);
+                const nameEl = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
+                if (nameEl) this.editTaskName(nameEl);
+            };
+            
+            // 右键菜单阻止 (预留)
+            bar.oncontextmenu = (e) => {
+                e.preventDefault(); 
+                e.stopPropagation();
+                // 未来可在此处调用 showContextMenu(e, task);
             };
         });
 
-        // ==================== 点击时间轴空白处取消选择 ====================
+        // ==================== 3. 外部标签交互 ====================
+        this.container.querySelectorAll('.gantt-bar-label-external').forEach(label => {
+            const taskId = label.dataset.taskId;
+            const task = this.tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            const toggle = label.querySelector('.collapse-toggle');
+            if (toggle) {
+                toggle.onclick = (e) => { e.stopPropagation(); this.toggleTaskCollapse(taskId); };
+            }
+
+            label.onclick = (e) => {
+                if (e.target.classList.contains('collapse-toggle')) return;
+                e.stopPropagation();
+                this.selectTask(taskId);
+                this.showInlineTaskForm(task);
+            };
+            
+            label.ondblclick = (e) => {
+                e.stopPropagation();
+                const nameEl = this.container.querySelector(`.gantt-task-name[data-task-id="${taskId}"]`);
+                if (nameEl) this.editTaskName(nameEl);
+            };
+        });
+
+        // ==================== 4. 全局点击 (取消选择) ====================
         const timelineWrapper = this.container.querySelector('.gantt-timeline-wrapper');
         if (timelineWrapper) {
-            timelineWrapper.addEventListener('click', (e) => {
-                // 如果点击的不是任务条、手柄、表单或标签，则取消选择
-                if (!e.target.closest('.gantt-bar, .gantt-milestone, .gantt-bar-handle, .inline-task-form, .gantt-bar-label-external, .gantt-bar-label-start')) {
+            const handleBackgroundClick = (e) => {
+                const isInteractive = e.target.closest('.gantt-bar') || 
+                                      e.target.closest('.gantt-milestone') ||
+                                      e.target.closest('.gantt-bar-label-external') || 
+                                      e.target.closest('.gantt-bar-label-start') ||
+                                      e.target.closest('.inline-task-form') ||
+                                      e.target.closest('.dependency-selector-modal');
+
+                if (!isInteractive && !this.isDragging) {
                     this.deselect();
                 }
-            });
+            };
+            
+            timelineWrapper.onclick = handleBackgroundClick;
         }
 
-        // ==================== 全局鼠标事件（拖拽和调整大小）====================
-        if (!this._mouseMoveHandler) {
-            this._mouseMoveHandler = (e) => this.onMouseMove(e);
+        // ==================== 5. 全局事件监听 (Move / Up) ====================
+        if (!this._globalEventsBound) {
+            // Mouse Events
+            document.addEventListener('mousemove', (e) => this.onMouseMove(e));
+            document.addEventListener('mouseup', (e) => this.onMouseUp(e));
+            
+            // Touch Events (Mapped to Mouse Handlers)
+            document.addEventListener('touchmove', (e) => {
+                if (!this.dragState) return;
+                const touch = e.touches[0];
+                const mockEvent = {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY,
+                    preventDefault: () => { if(e.cancelable) e.preventDefault(); }
+                };
+                this.onMouseMove(mockEvent);
+            }, { passive: false });
+
+            document.addEventListener('touchend', (e) => {
+                if (!this.dragState) return;
+                this.onMouseUp(e);
+            }, { passive: false });
+
+            this._globalEventsBound = true;
         }
-        if (!this._mouseUpHandler) {
-            this._mouseUpHandler = (e) => {
-                if (this.dragState) this.onMouseUp(e);
-            };
-        }
-        
-        document.addEventListener('mousemove', this._mouseMoveHandler);
-        document.addEventListener('mouseup', this._mouseUpHandler);
     };
 
     /**
-     * 编辑任务名称（内联编辑）
-     * @param {HTMLElement} element - 任务名称元素
+     * 统一输入处理入口 (Mouse & Touch)
      */
-    GanttChart.prototype.editTaskName = function(element) {
-        if (element.classList.contains('editing')) return;
-        
-        const taskId = element.dataset.taskId;
-        const task = this.tasks.find(t => t.id === taskId);
-        if (!task) return;
-        
-        const originalName = task.name;
+    GanttChart.prototype.handleInputStart = function(e, task, bar) {
+        // 忽略里程碑和汇总任务的拖拽
+        if (task.isMilestone || task.isSummary) return;
 
-        // 创建输入框
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = originalName;
-        input.style.cssText = 'border:1px solid #007bff;border-radius:4px;padding:4px 8px;font-size:0.9rem;width:100%;outline:none;';
+        // 1. 调整大小
+        if (e.target.classList.contains('gantt-bar-handle')) {
+            if (this.options.enableResize) {
+                this.startResize(e, task, bar, e.target.classList.contains('right'));
+                e.stopPropagation();
+                if(e.type !== 'touchstart') e.preventDefault();
+            }
+            return;
+        }
 
-        // 替换元素内容
-        element.innerHTML = '';
-        element.appendChild(input);
-        element.classList.add('editing');
-        
-        // 聚焦并选中文本
-        setTimeout(() => { 
-            input.focus(); 
-            input.select(); 
-        }, 10);
-
-        // 保存编辑
-        const saveEdit = () => {
-            const newName = input.value.trim();
-            if (newName && newName !== originalName) {
-                task.name = newName;
-                addLog(`✏️ 任务名称从 "${originalName}" 改为 "${newName}"`);
-            }
-            
-            // 恢复显示
-            const indent = '　'.repeat((task.outlineLevel || 1) - 1);
-            const icon = task.isMilestone ? '🎯' : task.isSummary ? '📁' : '📋';
-            const wbsPrefix = task.wbs ? `<span class="wbs-badge">[${task.wbs}]</span> ` : '';
-            
-            // ⭐ 重新生成折叠按钮
-            const collapseBtn = task.isSummary && task.children && task.children.length > 0 ? 
-                `<span class="task-collapse-btn" data-task-id="${task.id}">${task.isCollapsed ? '▶' : '▼'}</span>` : '';
-            
-            element.innerHTML = `${collapseBtn}<span class="task-name-content">${indent}${icon} ${wbsPrefix}${task.name}</span>`;
-            element.classList.remove('editing');
-            
-            // ⭐ 重新绑定折叠按钮事件
-            const newCollapseBtn = element.querySelector('.task-collapse-btn');
-            if (newCollapseBtn) {
-                newCollapseBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    this.toggleTaskCollapse(task.id);
-                };
-            }
-            
-            // 更新外部标签
-            const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${taskId}"]`);
-            if (externalLabel) {
-                const displayName = `${indent}${icon} ${task.wbs ? '[' + task.wbs + '] ' : ''}${task.name}`;
-                const progressBadge = !task.isMilestone ? `<span class="task-progress-badge">${task.progress || 0}%</span>` : '';
-                externalLabel.innerHTML = `${displayName} ${progressBadge}`;
-            }
-        };
-
-        // 失焦时保存
-        input.onblur = () => setTimeout(saveEdit, 100);
-        
-        // 键盘事件
-        input.onkeydown = (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                saveEdit();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                element.textContent = originalName;
-                element.classList.remove('editing');
-            }
-        };
-        
-        // 阻止点击冒泡
-        input.onclick = (e) => e.stopPropagation();
+        // 2. 移动任务
+        if (this.options.enableEdit) {
+            // 初始化状态，等待阈值 (3px)
+            this.dragState = { 
+                type: 'awaiting_threshold',
+                task, bar, 
+                startX: e.clientX, 
+                originalStart: task.start, 
+                originalEnd: task.end 
+            };
+            e.stopPropagation();
+        }
     };
 
-    console.log('✅ gantt-events-binding.js loaded successfully (Epsilon4 - 层级任务支持)');
-
+    console.log('✅ gantt-events-binding.js loaded (Epsilon32 - Touch Enabled)');
 })();
