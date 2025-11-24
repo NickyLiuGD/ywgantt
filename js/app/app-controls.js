@@ -310,7 +310,81 @@
         clearHighlightsBtn.onclick = () => gantt.clearConflictHighlights();
     }
 
-// 在 app-controls.js 中添加以下逻辑
+    // ==================== ⭐ 新增：上传本地文件到云端 ====================
+    const uploadToCloudBtn = document.getElementById('uploadToCloud');
+    if (uploadToCloudBtn) {
+        uploadToCloudBtn.onclick = () => {
+            // 创建隐藏的文件输入框
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                // UILoading 状态
+                const originalHtml = uploadToCloudBtn.innerHTML;
+                uploadToCloudBtn.innerHTML = '<span class="btn-icon icon">⏳</span><span class="btn-text">上传中...</span>';
+                uploadToCloudBtn.disabled = true;
+
+                try {
+                    // 1. 读取本地文件
+                    const text = await file.text();
+                    let jsonData;
+                    try {
+                        jsonData = JSON.parse(text);
+                    } catch (err) {
+                        throw new Error('文件格式错误，必须是有效的 JSON 文件');
+                    }
+
+                    // 简单验证数据结构
+                    if (!jsonData.tasks && !Array.isArray(jsonData)) {
+                        throw new Error('无效的甘特图数据结构');
+                    }
+
+                    // 2. 上传到 KV (使用文件名作为 Key)
+                    // 注意：如果文件名包含特殊字符，saveToKV 需要处理或后端处理，这里假设文件名合法
+                    await saveToKV(file.name, jsonData);
+                    addLog(`☁️ 文件已上传至云端: ${file.name}`);
+
+                    // 3. 直接加载数据到当前视图
+                    const tasksRaw = Array.isArray(jsonData) ? jsonData : jsonData.tasks;
+                    
+                    // 数据标准化（补全ID等）
+                    const tasks = tasksRaw.map(t => ({
+                        ...t,
+                        id: t.id || generateId(),
+                        dependencies: t.dependencies || []
+                    }));
+
+                    // 更新甘特图
+                    gantt.tasks = tasks;
+                    gantt.calculateDateRange();
+                    gantt.render();
+
+                    // 如果在 PERT 视图，刷新 PERT
+                    if (typeof refreshPertViewIfActive === 'function') {
+                        refreshPertViewIfActive();
+                    }
+
+                    addLog(`✅ 已加载上传的文件: ${file.name} (${tasks.length} 个任务)`);
+                    alert(`✅ 上传并加载成功！\n文件名: ${file.name}`);
+
+                } catch (error) {
+                    console.error('上传失败:', error);
+                    addLog(`❌ 上传失败: ${error.message}`);
+                    alert(`上传失败: ${error.message}`);
+                } finally {
+                    // 恢复按钮状态
+                    uploadToCloudBtn.innerHTML = originalHtml;
+                    uploadToCloudBtn.disabled = false;
+                }
+            };
+
+            input.click(); // 触发文件选择
+        };
+    }
 
     // ==================== ⭐ 新增：一键云保存 (快捷保存) ====================
     const quickSaveBtn = document.getElementById('quickCloudSave');
@@ -362,7 +436,7 @@
             }
         };
     }
-    
+
     // 工具栏悬停展开
     const toolbarCollapsed = document.getElementById('toolbarCollapsed');
     const toolbarExpanded = document.getElementById('floatingToolbarExpanded');
