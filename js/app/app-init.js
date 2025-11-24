@@ -10,19 +10,68 @@
     /**
      * 从JSON文件加载初始任务
      */
+// 替换原有的 loadInitialTasks 函数
+
+    /**
+     * 加载初始任务 (优先从 KV 获取最新，失败则降级到本地)
+     */
     async function loadInitialTasks() {
+        let loadedFromCloud = false;
+
         try {
-            const response = await fetch('data/initial-tasks.json?t=' + Date.now());
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const data = await response.json();
-            const tasks = parseJSONTasks(data);
-            
-            initializeGantt(tasks, data.project);
-            
+            // 1. 尝试获取云端文件列表
+            console.log('☁️ 正在检查云端存档...');
+            const files = await listKVFiles();
+
+            if (files && files.length > 0) {
+                // list.ts 已经按时间戳倒序排列，files[0] 即为最新
+                const latestFile = files[0];
+                console.log(`📥 发现最新存档: ${latestFile.name} (${new Date(latestFile.timestamp).toLocaleString()})`);
+                addLog(`☁️ 正在加载云端最新存档: ${latestFile.name}`);
+
+                // 2. 加载文件内容
+                const cloudData = await loadFromKV(latestFile.name);
+                
+                // 3. 解析数据 (兼容纯数组和对象结构)
+                const tasksRaw = Array.isArray(cloudData) ? cloudData : (cloudData.tasks || []);
+                const projectInfo = cloudData.project || { name: '云端项目' };
+
+                // 4. 标准化任务数据 (复用 parseJSONTasks 或手动处理)
+                // 注意：这里需要确保 parseJSONTasks 能处理 raw tasks，
+                // 或者我们这里手动补全 ID 和 默认值
+                const tasks = tasksRaw.map(t => ({
+                    ...t,
+                    id: t.id || generateId(), // 确保有 ID
+                    dependencies: t.dependencies || []
+                }));
+
+                initializeGantt(tasks, projectInfo);
+                loadedFromCloud = true;
+                addLog(`✅ 成功加载云端存档: ${latestFile.name}`);
+            } else {
+                console.log('☁️ 云端无存档，使用本地默认数据');
+            }
+
         } catch (error) {
-            console.warn('⚠️ 加载失败，使用最小数据集:', error.message);
-            initializeGantt(getMinimalTasks(), { name: '默认项目' });
+            console.warn('⚠️ 云端加载失败 (可能是离线或未配置 KV):', error);
+            addLog('⚠️ 无法连接云端，切换至本地模式');
+        }
+
+        // 5. 如果云端加载失败或无数据，加载本地默认数据 (降级方案)
+        if (!loadedFromCloud) {
+            try {
+                const response = await fetch('data/initial-tasks.json?t=' + Date.now());
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                const tasks = parseJSONTasks(data); // 使用原有的解析函数
+                
+                initializeGantt(tasks, data.project);
+                addLog('📂 已加载本地默认演示数据');
+            } catch (error) {
+                console.warn('⚠️ 本地数据加载失败，使用最小数据集');
+                initializeGantt(getMinimalTasks(), { name: '新项目' });
+            }
         }
     }
 

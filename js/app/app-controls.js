@@ -310,6 +310,59 @@
         clearHighlightsBtn.onclick = () => gantt.clearConflictHighlights();
     }
 
+// 在 app-controls.js 中添加以下逻辑
+
+    // ==================== ⭐ 新增：一键云保存 (快捷保存) ====================
+    const quickSaveBtn = document.getElementById('quickCloudSave');
+    if (quickSaveBtn) {
+        quickSaveBtn.onclick = async () => {
+            const now = new Date();
+            // 生成时间戳文件名: Project_2025-11-24_14-30-05.json
+            const dateStr = formatDate(now);
+            const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
+            const filename = `Project_${dateStr}_${timeStr}.json`;
+
+            // 准备数据 (使用模板格式以包含项目信息)
+            const jsonData = {
+                project: {
+                    name: "项目快照",
+                    version: "1.0",
+                    description: `自动保存于 ${dateStr} ${now.toLocaleTimeString()}`,
+                    updated: now.getTime()
+                },
+                tasks: gantt.tasks
+            };
+
+            try {
+                // UI 状态反馈
+                quickSaveBtn.disabled = true;
+                const btnIcon = quickSaveBtn.querySelector('.btn-icon');
+                const originalIcon = btnIcon.textContent;
+                btnIcon.textContent = '⏳';
+
+                // 调用 KV 存储接口
+                await saveToKV(filename, jsonData);
+
+                addLog(`✅ 云端保存成功：${filename}`);
+                
+                // 短暂的成功提示
+                btnIcon.textContent = '✅';
+                setTimeout(() => {
+                    btnIcon.textContent = originalIcon;
+                    quickSaveBtn.disabled = false;
+                }, 1500);
+
+            } catch (error) {
+                console.error('云保存失败:', error);
+                addLog(`❌ 云保存失败：${error.message}`);
+                alert(`保存失败: ${error.message}`);
+                
+                quickSaveBtn.disabled = false;
+                quickSaveBtn.querySelector('.btn-icon').textContent = '☁️';
+            }
+        };
+    }
+    
     // 工具栏悬停展开
     const toolbarCollapsed = document.getElementById('toolbarCollapsed');
     const toolbarExpanded = document.getElementById('floatingToolbarExpanded');
