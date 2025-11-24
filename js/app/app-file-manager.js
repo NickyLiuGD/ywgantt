@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-// ▓▓ 云端文件管理模块 (完整独立版)                                    ▓▓
+// ▓▓ 云端文件管理模块                                                ▓▓
 // ▓▓ 路径: js/app/app-file-manager.js                                ▓▓
-// ▓▓ 版本: Epsilon25                                                ▓▓
+// ▓▓ 版本: Epsilon26 - 加载/上传后自动全貌                          ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -14,12 +14,9 @@
     const manageFilesBtn = document.getElementById('manageFiles');
     if (!manageFilesBtn) return;
 
-    // 打开文件管理器
     manageFilesBtn.onclick = () => {
         const modal = createModalShell();
         const now = Date.now();
-        
-        // 使用缓存优化体验
         if (_fileListCache && (now - _lastFetchTime < CACHE_DURATION)) {
             renderFileList(modal, _fileListCache);
         } else {
@@ -39,16 +36,12 @@
         }
     }
 
-    /**
-     * 创建模态框外壳 (纯图标 + 图案关闭)
-     */
     function createModalShell() {
         const oldModal = document.querySelector('.dependency-selector-modal');
         if (oldModal) oldModal.remove();
 
         const modal = document.createElement('div');
         modal.className = 'dependency-selector-modal';
-        
         modal.innerHTML = `
             <div class="dependency-selector-overlay"></div>
             <div class="dependency-selector-content" style="width: 650px; max-height: 80vh;">
@@ -69,25 +62,20 @@
                 </div>
             </div>
         `;
-        
         document.body.appendChild(modal);
         bindBaseEvents(modal);
         requestAnimationFrame(() => modal.classList.add('show'));
         return modal;
     }
 
-    /**
-     * 核心：独立上传逻辑
-     */
     function handleFileUpload(modal) {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json';
-        
         input.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
+            
             const uploadBtn = modal.querySelector('#modalUploadBtn');
             if(uploadBtn) { uploadBtn.innerHTML = '⏳'; uploadBtn.disabled = true; }
 
@@ -96,24 +84,22 @@
                 let jsonData;
                 try { jsonData = JSON.parse(text); } catch(err) { throw new Error('无效的 JSON 文件'); }
 
-                // 保存到 KV
                 await saveToKV(file.name, jsonData);
                 addLog(`☁️ 文件已上传: ${file.name}`);
 
-                // 渲染数据
                 const tasksRaw = Array.isArray(jsonData) ? jsonData : (jsonData.tasks || []);
                 const tasks = tasksRaw.map(t => ({...t, id: t.id||generateId(), dependencies: t.dependencies||[]}));
                 
-                gantt.tasks = tasks; gantt.calculateDateRange(); gantt.render();
+                gantt.tasks = tasks;
+                
+                // ⭐ 上传成功后自动切换全貌
+                gantt.switchToOverviewMode();
+                
                 if(typeof refreshPertViewIfActive === 'function') refreshPertViewIfActive();
 
-                // 刷新并关闭
                 _fileListCache = null;
-                const closeBtn = modal.querySelector('#closeFileManager');
-                if(closeBtn) closeBtn.click();
-                
+                modal.querySelector('#closeFileManager').click();
                 setTimeout(() => alert(`✅ 上传并加载成功: ${file.name}`), 300);
-
             } catch (error) {
                 alert(`上传失败: ${error.message}`);
             } finally {
@@ -125,8 +111,6 @@
 
     function renderSkeleton(modal) {
         const body = modal.querySelector('#fileManagerBody');
-        const badge = modal.querySelector('#fileCountBadge');
-        if (badge) badge.textContent = '...';
         body.innerHTML = `<div class="list-group list-group-flush">${
             `<div class="list-group-item px-3 py-3" style="background:white;border-bottom:1px solid #eee;">
                 <div class="d-flex justify-content-between align-items-center">
@@ -183,7 +167,6 @@
             btn.style.transform = 'rotate(360deg)'; setTimeout(() => btn.style.transform = 'none', 500);
             _fileListCache = null; renderSkeleton(modal); fetchAndRender(modal);
         };
-        // ⭐ 绑定独立上传
         modal.querySelector('#modalUploadBtn').onclick = () => handleFileUpload(modal);
     }
 
@@ -196,9 +179,13 @@
                 try {
                     btn.disabled = true; btn.innerHTML = '⏳';
                     const data = await loadFromKV(filename);
-                    const tasksRaw = Array.isArray(data) ? data : (data.tasks || []);
-                    const tasks = tasksRaw.map(t => ({...t, id: t.id||generateId(), dependencies: t.dependencies||[]}));
-                    gantt.tasks = tasks; gantt.calculateDateRange(); gantt.render();
+                    const tasks = (Array.isArray(data) ? data : data.tasks || []).map(t => ({...t, id: t.id||generateId(), dependencies: t.dependencies||[]}));
+                    
+                    gantt.tasks = tasks;
+                    
+                    // ⭐ 加载成功后自动切换全貌
+                    gantt.switchToOverviewMode();
+                    
                     if(typeof refreshPertViewIfActive === 'function') refreshPertViewIfActive();
                     addLog(`✅ 加载成功：${filename}`); closeModal();
                 } catch(e) { alert(e.message); btn.disabled=false; btn.innerHTML='📂 加载'; }
@@ -217,5 +204,5 @@
         });
     }
 
-    console.log('✅ app-file-manager.js loaded (Epsilon25)');
+    console.log('✅ app-file-manager.js loaded (Epsilon26)');
 })();

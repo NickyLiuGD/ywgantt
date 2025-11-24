@@ -103,13 +103,22 @@
         if (!global.gantt) return;
 
         global.gantt.tasks = tasks;
-        global.gantt.calculateDateRange();
-        global.gantt.render();
-        global.gantt.updateHeight(); // 再次调整高度以适应内容
+
+        // 如果有任务，直接计算全貌参数并渲染
+        if (tasks.length > 0) {
+            // switchToOverviewMode 内部会包含 calculateDateRange 和 render
+            global.gantt.switchToOverviewMode();
+            console.log('🔭 已自动切换至全貌视图');
+        } else {
+            // 无任务时的降级处理
+            global.gantt.calculateDateRange();
+            global.gantt.render();
+        }
+        
+        global.gantt.updateHeight();
 
         if (projectInfo && projectInfo.name) {
-            // 可以选择更新页面标题等
-            console.log(`项目名称: ${projectInfo.name}`);
+            document.title = `${projectInfo.name} - 云端甘特图`;
         }
     }
 
