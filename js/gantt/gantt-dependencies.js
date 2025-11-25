@@ -437,23 +437,23 @@
     // ==================== 第七部分：⭐ 可见任务处理 ====================
 
     /**
-     * ⭐ 获取可见任务列表（排除折叠的子任务）
+     * ⭐ 获取可见任务列表（排除被折叠的子任务/孙辈任务）
      */
     function getVisibleTasks(allTasks) {
         return allTasks.filter(task => {
             if (!task.parentId) return true;
             
-            // 检查所有祖先是否有折叠的
+            // 递归检查所有祖先是否折叠
             let current = task;
             while (current.parentId) {
                 const parent = allTasks.find(t => t.id === current.parentId);
                 if (!parent) break;
                 
                 if (parent.isCollapsed) {
-                    return false;
+                    return false; // 祖先被折叠，当前任务隐藏
                 }
                 
-                current = parent;
+                current = parent; // 继续向上检查
             }
             
             return true;

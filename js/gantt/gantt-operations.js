@@ -548,21 +548,40 @@
     // ==================== ⭐ 折叠/展开（修复版） ====================
 
     /**
-     * ⭐ 切换任务折叠状态（修复版 - 正确重渲染依赖箭头）
+     * 切换任务折叠状态
      */
     GanttChart.prototype.toggleTaskCollapse = function(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task || !task.isSummary) return;
-
         task.isCollapsed = !task.isCollapsed;
-        
-        const childrenCount = task.children ? task.children.length : 0;
-        addLog(`${task.isCollapsed ? '📂' : '📁'} 任务 "${task.name}" 已${task.isCollapsed ? '折叠' : '展开'}（${childrenCount}个子任务）`);
-        
-        // ⭐ 完整重新渲染（包括依赖箭头）
         this.render();
     };
 
+    /**
+     * ⭐ 新增：全部展开
+     */
+    GanttChart.prototype.expandAllTasks = function() {
+        this.tasks.forEach(task => {
+            if (task.isSummary) {
+                task.isCollapsed = false;
+            }
+        });
+        addLog('📂 已全部展开任务');
+        this.render();
+    };
+
+    /**
+     * ⭐ 新增：全部折叠
+     */
+    GanttChart.prototype.collapseAllTasks = function() {
+        this.tasks.forEach(task => {
+            if (task.isSummary) {
+                task.isCollapsed = true;
+            }
+        });
+        addLog('📁 已全部折叠任务');
+        this.render();
+    };
     // ==================== 工具函数 ====================
 
     /**
