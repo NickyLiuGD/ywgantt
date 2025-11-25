@@ -1,14 +1,14 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图编辑表单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-form.js                           ▓▓
-// ▓▓ 版本: Epsilon18-Robust - 强力修复工期显示问题                    ▓▓
+// ▓▓ 版本: Epsilon23 - 终极完整版 (工期修复 + 完工验证 + 全功能)      ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
     'use strict';
 
     /**
-     * 显示任务编辑表单（完整版）
+     * 显示任务编辑表单
      */
     GanttChart.prototype.showInlineTaskForm = function(task) {
         // 移除旧表单
@@ -33,9 +33,8 @@
             !t.isMilestone
         );
         
-        // ⭐ 修复1：健壮的数据处理，防止 undefined 或 string 导致的问题
+        // ⭐ 修复数据类型问题：强制转换为整数
         const rawDuration = parseInt(task.duration);
-        // 如果解析失败(NaN)或小于0，默认为1；如果是里程碑则为0
         const currentDuration = task.isMilestone ? 0 : (isNaN(rawDuration) || rawDuration < 0 ? 1 : rawDuration);
         const currentDurationType = task.durationType || 'days';
         const hasChildren = task.children && task.children.length > 0;
@@ -50,7 +49,6 @@
             }).filter(t => t) : [];
 
         // 生成 1-30 天的基础选项
-        // 注意：这里不再依赖 HTML 字符串的 selected 属性，而是由后面的 JS 统一赋值
         const durationOptions = Array.from({length: 30}, (_, i) => i + 1)
             .map(d => `<option value="${d}">${d}</option>`)
             .join('');
@@ -141,7 +139,6 @@
                             ${task.isMilestone || hasChildren ? 'disabled' : ''}>
                         <option value="0">0</option>
                         ${durationOptions}
-                        <!-- 大于30的选项将通过JS动态添加 -->
                     </select>
                 </div>
                 <div style="width: 110px; padding-left: 8px;">
@@ -237,8 +234,7 @@
         rowsContainer.appendChild(form);
         this.updateFormPosition(form, bar, rowsContainer);
         
-        // ⭐ 修复2：在元素插入DOM后，显式设置下拉菜单的值
-        // 这样可以避免因HTML字符串解析导致的选中失败，并处理动态选项
+        // ⭐ 关键：在元素插入DOM后，显式设置下拉菜单的值
         this.setFormValues(form, task, currentDuration);
         
         this.bindFormEvents(form, task, bar, rowsContainer);
@@ -247,7 +243,7 @@
     };
 
     /**
-     * ⭐ 新增：显式设置表单值的辅助函数
+     * 显式设置表单值的辅助函数 (解决工期显示问题)
      */
     GanttChart.prototype.setFormValues = function(form, task, currentDuration) {
         const durationSelect = form.querySelector('#editDuration');
@@ -289,8 +285,6 @@
      * 绑定表单事件
      */
     GanttChart.prototype.bindFormEvents = function(form, task, bar, rowsContainer) {
-        console.log('🔧 开始绑定表单事件...');
-        
         // ==================== 滚动监听 ====================
         let rafId = null;
         const updatePosition = () => {
@@ -355,9 +349,7 @@
                     updateEndDate();
                 } else {
                     if (durationSelect) {
-                        // 恢复为1或之前的非零值
                         durationSelect.disabled = false;
-                        // 尝试恢复原来的工期，如果原来是0则设为1
                         let restoreVal = parseInt(task.duration) || 1;
                         if (restoreVal === 0) restoreVal = 1;
                         durationSelect.value = restoreVal;
@@ -385,9 +377,8 @@
                 if (newParentId) {
                     const newParent = this.tasks.find(t => t.id === newParentId);
                     if (newParent) {
-                        const newLevel = (newParent.outlineLevel || 1) + 1;
                         if (autoLevelDisplay) {
-                            autoLevelDisplay.textContent = `${newLevel}级`;
+                            autoLevelDisplay.textContent = `${(newParent.outlineLevel || 1) + 1}级`;
                             autoLevelDisplay.style.color = '#10b981';
                         }
                         
@@ -452,7 +443,7 @@
         if (durationSelect) durationSelect.addEventListener('change', updateEndDate);
         if (durationTypeSelect) durationTypeSelect.addEventListener('change', updateEndDate);
 
-        // 编辑依赖按钮事件绑定
+        // ==================== 依赖编辑按钮 ====================
         const editDepsBtn = form.querySelector('#editDepsBtn');
         
         if (editDepsBtn) {
@@ -463,7 +454,7 @@
             };
         }
 
-        // 依赖标签删除按钮
+        // ==================== 依赖标签移除按钮 ====================
         form.querySelectorAll('.dep-tag-remove').forEach(btn => {
             btn.onclick = (e) => {
                 e.stopPropagation();
@@ -506,7 +497,6 @@
             deleteTaskBtn.onclick = () => {
                 if (task.children && task.children.length > 0) {
                     alert(`❌ 无法删除任务 "${task.name}"\n\n此任务包含 ${task.children.length} 个子任务，请先删除子任务。`);
-                    addLog(`❌ 无法删除 "${task.name}"：包含 ${task.children.length} 个子任务`);
                     return;
                 }
                 
@@ -548,9 +538,6 @@
      * 显示依赖任务选择器（修复版 - 保留原有依赖）
      */
     GanttChart.prototype.showDependencySelector = function(task, parentForm) {
-        // ... (此处保持不变，已省略以节省空间，请保留原有 showDependencySelector 代码) ...
-        // 如果您没有修改这部分，可以复制上一个版本的内容，或者如果需要我提供完整代码请告知
-        // 为了确保文件完整，以下是 showDependencySelector 的完整代码
         console.log('🔧 显示依赖任务选择器...');
         
         const oldSelector = document.querySelector('.dependency-selector-modal');
@@ -592,6 +579,7 @@
                             const indent = '　'.repeat((t.outlineLevel || 1) - 1);
                             const icon = t.isMilestone ? '🎯' : (t.children?.length > 0 ? '📁' : '📋');
                             
+                            // 已选依赖不验证（允许保留），其他进行验证
                             const validation = isChecked ? 
                                 { canAdd: true, reason: '' } : 
                                 this.canAddDependency(t.id, task.id);
@@ -629,18 +617,28 @@
         `;
 
         document.body.appendChild(modal);
+        
         this.bindDependencySelectorEvents(modal, task, parentForm);
-        requestAnimationFrame(() => modal.classList.add('show'));
+
+        requestAnimationFrame(() => {
+            modal.classList.add('show');
+        });
+        
+        addLog(`📝 打开依赖任务选择器（当前已选 ${currentDeps.length} 个）`);
     };
 
     /**
      * 绑定依赖选择器事件
      */
     GanttChart.prototype.bindDependencySelectorEvents = function(modal, task, parentForm) {
+        console.log('🔧 开始绑定依赖选择器事件...');
+        
         const closeDepsSelector = () => {
             modal.classList.remove('show');
             setTimeout(() => {
-                if (modal.parentElement) modal.parentElement.removeChild(modal);
+                if (modal.parentElement) {
+                    modal.parentElement.removeChild(modal);
+                }
             }, 200);
         };
 
@@ -659,7 +657,11 @@
                 depsItems.forEach(item => {
                     const name = item.dataset.taskName;
                     const wbs = item.dataset.taskWbs;
-                    item.style.display = (name.includes(keyword) || wbs.includes(keyword)) ? 'block' : 'none';
+                    if (name.includes(keyword) || wbs.includes(keyword)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
                 });
             };
         }
@@ -687,6 +689,8 @@
         const confirmBtn = modal.querySelector('#confirmDeps');
         if (confirmBtn) {
             confirmBtn.onclick = () => {
+                console.log('🖱️ 保存依赖关系...');
+                
                 const selectedIds = Array.from(checkboxes)
                     .filter(cb => cb.checked && !cb.disabled)
                     .map(cb => cb.value);
@@ -707,6 +711,8 @@
                 closeDepsSelector();
             };
         }
+        
+        console.log('✅ 依赖选择器所有事件绑定完成');
     };
 
     /**
@@ -794,7 +800,7 @@
     };
 
     /**
-     * 保存任务表单
+     * ⭐ 核心修改：保存任务表单（包含完工验证）
      */
     GanttChart.prototype.saveTaskForm = function(form, task) {
         const newName = form.querySelector('#editName').value.trim();
@@ -803,26 +809,56 @@
             return; 
         }
 
-        const isMilestone = form.querySelector('#editMilestone').checked;
-        const newParentId = form.querySelector('#editParent').value || null;
-        const start = form.querySelector('#editStart').value;
+        const progress = parseInt(form.querySelector('#editProgress')?.value) || 0;
+        const startStr = form.querySelector('#editStart').value;
         const duration = parseInt(form.querySelector('#editDuration').value) || 0;
         const durationType = form.querySelector('#editDurationType')?.value || 'days';
-        const progress = parseInt(form.querySelector('#editProgress')?.value) || 0;
+        const isMilestone = form.querySelector('#editMilestone').checked;
+        const hasChildren = task.children && task.children.length > 0;
+
+        // ⭐⭐⭐ 完工验证逻辑 ⭐⭐⭐
+        if (progress >= 100) {
+            // 1. 检查依赖任务是否已完成
+            if (task.dependencies && task.dependencies.length > 0) {
+                const incompleteDeps = [];
+                task.dependencies.forEach(dep => {
+                    const depId = typeof dep === 'string' ? dep : dep.taskId;
+                    const depTask = this.tasks.find(t => t.id === depId);
+                    if (depTask && depTask.progress < 100) {
+                        incompleteDeps.push(depTask.name);
+                    }
+                });
+
+                if (incompleteDeps.length > 0) {
+                    alert(`❌ 无法完成任务 "${task.name}"\n\n以下前置依赖尚未完成：\n• ${incompleteDeps.join('\n• ')}\n\n请先完成所有前置任务。`);
+                    if (typeof addLog === 'function') addLog(`❌ 拒绝完成 "${task.name}"：依赖未完成`);
+                    return; // ⛔ 阻止保存
+                }
+            }
+
+            // 2. 检查任务是否在未来（仅对非里程碑有效）
+            if (!isMilestone && !hasChildren && startStr) {
+                const startDate = new Date(startStr);
+                const endDate = calculateEndDate(startDate, duration, durationType);
+                
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const endCheck = new Date(endDate);
+                endCheck.setHours(0, 0, 0, 0);
+
+                if (endCheck > today) {
+                    alert(`❌ 无法完成任务 "${task.name}"\n\n任务计划结束日期 (${formatDate(endDate)}) 在未来。\n不能提前标记为 100% 完成。`);
+                    if (typeof addLog === 'function') addLog(`❌ 拒绝完成 "${task.name}"：任务结束日期在未来`);
+                    return; // ⛔ 阻止保存
+                }
+            }
+        }
+        // ⭐⭐⭐ 验证结束 ⭐⭐⭐
+
+        // 常规保存逻辑
+        const newParentId = form.querySelector('#editParent').value || null;
         const priority = form.querySelector('#editPriority').value;
         const notes = form.querySelector('#editNotes').value.trim();
-
-        const hasChildren = task.children && task.children.length > 0;
-        
-        if (!hasChildren && !isMilestone && !start) {
-            alert('请选择开始日期');
-            return;
-        }
-
-        if (!hasChildren && !isMilestone && duration < 1) {
-            alert('普通任务工期必须大于0');
-            return;
-        }
 
         const oldDepsCount = task.dependencies ? task.dependencies.length : 0;
 
@@ -834,17 +870,16 @@
         task.durationType = durationType;
 
         if (!hasChildren) {
-            task.start = start;
+            task.start = startStr;
             
             if (isMilestone) {
-                task.end = start;
+                task.end = startStr;
                 task.duration = 0;
                 task.progress = 100;
                 task.durationType = 'days';
             } else {
-                const startDate = new Date(start);
+                const startDate = new Date(startStr);
                 const endDate = calculateEndDate(startDate, duration, durationType);
-                
                 task.end = formatDate(endDate);
                 task.duration = duration;
                 task.progress = progress;
@@ -861,6 +896,7 @@
             task.dependencies = [];
         }
 
+        // 确保依赖格式正确
         task.dependencies = task.dependencies.map(dep => {
             if (typeof dep === 'string') {
                 return { taskId: dep, type: 'FS', lag: 0 };
@@ -964,7 +1000,6 @@
      * 编辑任务名称
      */
     GanttChart.prototype.editTaskName = function(element) {
-        // ... (保持不变) ...
         if (element.classList.contains('editing')) return;
         
         const taskId = element.dataset.taskId;
@@ -999,9 +1034,7 @@
             const wbsPrefix = task.wbs ? `<span class="wbs-badge">[${task.wbs}]</span> ` : '';
             
             const collapseBtn = (task.isSummary && task.children && task.children.length > 0) ? 
-                `<span class="task-collapse-btn" data-task-id="${task.id}">
-                    ${task.isCollapsed ? '▶' : '▼'}
-                </span>` : '';
+                `<span class="task-collapse-btn" data-task-id="${task.id}">${task.isCollapsed ? '▶' : '▼'}</span>` : '';
             
             element.innerHTML = `${collapseBtn}<span class="task-name-content">${indent}${icon} ${wbsPrefix}${task.name}</span>`;
             element.classList.remove('editing');
@@ -1063,6 +1096,6 @@
         }
     };
 
-    console.log('✅ gantt-events-form.js loaded successfully (Epsilon18-Robust - 强力修复工期问题)');
+    console.log('✅ gantt-events-form.js loaded successfully (Epsilon23 - 完整无省略版)');
 
 })();
