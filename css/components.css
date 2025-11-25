@@ -604,6 +604,25 @@ input:checked + .switch-slider:before {
 .quick-menu-move[data-action="down"]:hover .quick-menu-icon {
     transform: translateY(2px); /* 下移按钮向下动 */
 }
+/* ⭐ 新增：全部展开按钮 (绿色 - 象征打开/生长) */
+.quick-menu-expand .quick-menu-icon { color: #10b981; }
+.quick-menu-expand:hover {
+    background: rgba(16, 185, 129, 0.15);
+}
+.quick-menu-expand:hover .quick-menu-icon {
+    transform: scale(1.2);
+    filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
+}
+
+/* ⭐ 新增：全部折叠按钮 (橙色 - 象征收纳/归档) */
+.quick-menu-collapse .quick-menu-icon { color: #f59e0b; }
+.quick-menu-collapse:hover {
+    background: rgba(245, 158, 11, 0.15);
+}
+.quick-menu-collapse:hover .quick-menu-icon {
+    transform: scale(1.2);
+    filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6));
+}
 .quick-menu-btn:active { transform: scale(0.9); }
 
 /* ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓

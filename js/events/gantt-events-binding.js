@@ -11,33 +11,8 @@
      * 绑定所有事件
      */
     GanttChart.prototype.attachEvents = function() {
-        // ⭐ 新增：绑定表头"全部折叠/展开"按钮事件
-        const expandAllBtn = this.container.querySelector('#expandAllBtn');
-        const collapseAllBtn = this.container.querySelector('#collapseAllBtn');
-
-        if (expandAllBtn) {
-            expandAllBtn.onclick = (e) => {
-                e.stopPropagation();
-                // 调用 gantt-operations.js 中定义的方法
-                if (typeof this.expandAllTasks === 'function') {
-                    this.expandAllTasks();
-                } else {
-                    console.warn('expandAllTasks method not found');
-                }
-            };
-        }
-
-        if (collapseAllBtn) {
-            collapseAllBtn.onclick = (e) => {
-                e.stopPropagation();
-                // 调用 gantt-operations.js 中定义的方法
-                if (typeof this.collapseAllTasks === 'function') {
-                    this.collapseAllTasks();
-                } else {
-                    console.warn('collapseAllTasks method not found');
-                }
-            };
-        }
+        // ⭐ 删除：移除了之前对 #expandAllBtn 和 #collapseAllBtn 的绑定代码
+        // 它们的逻辑现在由 gantt-events-quickmenu.js 接管
 
         // ==================== 左侧任务名称事件 ====================
         this.container.querySelectorAll('.gantt-task-name').forEach(el => {

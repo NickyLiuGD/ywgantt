@@ -23,13 +23,9 @@
         const html = `
             <div class="gantt-wrapper">
                 <div class="gantt-sidebar" id="ganttSidebar">
-                    <div class="gantt-sidebar-header">
+                    <!-- ⭐ 修改：移除硬编码的按钮，只保留纯净的表头，菜单由JS动态挂载 -->
+                    <div class="gantt-sidebar-header" id="taskNameHeader">
                         <span>任务名称</span>
-                        <!-- ⭐ 新增：全部折叠/展开按钮 (CSS控制悬停显示) -->
-                        <div class="header-controls">
-                            <span class="header-btn" id="expandAllBtn" title="全部展开">📂</span>
-                            <span class="header-btn" id="collapseAllBtn" title="全部折叠">📁</span>
-                        </div>
                     </div>
                     <div class="gantt-sidebar-body" id="ganttSidebarBody">
                         ${this.renderTaskNames()}
