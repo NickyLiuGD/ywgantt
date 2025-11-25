@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ PERT 核心渲染模块                                               ▓▓
 // ▓▓ 路径: js/pert-chart.js                                         ▓▓
-// ▓▓ 版本: Epsilon3 - 核心渲染（拆分版 1/2）                        ▓▓
+// ▓▓ 版本: Epsilon25 - 完整版 (修复依赖对象格式兼容性问题)           ▓▓
 // ▓▓ 职责: 布局算法、SVG绘制、手柄创建                              ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
@@ -45,6 +45,18 @@
         handleHoverColor: '#5568d3',
         handleActiveColor: '#10b981'
     };
+
+    // ==================== 辅助函数 ====================
+
+    /**
+     * ⭐ 核心修复：安全提取依赖ID
+     * 兼容字符串格式 ['id1'] 和对象格式 [{taskId:'id1'}]
+     */
+    function getDepId(dep) {
+        if (typeof dep === 'string') return dep;
+        if (typeof dep === 'object' && dep && dep.taskId) return dep.taskId;
+        return null;
+    }
 
     // ==================== 主渲染入口 ====================
     
@@ -113,8 +125,10 @@
         // 计算入度
         tasks.forEach(task => {
             if (task.dependencies && task.dependencies.length > 0) {
-                task.dependencies.forEach(depId => {
-                    if (taskMap[depId]) {
+                task.dependencies.forEach(dep => {
+                    // ⭐ 修复：使用 getDepId 读取依赖
+                    const depId = getDepId(dep);
+                    if (depId && taskMap[depId]) {
                         inDegree[task.id]++;
                     }
                 });
@@ -141,8 +155,13 @@
             currentLevelTasks.forEach(task => {
                 visited.add(task.id);
                 tasks.forEach(t => {
-                    if (t.dependencies && t.dependencies.includes(task.id)) {
-                        inDegree[t.id]--;
+                    if (t.dependencies && t.dependencies.length > 0) {
+                        // ⭐ 修复：检查 t 是否依赖 task.id
+                        // 原逻辑直接比较字符串，现需兼容对象
+                        const dependsOnCurrent = t.dependencies.some(d => getDepId(d) === task.id);
+                        if (dependsOnCurrent) {
+                            inDegree[t.id]--;
+                        }
                     }
                 });
             });
@@ -364,7 +383,10 @@
         tasks.forEach(task => {
             if (!task.dependencies || task.dependencies.length === 0) return;
             
-            task.dependencies.forEach(depId => {
+            task.dependencies.forEach(dep => {
+                // ⭐ 修复：使用 getDepId 提取依赖ID
+                const depId = getDepId(dep);
+                
                 const from = positions[depId];
                 const to = positions[task.id];
                 if (!from || !to) return;
@@ -416,7 +438,10 @@
             const pos = positions[task.id];
             if (!pos) return;
             
-            const duration = daysBetween(task.start, task.end) + 1;
+            const duration = (typeof daysBetween === 'function') ? 
+                daysBetween(task.start, task.end) + 1 : 
+                (task.duration || 1);
+                
             const taskName = task.name.length > 18 ? task.name.substring(0, 16) + '...' : task.name;
             
             // 创建节点组
@@ -445,11 +470,11 @@
             rect.style.filter = 'url(#pert-nodeShadow)';
             g.appendChild(rect);
             
-            // ⭐ 左侧手柄（接收依赖）
+            // 左侧手柄（接收依赖）
             const leftHandle = createHandle('left', pertConfig.nodeHeight / 2, task.id);
             g.appendChild(leftHandle);
             
-            // ⭐ 右侧手柄（创建依赖）
+            // 右侧手柄（创建依赖）
             const rightHandle = createHandle('right', pertConfig.nodeHeight / 2, task.id);
             g.appendChild(rightHandle);
             
@@ -525,8 +550,10 @@
             dateText.setAttribute('font-size', '11');
             dateText.setAttribute('fill', '#adb5bd');
             dateText.setAttribute('font-weight', '500');
-            const startStr = formatDate(new Date(task.start)).substring(5);
-            const endStr = formatDate(new Date(task.end)).substring(5);
+            
+            const formatDateSafe = (d) => (typeof formatDate === 'function') ? formatDate(new Date(d)).substring(5) : '';
+            const startStr = formatDateSafe(task.start);
+            const endStr = formatDateSafe(task.end);
             dateText.textContent = `${startStr} ~ ${endStr}`;
             g.appendChild(dateText);
             
@@ -621,6 +648,6 @@
     global.calculateCanvasSize = calculateCanvasSize;
     global.createHandle = createHandle;
 
-    console.log('✅ pert-chart.js loaded successfully (Epsilon3 - 核心渲染)');
+    console.log('✅ pert-chart.js loaded successfully (Epsilon25 - 修复依赖对象格式)');
 
 })(typeof window !== 'undefined' ? window : this);
