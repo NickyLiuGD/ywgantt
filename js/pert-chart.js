@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ PERT 核心渲染模块                                               ▓▓
 // ▓▓ 路径: js/pert-chart.js                                         ▓▓
-// ▓▓ 版本: Epsilon25 - 完整版 (修复依赖对象格式兼容性问题)           ▓▓
+// ▓▓ 版本: Epsilon26 - 完整版 (修复逻辑关系显示 + 深度兼容对象格式)    ▓▓
 // ▓▓ 职责: 布局算法、SVG绘制、手柄创建                              ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
@@ -46,15 +46,16 @@
         handleActiveColor: '#10b981'
     };
 
-    // ==================== 辅助函数 ====================
+    // ==================== 核心辅助函数 ====================
 
     /**
      * ⭐ 核心修复：安全提取依赖ID
      * 兼容字符串格式 ['id1'] 和对象格式 [{taskId:'id1'}]
      */
     function getDepId(dep) {
+        if (!dep) return null;
         if (typeof dep === 'string') return dep;
-        if (typeof dep === 'object' && dep && dep.taskId) return dep.taskId;
+        if (typeof dep === 'object') return dep.taskId || null;
         return null;
     }
 
@@ -68,7 +69,8 @@
         const pertContainer = document.getElementById('pertContainer');
         
         if (!pertContainer) {
-            throw new Error('pertContainer 不存在');
+            console.error('❌ pertContainer 不存在');
+            return;
         }
         
         if (!tasks || tasks.length === 0) {
@@ -84,19 +86,25 @@
             return;
         }
         
-        // 计算布局
+        console.log('🔄 开始计算 PERT 布局...');
+
+        // 1. 计算层级布局 (拓扑排序)
         const levels = calculateTaskLevels(tasks);
+        
+        // 2. 计算坐标位置
         const positions = calculateNodePositions(levels);
+        
+        // 3. 计算画布尺寸
         const canvasSize = calculateCanvasSize(levels);
         
-        // 创建 HTML 结构
+        // 4. 创建 HTML 结构 (工具栏等)
         createPertHTML(tasks, levels, canvasSize);
         
-        // 延迟绘制（确保 DOM 已生成）
+        // 5. 延迟绘制图形 (确保 DOM 已挂载)
         setTimeout(() => {
             drawPertGraph(tasks, positions, canvasSize);
             
-            // 调用交互模块的事件绑定（由 pert-interactive.js 提供）
+            // 绑定交互事件
             if (typeof attachPertInteractiveEvents === 'function') {
                 attachPertInteractiveEvents(canvasSize);
             }
@@ -108,7 +116,7 @@
     /**
      * 计算任务层级（拓扑排序 - Kahn算法）
      * @param {Array} tasks - 任务数组
-     * @returns {Array<Array>} 层级数组，每层包含该层的任务
+     * @returns {Array<Array>} 层级数组
      */
     function calculateTaskLevels(tasks) {
         const levels = [];
@@ -122,12 +130,12 @@
             inDegree[t.id] = 0;
         });
         
-        // 计算入度
+        // ⭐ 修复步骤 1: 计算入度 (使用 getDepId)
         tasks.forEach(task => {
             if (task.dependencies && task.dependencies.length > 0) {
                 task.dependencies.forEach(dep => {
-                    // ⭐ 修复：使用 getDepId 读取依赖
                     const depId = getDepId(dep);
+                    // 只有当依赖的任务实际存在时，才增加入度
                     if (depId && taskMap[depId]) {
                         inDegree[task.id]++;
                     }
@@ -135,7 +143,7 @@
             }
         });
         
-        // 拓扑排序
+        // 拓扑排序循环
         let currentLevel = 0;
         let remainingTasks = [...tasks];
         
@@ -151,15 +159,17 @@
             
             levels[currentLevel] = currentLevelTasks;
             
-            // 更新入度
-            currentLevelTasks.forEach(task => {
-                visited.add(task.id);
+            // ⭐ 修复步骤 2: 更新入度 (使用 getDepId)
+            currentLevelTasks.forEach(completedTask => {
+                visited.add(completedTask.id);
+                
+                // 遍历剩余任务，减少依赖当前完成任务的入度
                 tasks.forEach(t => {
                     if (t.dependencies && t.dependencies.length > 0) {
-                        // ⭐ 修复：检查 t 是否依赖 task.id
-                        // 原逻辑直接比较字符串，现需兼容对象
-                        const dependsOnCurrent = t.dependencies.some(d => getDepId(d) === task.id);
-                        if (dependsOnCurrent) {
+                        // 检查 t 是否依赖 completedTask
+                        // 使用 getDepId 确保兼容对象格式
+                        const isDependent = t.dependencies.some(d => getDepId(d) === completedTask.id);
+                        if (isDependent) {
                             inDegree[t.id]--;
                         }
                     }
@@ -175,8 +185,7 @@
 
     /**
      * 计算节点位置
-     * @param {Array<Array>} levels - 层级数组
-     * @returns {Object} 位置映射 {taskId: {x, y, level, indexInLevel, task}}
+     * @returns {Object} 位置映射
      */
     function calculateNodePositions(levels) {
         const positions = {};
@@ -198,8 +207,6 @@
 
     /**
      * 计算画布大小
-     * @param {Array<Array>} levels - 层级数组
-     * @returns {Object} {width, height}
      */
     function calculateCanvasSize(levels) {
         const width = pertConfig.padding * 2 + 
@@ -218,9 +225,6 @@
     
     /**
      * 创建 PERT HTML 结构（工具栏 + 画布容器）
-     * @param {Array} tasks - 任务数组
-     * @param {Array<Array>} levels - 层级数组
-     * @param {Object} canvasSize - 画布大小
      */
     function createPertHTML(tasks, levels, canvasSize) {
         const pertContainer = document.getElementById('pertContainer');
@@ -276,9 +280,6 @@
     
     /**
      * 绘制 PERT 图形（SVG 主函数）
-     * @param {Array} tasks - 任务数组
-     * @param {Object} positions - 位置映射
-     * @param {Object} canvasSize - 画布大小
      */
     function drawPertGraph(tasks, positions, canvasSize) {
         const svgContainer = document.getElementById('pertSvgContainer');
@@ -312,7 +313,6 @@
 
     /**
      * 创建 SVG 定义（渐变、滤镜、箭头）
-     * @returns {SVGDefsElement}
      */
     function createSvgDefs() {
         const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
@@ -371,27 +371,30 @@
     }
 
     /**
-     * 绘制连接线（任务依赖关系）
-     * @param {Array} tasks - 任务数组
-     * @param {Object} positions - 位置映射
-     * @param {SVGElement} content - SVG 内容组
+     * ⭐ 修复步骤 3: 绘制连接线 (使用 getDepId)
      */
     function drawConnections(tasks, positions, content) {
         const gap = 10;
         const hLength = 50;
+        let connectionCount = 0;
         
         tasks.forEach(task => {
             if (!task.dependencies || task.dependencies.length === 0) return;
             
             task.dependencies.forEach(dep => {
-                // ⭐ 修复：使用 getDepId 提取依赖ID
+                // ⭐ 修复：使用 getDepId 提取 ID
                 const depId = getDepId(dep);
                 
                 const from = positions[depId];
                 const to = positions[task.id];
-                if (!from || !to) return;
+                
+                if (!from || !to) {
+                    // 依赖的任务可能已被过滤或不存在，静默跳过
+                    return;
+                }
                 
                 // 计算起点和终点
+                // 规则：从“前置任务(Right Handle)”连线到“当前任务(Left Handle)”
                 const x1 = from.x + pertConfig.nodeWidth;
                 const y1 = from.y + pertConfig.nodeHeight / 2;
                 const x2 = to.x;
@@ -423,21 +426,22 @@
                 path.style.opacity = '0.7';
                 
                 content.appendChild(path);
+                connectionCount++;
             });
         });
+        
+        console.log(`✅ PERT 连线绘制完成，共 ${connectionCount} 条`);
     }
 
     /**
      * 绘制节点（任务卡片）
-     * @param {Array} tasks - 任务数组
-     * @param {Object} positions - 位置映射
-     * @param {SVGElement} content - SVG 内容组
      */
     function drawNodes(tasks, positions, content) {
         tasks.forEach(task => {
             const pos = positions[task.id];
             if (!pos) return;
             
+            // 兼容 duration 计算（优先使用 date-utils，没有则回退到 task.duration）
             const duration = (typeof daysBetween === 'function') ? 
                 daysBetween(task.start, task.end) + 1 : 
                 (task.duration || 1);
@@ -470,11 +474,11 @@
             rect.style.filter = 'url(#pert-nodeShadow)';
             g.appendChild(rect);
             
-            // 左侧手柄（接收依赖）
+            // ⭐ 左侧手柄（接收依赖）
             const leftHandle = createHandle('left', pertConfig.nodeHeight / 2, task.id);
             g.appendChild(leftHandle);
             
-            // 右侧手柄（创建依赖）
+            // ⭐ 右侧手柄（创建依赖）
             const rightHandle = createHandle('right', pertConfig.nodeHeight / 2, task.id);
             g.appendChild(rightHandle);
             
@@ -499,35 +503,24 @@
             line.setAttribute('stroke-width', '1.5');
             g.appendChild(line);
             
-            // 工期
-            const durationText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            durationText.setAttribute('x', pertConfig.nodeWidth / 2);
-            durationText.setAttribute('y', '66');
-            durationText.setAttribute('text-anchor', 'middle');
-            durationText.setAttribute('font-size', '13');
-            durationText.setAttribute('fill', '#495057');
-            durationText.setAttribute('font-weight', '500');
-            durationText.textContent = `📅 ${duration}天`;
-            g.appendChild(durationText);
-            
-            // 进度百分比
-            const progressText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            progressText.setAttribute('x', pertConfig.nodeWidth / 2);
-            progressText.setAttribute('y', '83');
-            progressText.setAttribute('text-anchor', 'middle');
-            progressText.setAttribute('font-size', '13');
-            progressText.setAttribute('fill', task.progress >= 100 ? '#10b981' : '#667eea');
-            progressText.setAttribute('font-weight', '600');
-            progressText.textContent = `${task.progress}%`;
-            g.appendChild(progressText);
+            // 工期 & 进度文字
+            const infoText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            infoText.setAttribute('x', pertConfig.nodeWidth / 2);
+            infoText.setAttribute('y', '66');
+            infoText.setAttribute('text-anchor', 'middle');
+            infoText.setAttribute('font-size', '13');
+            infoText.setAttribute('fill', '#495057');
+            infoText.setAttribute('font-weight', '500');
+            infoText.textContent = `📅 ${duration}天  📊 ${task.progress}%`;
+            g.appendChild(infoText);
             
             // 进度条背景
             const progressBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             progressBg.setAttribute('x', '20');
             progressBg.setAttribute('y', pertConfig.nodeHeight - 18);
             progressBg.setAttribute('width', pertConfig.nodeWidth - 40);
-            progressBg.setAttribute('height', '8');
-            progressBg.setAttribute('rx', '4');
+            progressBg.setAttribute('height', '6');
+            progressBg.setAttribute('rx', '3');
             progressBg.setAttribute('fill', '#e9ecef');
             g.appendChild(progressBg);
             
@@ -536,8 +529,8 @@
             progressBar.setAttribute('x', '20');
             progressBar.setAttribute('y', pertConfig.nodeHeight - 18);
             progressBar.setAttribute('width', Math.max((pertConfig.nodeWidth - 40) * task.progress / 100, 0));
-            progressBar.setAttribute('height', '8');
-            progressBar.setAttribute('rx', '4');
+            progressBar.setAttribute('height', '6');
+            progressBar.setAttribute('rx', '3');
             progressBar.setAttribute('fill', task.progress >= 100 ? '#10b981' : '#667eea');
             progressBar.style.transition = 'width 0.3s ease';
             g.appendChild(progressBar);
@@ -648,6 +641,6 @@
     global.calculateCanvasSize = calculateCanvasSize;
     global.createHandle = createHandle;
 
-    console.log('✅ pert-chart.js loaded successfully (Epsilon25 - 修复依赖对象格式)');
+    console.log('✅ pert-chart.js loaded successfully (Epsilon26 - 修复逻辑关系显示)');
 
 })(typeof window !== 'undefined' ? window : this);
