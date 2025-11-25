@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图编辑表单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-form.js                           ▓▓
-// ▓▓ 版本: Epsilon17 - 修复依赖选择器保存问题                       ▓▓
+// ▓▓ 版本: Epsilon17-Fix - 修复工期显示默认为1的问题                  ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -33,7 +33,9 @@
             !t.isMilestone
         );
         
-        const currentDuration = task.isMilestone ? 0 : (task.duration || 1);
+        // ⭐ 修复：强制转换为整数，防止字符串类型的数字导致匹配失败
+        const rawDuration = parseInt(task.duration);
+        const currentDuration = task.isMilestone ? 0 : (isNaN(rawDuration) ? 1 : rawDuration);
         const currentDurationType = task.durationType || 'days';
         const hasChildren = task.children && task.children.length > 0;
         const canDelete = !hasChildren;
@@ -46,7 +48,7 @@
                 return depTask;
             }).filter(t => t) : [];
 
-        // 工期下拉选项
+        // 工期下拉选项 (生成 1-30 天)
         const durationOptions = Array.from({length: 30}, (_, i) => i + 1)
             .map(d => `<option value="${d}" ${currentDuration === d ? 'selected' : ''}>${d}</option>`)
             .join('');
@@ -137,6 +139,7 @@
                             ${task.isMilestone || hasChildren ? 'disabled' : ''}>
                         <option value="0" ${currentDuration === 0 ? 'selected' : ''}>0</option>
                         ${durationOptions}
+                        <!-- ⭐ 如果工期大于30，动态添加选项并选中 -->
                         ${currentDuration > 30 ? `<option value="${currentDuration}" selected>${currentDuration}</option>` : ''}
                     </select>
                 </div>
@@ -239,7 +242,7 @@
         
         this.bindFormEvents(form, task, bar, rowsContainer);
         
-        console.log('✅ 表单已创建，事件已绑定');
+        console.log('✅ 表单已创建，工期显示为:', currentDuration);
     };
 
     /**
@@ -498,7 +501,7 @@
     };
 
     /**
-     * ⭐⭐⭐ 显示依赖任务选择器（修复版 - 保留原有依赖）
+     * 显示依赖任务选择器（修复版 - 保留原有依赖）
      */
     GanttChart.prototype.showDependencySelector = function(task, parentForm) {
         console.log('🔧 显示依赖任务选择器...');
@@ -512,7 +515,7 @@
         
         const availableTasks = this.tasks.filter(t => t.id !== task.id);
         
-        // ⭐ 获取当前已选依赖（保存原始数据）
+        // 获取当前已选依赖（保存原始数据）
         const currentDeps = Array.isArray(task.dependencies) ? 
             task.dependencies.map(dep => {
                 const depId = typeof dep === 'string' ? dep : dep.taskId;
@@ -550,7 +553,6 @@
                             const indent = '　'.repeat((t.outlineLevel || 1) - 1);
                             const icon = t.isMilestone ? '🎯' : (t.children?.length > 0 ? '📁' : '📋');
                             
-                            // ⭐ 修复：已选依赖不验证（允许保留）
                             const validation = isChecked ? 
                                 { canAdd: true, reason: '' } : 
                                 this.canAddDependency(t.id, task.id);
@@ -592,7 +594,6 @@
         
         this.bindDependencySelectorEvents(modal, task, parentForm);
 
-        // 显示动画
         requestAnimationFrame(() => {
             modal.classList.add('show');
         });
@@ -615,98 +616,68 @@
             }, 200);
         };
 
-        // 关闭按钮
         const closeBtn = modal.querySelector('#closeDepsSelector');
-        if (closeBtn) {
-            closeBtn.onclick = closeDepsSelector;
-        }
+        if (closeBtn) closeBtn.onclick = closeDepsSelector;
 
-        // 遮罩层点击关闭
         const overlay = modal.querySelector('.dependency-selector-overlay');
-        if (overlay) {
-            overlay.onclick = closeDepsSelector;
-        }
+        if (overlay) overlay.onclick = closeDepsSelector;
 
-        // 搜索功能
         const searchInput = modal.querySelector('#depsSearchInput');
         const depsItems = modal.querySelectorAll('.deps-item');
         
         if (searchInput) {
             searchInput.oninput = () => {
                 const keyword = searchInput.value.toLowerCase();
-                
                 depsItems.forEach(item => {
                     const name = item.dataset.taskName;
                     const wbs = item.dataset.taskWbs;
-                    
-                    if (name.includes(keyword) || wbs.includes(keyword)) {
-                        item.style.display = 'block';
-                    } else {
-                        item.style.display = 'none';
-                    }
+                    item.style.display = (name.includes(keyword) || wbs.includes(keyword)) ? 'block' : 'none';
                 });
             };
         }
 
-        // 复选框计数
         const checkboxes = modal.querySelectorAll('.deps-list input[type="checkbox"]');
         const selectedCount = modal.querySelector('#selectedCount');
         
         checkboxes.forEach(cb => {
             cb.onchange = () => {
                 const count = Array.from(checkboxes).filter(c => c.checked && !c.disabled).length;
-                if (selectedCount) {
-                    selectedCount.textContent = count;
-                }
+                if (selectedCount) selectedCount.textContent = count;
             };
         });
 
-        // 禁用项点击提示
         depsItems.forEach(item => {
             if (item.classList.contains('deps-item-disabled')) {
                 item.onclick = (e) => {
                     e.preventDefault();
                     const reason = item.getAttribute('title');
-                    if (reason) {
-                        showTooltip(item, reason.replace('禁用原因: ', ''));
-                    }
+                    if (reason) showTooltip(item, reason.replace('禁用原因: ', ''));
                 };
             }
         });
 
-        // ⭐ 保存按钮（保留未勾选的原有依赖）
         const confirmBtn = modal.querySelector('#confirmDeps');
         if (confirmBtn) {
             confirmBtn.onclick = () => {
                 console.log('🖱️ 保存依赖关系...');
-                
-                // ⭐ 获取所有勾选的任务ID（包括原有的和新增的）
                 const selectedIds = Array.from(checkboxes)
                     .filter(cb => cb.checked && !cb.disabled)
                     .map(cb => cb.value);
                 
-                console.log('✅ 选中的依赖任务ID:', selectedIds);
-                
-                // ⭐ 更新任务的依赖关系（保持对象格式）
                 task.dependencies = selectedIds.map(depId => ({
                     taskId: depId,
                     type: 'FS',
                     lag: 0
                 }));
                 
-                console.log('✅ 任务依赖已更新:', task.dependencies);
-                
-                // 更新父表单的依赖标签显示
                 this.updateDependencyTags(task, parentForm);
                 
-                // 立即重新渲染依赖箭头
                 const dates = this.generateDates();
                 const visibleTasks = getVisibleTasks(this.tasks);
                 this.renderDependencies(dates, visibleTasks);
                 console.log('🔄 依赖箭头已立即渲染');
                 
                 addLog(`✅ 已更新 "${task.name}" 的依赖关系（${selectedIds.length} 个）`);
-                
                 closeDepsSelector();
             };
         }
@@ -763,7 +734,6 @@
                 `;
             }).join('');
             
-            // 重新绑定删除按钮
             container.querySelectorAll('.dep-tag-remove').forEach(btn => {
                 btn.onclick = (e) => {
                     e.stopPropagation();
@@ -792,7 +762,6 @@
         
         this.updateDependencyTags(task, form);
         
-        // ⭐ 立即重新渲染依赖箭头
         const dates = this.generateDates();
         const visibleTasks = getVisibleTasks(this.tasks);
         this.renderDependencies(dates, visibleTasks);
@@ -864,7 +833,6 @@
 
         task.wbs = this.generateWBS(task.id);
 
-        // ⭐ 依赖关系已在模态框中更新，这里只需确保格式统一
         if (!Array.isArray(task.dependencies)) {
             task.dependencies = [];
         }
@@ -880,8 +848,6 @@
 
         const newDepsCount = task.dependencies.length;
 
-        console.log(`📊 任务 "${task.name}" 依赖关系:`, task.dependencies);
-
         if (hasChildren) {
             this.recalculateSummaryTask(task.id);
         }
@@ -893,7 +859,6 @@
         
         this.render();
         
-        // ⭐ 延迟渲染依赖箭头
         setTimeout(() => {
             const dates = this.generateDates();
             const visibleTasks = getVisibleTasks(this.tasks);
@@ -1073,6 +1038,6 @@
         }
     };
 
-    console.log('✅ gantt-events-form.js loaded successfully (Epsilon17 - 修复依赖保存)');
+    console.log('✅ gantt-events-form.js loaded successfully (Epsilon17-Fix - 修复工期默认为1)');
 
 })();
