@@ -1,8 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ PERT 核心渲染模块                                               ▓▓
 // ▓▓ 路径: js/pert-chart.js                                         ▓▓
-// ▓▓ 版本: Epsilon26 - 完整版 (修复逻辑关系显示 + 深度兼容对象格式)    ▓▓
-// ▓▓ 职责: 布局算法、SVG绘制、手柄创建                              ▓▓
+// ▓▓ 版本: Epsilon27 Revised - 组合任务视图逻辑 (绝对完整版)          ▓▓
+// ▓▓ 职责: 布局算法、SVG绘制、手柄创建、父子逻辑处理                 ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -10,9 +10,6 @@
 
     // ==================== 状态管理 ====================
     
-    /**
-     * PERT 全局状态
-     */
     const pertState = {
         scale: 1.0,
         offsetX: 0,
@@ -22,16 +19,12 @@
         dragStartX: 0,
         dragStartY: 0,
         hoveredNode: null,
-        // 依赖连线拖拽状态
         isLinkingDependency: false,
         linkingFromTaskId: null,
         linkingFromHandle: null,
         tempLineElement: null
     };
 
-    /**
-     * PERT 配置常量
-     */
     const pertConfig = {
         nodeWidth: 160,
         nodeHeight: 100,
@@ -49,7 +42,7 @@
     // ==================== 核心辅助函数 ====================
 
     /**
-     * ⭐ 核心修复：安全提取依赖ID
+     * 安全提取依赖ID
      * 兼容字符串格式 ['id1'] 和对象格式 [{taskId:'id1'}]
      */
     function getDepId(dep) {
@@ -59,13 +52,23 @@
         return null;
     }
 
+    /**
+     * ⭐ [新增逻辑] 获取有效的依赖目标 ID
+     * 如果依赖的目标任务（子任务）在当前视图中不可见（因为父任务已折叠），
+     * 则将依赖关系“重定向”到其可见的父任务上。
+     */
+    function resolveEffectiveId(rawDepId, displayTasks, allTasks) {
+        // 尝试使用全局定义的依赖解析逻辑 (位于 gantt-dependencies.js)
+        if (typeof getEffectiveDependency === 'function') {
+            const effectiveId = getEffectiveDependency(rawDepId, allTasks, displayTasks);
+            return effectiveId || rawDepId;
+        }
+        return rawDepId;
+    }
+
     // ==================== 主渲染入口 ====================
     
-    /**
-     * 渲染 PERT 网络图（主入口）
-     * @param {Array} tasks - 任务数组
-     */
-    function renderPertChart(tasks) {
+    function renderPertChart(allTasks) {
         const pertContainer = document.getElementById('pertContainer');
         
         if (!pertContainer) {
@@ -73,7 +76,7 @@
             return;
         }
         
-        if (!tasks || tasks.length === 0) {
+        if (!allTasks || allTasks.length === 0) {
             pertContainer.innerHTML = `
                 <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #999; background: white; border-radius: 8px;">
                     <div style="text-align: center; padding: 40px;">
@@ -88,8 +91,27 @@
         
         console.log('🔄 开始计算 PERT 布局...');
 
-        // 1. 计算层级布局 (拓扑排序)
-        const levels = calculateTaskLevels(tasks);
+        // ⭐ [新增逻辑] 数据过滤：准备用于显示的节点列表
+        // 1. 获取甘特图当前的可见任务 (处理折叠逻辑)
+        let displayTasks = (typeof getVisibleTasks === 'function') ? 
+                           getVisibleTasks(allTasks) : [...allTasks];
+
+        // 2. 进一步过滤：剔除"已展开的摘要任务"
+        // 逻辑：如果父任务展开了，PERT图里只显示它的子任务（具体执行者），父任务本身作为容器不显示
+        displayTasks = displayTasks.filter(t => {
+            if (t.isSummary && !t.isCollapsed) {
+                return false; 
+            }
+            return true;
+        });
+
+        if (displayTasks.length === 0) {
+            pertContainer.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#666;">无可见任务节点</div>`;
+            return;
+        }
+
+        // 1. 计算层级布局 (传入过滤后的列表进行排版，传入全量列表用于查询关系)
+        const levels = calculateTaskLevels(displayTasks, allTasks);
         
         // 2. 计算坐标位置
         const positions = calculateNodePositions(levels);
@@ -98,11 +120,12 @@
         const canvasSize = calculateCanvasSize(levels);
         
         // 4. 创建 HTML 结构 (工具栏等)
-        createPertHTML(tasks, levels, canvasSize);
+        createPertHTML(displayTasks, levels, canvasSize);
         
-        // 5. 延迟绘制图形 (确保 DOM 已挂载)
+        // 5. 绘制图形 (延迟以确保 DOM 就绪)
         setTimeout(() => {
-            drawPertGraph(tasks, positions, canvasSize);
+            // 传入 displayTasks 用于绘制节点，传入 allTasks 用于查找父级名称
+            drawPertGraph(displayTasks, positions, canvasSize, allTasks);
             
             // 绑定交互事件
             if (typeof attachPertInteractiveEvents === 'function') {
@@ -115,28 +138,37 @@
     
     /**
      * 计算任务层级（拓扑排序 - Kahn算法）
-     * @param {Array} tasks - 任务数组
-     * @returns {Array<Array>} 层级数组
      */
-    function calculateTaskLevels(tasks) {
+    function calculateTaskLevels(displayTasks, allTasks) {
         const levels = [];
         const visited = new Set();
         const taskMap = {};
         const inDegree = {};
         
         // 初始化：建立任务映射和入度表
-        tasks.forEach(t => {
+        displayTasks.forEach(t => {
             taskMap[t.id] = t;
             inDegree[t.id] = 0;
         });
         
-        // ⭐ 修复步骤 1: 计算入度 (使用 getDepId)
-        tasks.forEach(task => {
-            if (task.dependencies && task.dependencies.length > 0) {
-                task.dependencies.forEach(dep => {
-                    const depId = getDepId(dep);
-                    // 只有当依赖的任务实际存在时，才增加入度
-                    if (depId && taskMap[depId]) {
+        // 计算入度
+        displayTasks.forEach(task => {
+            // 获取该任务的聚合依赖（包括它内部子任务对外的依赖）
+            let depsToCheck = [];
+            if (typeof getAggregatedDependencies === 'function') {
+                depsToCheck = getAggregatedDependencies(task.id, allTasks);
+            } else if (task.dependencies) {
+                depsToCheck = task.dependencies.map(d => getDepId(d));
+            }
+
+            if (depsToCheck.length > 0) {
+                depsToCheck.forEach(rawDepId => {
+                    // ⭐ [新增逻辑] 重定向依赖到可见节点
+                    const effectiveDepId = resolveEffectiveId(rawDepId, displayTasks, allTasks);
+                    
+                    // 只有当依赖的目标在当前显示列表中时，才增加入度
+                    // 并且避免自环 (effectiveDepId !== task.id)
+                    if (effectiveDepId && taskMap[effectiveDepId] && effectiveDepId !== task.id) {
                         inDegree[task.id]++;
                     }
                 });
@@ -145,10 +177,10 @@
         
         // 拓扑排序循环
         let currentLevel = 0;
-        let remainingTasks = [...tasks];
+        let remainingTasks = [...displayTasks];
         
         while (remainingTasks.length > 0) {
-            // 找出入度为0的任务（当前层级）
+            // 找出入度为0的任务
             const currentLevelTasks = remainingTasks.filter(task => inDegree[task.id] === 0);
             
             if (currentLevelTasks.length === 0) {
@@ -159,17 +191,27 @@
             
             levels[currentLevel] = currentLevelTasks;
             
-            // ⭐ 修复步骤 2: 更新入度 (使用 getDepId)
+            // 更新入度
             currentLevelTasks.forEach(completedTask => {
                 visited.add(completedTask.id);
                 
                 // 遍历剩余任务，减少依赖当前完成任务的入度
-                tasks.forEach(t => {
-                    if (t.dependencies && t.dependencies.length > 0) {
-                        // 检查 t 是否依赖 completedTask
-                        // 使用 getDepId 确保兼容对象格式
-                        const isDependent = t.dependencies.some(d => getDepId(d) === completedTask.id);
-                        if (isDependent) {
+                remainingTasks.forEach(t => {
+                    let depsToCheck = [];
+                    if (typeof getAggregatedDependencies === 'function') {
+                        depsToCheck = getAggregatedDependencies(t.id, allTasks);
+                    } else if (t.dependencies) {
+                        depsToCheck = t.dependencies.map(d => getDepId(d));
+                    }
+
+                    if (depsToCheck.length > 0) {
+                        // 检查 t 是否依赖 completedTask (需经过 ID 重定向)
+                        const dependsOnCurrent = depsToCheck.some(rawDepId => {
+                            const effectiveId = resolveEffectiveId(rawDepId, displayTasks, allTasks);
+                            return effectiveId === completedTask.id;
+                        });
+                        
+                        if (dependsOnCurrent) {
                             inDegree[t.id]--;
                         }
                     }
@@ -185,7 +227,6 @@
 
     /**
      * 计算节点位置
-     * @returns {Object} 位置映射
      */
     function calculateNodePositions(levels) {
         const positions = {};
@@ -223,9 +264,6 @@
 
     // ==================== HTML 创建 ====================
     
-    /**
-     * 创建 PERT HTML 结构（工具栏 + 画布容器）
-     */
     function createPertHTML(tasks, levels, canvasSize) {
         const pertContainer = document.getElementById('pertContainer');
         
@@ -254,7 +292,7 @@
                     <div style="margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 0.85rem; color: #6c757d;">
                         <span>缩放: <strong id="pertScaleValue" style="color: #667eea; font-size: 0.95rem;">100%</strong></span>
                         <span style="width: 1px; height: 16px; background: #dee2e6;"></span>
-                        <span>任务: <strong style="color: #667eea;">${tasks.length}</strong></span>
+                        <span>节点: <strong style="color: #667eea;">${tasks.length}</strong></span>
                         <span style="width: 1px; height: 16px; background: #dee2e6;"></span>
                         <span>层级: <strong style="color: #667eea;">${levels.length}</strong></span>
                     </div>
@@ -281,7 +319,7 @@
     /**
      * 绘制 PERT 图形（SVG 主函数）
      */
-    function drawPertGraph(tasks, positions, canvasSize) {
+    function drawPertGraph(displayTasks, positions, canvasSize, allTasks) {
         const svgContainer = document.getElementById('pertSvgContainer');
         if (!svgContainer) {
             console.error('❌ SVG 容器未找到');
@@ -307,8 +345,8 @@
         svgContainer.appendChild(svg);
         
         // 绘制连接线和节点
-        drawConnections(tasks, positions, content);
-        drawNodes(tasks, positions, content);
+        drawConnections(displayTasks, positions, content, allTasks);
+        drawNodes(displayTasks, positions, content, allTasks);
     }
 
     /**
@@ -371,30 +409,36 @@
     }
 
     /**
-     * ⭐ 修复步骤 3: 绘制连接线 (使用 getDepId)
+     * 绘制连接线（任务依赖关系）
+     * ⭐ 支持依赖重定向
      */
-    function drawConnections(tasks, positions, content) {
+    function drawConnections(displayTasks, positions, content, allTasks) {
         const gap = 10;
         const hLength = 50;
         let connectionCount = 0;
         
-        tasks.forEach(task => {
-            if (!task.dependencies || task.dependencies.length === 0) return;
+        displayTasks.forEach(task => {
+            // 获取聚合依赖 (包括被折叠子任务的依赖)
+            let aggregatedDeps = [];
+            if (typeof getAggregatedDependencies === 'function') {
+                aggregatedDeps = getAggregatedDependencies(task.id, allTasks);
+            } else if (task.dependencies) {
+                aggregatedDeps = task.dependencies.map(d => getDepId(d));
+            }
             
-            task.dependencies.forEach(dep => {
-                // ⭐ 修复：使用 getDepId 提取 ID
-                const depId = getDepId(dep);
+            if (aggregatedDeps.length === 0) return;
+            
+            aggregatedDeps.forEach(rawDepId => {
+                // ⭐ 关键：重定向依赖到可见节点
+                const effectiveDepId = resolveEffectiveId(rawDepId, displayTasks, allTasks);
                 
-                const from = positions[depId];
+                const from = positions[effectiveDepId];
                 const to = positions[task.id];
                 
-                if (!from || !to) {
-                    // 依赖的任务可能已被过滤或不存在，静默跳过
-                    return;
-                }
+                // 避免自环或无效连接
+                if (!from || !to || from === to) return;
                 
                 // 计算起点和终点
-                // 规则：从“前置任务(Right Handle)”连线到“当前任务(Left Handle)”
                 const x1 = from.x + pertConfig.nodeWidth;
                 const y1 = from.y + pertConfig.nodeHeight / 2;
                 const x2 = to.x;
@@ -413,7 +457,7 @@
                 // 创建路径元素
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('class', 'pert-connection');
-                path.setAttribute('data-from', depId);
+                path.setAttribute('data-from', effectiveDepId); // 存储有效ID
                 path.setAttribute('data-to', task.id);
                 path.setAttribute('d', pathData);
                 path.setAttribute('stroke', '#dc3545');
@@ -435,13 +479,14 @@
 
     /**
      * 绘制节点（任务卡片）
+     * ⭐ 增加父任务标签
      */
-    function drawNodes(tasks, positions, content) {
-        tasks.forEach(task => {
+    function drawNodes(displayTasks, positions, content, allTasks) {
+        displayTasks.forEach(task => {
             const pos = positions[task.id];
             if (!pos) return;
             
-            // 兼容 duration 计算（优先使用 date-utils，没有则回退到 task.duration）
+            // 兼容 duration 计算
             const duration = (typeof daysBetween === 'function') ? 
                 daysBetween(task.start, task.end) + 1 : 
                 (task.duration || 1);
@@ -482,12 +527,33 @@
             const rightHandle = createHandle('right', pertConfig.nodeHeight / 2, task.id);
             g.appendChild(rightHandle);
             
-            // 任务名称
+            // ⭐ [新增逻辑] 绘制父任务归属标签
+            let parentLabel = '';
+            if (task.parentId && allTasks) {
+                const parent = allTasks.find(t => t.id === task.parentId);
+                if (parent) {
+                    parentLabel = `📂 ${parent.name}`;
+                }
+            }
+
+            if (parentLabel) {
+                const parentText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                parentText.setAttribute('x', pertConfig.nodeWidth / 2);
+                parentText.setAttribute('y', '18'); // 顶部靠上
+                parentText.setAttribute('text-anchor', 'middle');
+                parentText.setAttribute('font-size', '10');
+                parentText.setAttribute('fill', '#6c757d'); // 灰色
+                parentText.textContent = parentLabel;
+                g.appendChild(parentText);
+            }
+
+            // 任务名称 (如果有父级标签，位置下移)
+            const textY = parentLabel ? '38' : '32';
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             text.setAttribute('x', pertConfig.nodeWidth / 2);
-            text.setAttribute('y', '32');
+            text.setAttribute('y', textY);
             text.setAttribute('text-anchor', 'middle');
-            text.setAttribute('font-size', '15');
+            text.setAttribute('font-size', '14'); // 稍微调小以容纳
             text.setAttribute('font-weight', '600');
             text.setAttribute('fill', '#2c3e50');
             text.textContent = taskName;
@@ -496,9 +562,9 @@
             // 分隔线
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', '20');
-            line.setAttribute('y1', '48');
+            line.setAttribute('y1', '50');
             line.setAttribute('x2', pertConfig.nodeWidth - 20);
-            line.setAttribute('y2', '48');
+            line.setAttribute('y2', '50');
             line.setAttribute('stroke', '#dee2e6');
             line.setAttribute('stroke-width', '1.5');
             g.appendChild(line);
@@ -506,7 +572,7 @@
             // 工期 & 进度文字
             const infoText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             infoText.setAttribute('x', pertConfig.nodeWidth / 2);
-            infoText.setAttribute('y', '66');
+            infoText.setAttribute('y', '68');
             infoText.setAttribute('text-anchor', 'middle');
             infoText.setAttribute('font-size', '13');
             infoText.setAttribute('fill', '#495057');
@@ -538,9 +604,9 @@
             // 日期范围
             const dateText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             dateText.setAttribute('x', pertConfig.nodeWidth / 2);
-            dateText.setAttribute('y', pertConfig.nodeHeight + 22);
+            dateText.setAttribute('y', pertConfig.nodeHeight + 18);
             dateText.setAttribute('text-anchor', 'middle');
-            dateText.setAttribute('font-size', '11');
+            dateText.setAttribute('font-size', '10');
             dateText.setAttribute('fill', '#adb5bd');
             dateText.setAttribute('font-weight', '500');
             
@@ -641,6 +707,6 @@
     global.calculateCanvasSize = calculateCanvasSize;
     global.createHandle = createHandle;
 
-    console.log('✅ pert-chart.js loaded successfully (Epsilon26 - 修复逻辑关系显示)');
+    console.log('✅ pert-chart.js loaded successfully (Epsilon27 - 组合任务优化)');
 
 })(typeof window !== 'undefined' ? window : this);
