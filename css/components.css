@@ -943,3 +943,57 @@ input:checked + .switch-slider:before {
         display: none !important;
     }
 }
+
+/* ⭐ 新增：任务状态颜色 */
+.gantt-task-name.task-ready .task-name-content {
+    color: #059669; /*以此深绿色标识“就绪/可执行”状态 */
+    font-weight: 600;
+}
+/* 配合深色模式 */
+@media (prefers-color-scheme: dark) {
+    .gantt-task-name.task-ready .task-name-content {
+        color: #34d399;
+    }
+}
+
+/* ⭐ 优化：快捷菜单按钮文字悬停滑出效果 (统一界面逻辑) */
+.quick-menu-btn {
+    width: auto; /* 允许宽度自适应 */
+    min-width: 36px;
+    padding: 0 8px;
+    justify-content: center; /* 默认居中 */
+    overflow: hidden;
+}
+
+.quick-menu-btn .btn-text {
+    max-width: 0;
+    opacity: 0;
+    white-space: nowrap;
+    margin-left: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.quick-menu-btn:hover {
+    padding-right: 12px; /* 悬停时右侧增加一点内边距 */
+    justify-content: flex-start; /* 文字出现后左对齐 */
+}
+
+.quick-menu-btn:hover .btn-text {
+    max-width: 80px; /* 展开文字 */
+    opacity: 1;
+    margin-left: 6px;
+}
+
+/* 隐藏已完成任务按钮样式 */
+.quick-menu-hide-completed .quick-menu-icon { color: #6c757d; }
+.quick-menu-hide-completed:hover { background: rgba(108, 117, 125, 0.15); }
+
+/* 激活状态（例如正在隐藏已完成） */
+.quick-menu-btn.active {
+    background: rgba(102, 126, 234, 0.15);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+}

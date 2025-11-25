@@ -29,7 +29,8 @@
             showDependencies: true,
             showTaskNames: true,
             timeScale: 'day',
-            isOverviewMode: false
+            isOverviewMode: false,
+            hideCompleted: false // ⭐ 新增：默认不隐藏已完成任务            
         }, options || {});
 
         this.selectedTask = null;

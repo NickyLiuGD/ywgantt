@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图快捷菜单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-quickmenu.js                      ▓▓
-// ▓▓ 版本: Epsilon7 - 完整版 (支持任务操作 + 表头操作)              ▓▓
+// ▓▓ 版本: Epsilon10 - 完整版 (表头新图标 + 隐藏已完成 + 任务操作)    ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -25,7 +25,7 @@
             this.addQuickMenuToElement(el, 'right');
         });
 
-        // 3. 为表头添加快捷菜单 (全部展开/折叠)
+        // 3. 为表头添加快捷菜单 (全部展开/折叠/隐藏完成)
         const header = this.container.querySelector('.gantt-sidebar-header');
         if (header) {
             this.addHeaderMenuToElement(header);
@@ -77,7 +77,8 @@
     };
 
     /**
-     * 显示【表头】快捷菜单 (展开/折叠)
+     * 显示【表头】快捷菜单
+     * 功能：全部展开、全部折叠、显示/隐藏已完成
      */
     GanttChart.prototype.showHeaderQuickMenu = function(targetElement) {
         this.hideQuickMenu();
@@ -86,15 +87,28 @@
         menu.className = 'quick-menu';
         menu.dataset.type = 'header-menu';
         
+        // 判断当前"隐藏已完成"的状态
+        const isHiding = this.options.hideCompleted;
+        // 图标逻辑：隐藏时显示眼睛，显示时显示禁止符
+        const toggleIcon = isHiding ? '👁️' : '🚫'; 
+        const toggleText = isHiding ? '显示完成' : '隐藏完成';
+        const toggleClass = isHiding ? 'active' : '';
+
+        // 构建菜单 HTML (使用 btn-text 实现悬停冒泡效果)
         menu.innerHTML = `
             <button class="quick-menu-btn quick-menu-expand" title="全部展开" data-action="expandAll">
                 <span class="quick-menu-icon">📂</span>
-                <span style="font-size:0.75rem; margin-left:4px; font-weight:600; color:#10b981;">展开</span>
+                <span class="btn-text" style="color:#10b981;">全部展开</span>
             </button>
             <div style="width:1px;height:20px;background:#eee;margin:0 2px;"></div>
             <button class="quick-menu-btn quick-menu-collapse" title="全部折叠" data-action="collapseAll">
                 <span class="quick-menu-icon">📁</span>
-                <span style="font-size:0.75rem; margin-left:4px; font-weight:600; color:#f59e0b;">折叠</span>
+                <span class="btn-text" style="color:#f59e0b;">全部折叠</span>
+            </button>
+            <div style="width:1px;height:20px;background:#eee;margin:0 2px;"></div>
+            <button class="quick-menu-btn quick-menu-hide-completed ${toggleClass}" title="${toggleText}" data-action="toggleCompleted">
+                <span class="quick-menu-icon">${toggleIcon}</span>
+                <span class="btn-text" style="color:#6c757d;">${toggleText}</span>
             </button>
         `;
 
@@ -102,7 +116,8 @@
         
         // 定位：表头右下角
         const rect = targetElement.getBoundingClientRect();
-        menu.style.left = (rect.right - 140) + 'px'; 
+        // 调整 left 以确保菜单贴合表头右侧，不遮挡文字
+        menu.style.left = (rect.right - 150) + 'px'; 
         menu.style.top = (rect.bottom - 5) + 'px'; 
         
         currentQuickMenu = menu;
@@ -117,6 +132,13 @@
                     if (typeof this.expandAllTasks === 'function') this.expandAllTasks();
                 } else if (action === 'collapseAll') {
                     if (typeof this.collapseAllTasks === 'function') this.collapseAllTasks();
+                } else if (action === 'toggleCompleted') {
+                    // 切换选项并重绘
+                    this.options.hideCompleted = !this.options.hideCompleted;
+                    this.render();
+                    if (typeof addLog === 'function') {
+                        addLog(this.options.hideCompleted ? '🚫 已隐藏完成任务' : '👁️ 已显示完成任务');
+                    }
                 }
                 
                 this.hideQuickMenu();
@@ -138,7 +160,8 @@
     };
 
     /**
-     * 显示【任务】快捷菜单 (增/删/改/移动/复制)
+     * 显示【任务】快捷菜单
+     * 功能：增、删、改、复制、移动
      */
     GanttChart.prototype.showQuickMenu = function(targetElement, taskId, position) {
         this.hideQuickMenu();
@@ -150,26 +173,27 @@
         menu.className = 'quick-menu';
         menu.dataset.taskId = taskId;
         
+        // 更新结构：使用 btn-text 实现悬停文字冒泡
         menu.innerHTML = `
-            <button class="quick-menu-btn quick-menu-add" title="在下方添加新任务" data-action="add">
-                <span class="quick-menu-icon">➕</span>
+            <button class="quick-menu-btn quick-menu-add" data-action="add">
+                <span class="quick-menu-icon">➕</span><span class="btn-text" style="color:#10b981;">添加</span>
             </button>
-            <button class="quick-menu-btn quick-menu-copy" title="复制任务" data-action="copy">
-                <span class="quick-menu-icon">📄</span>
-            </button>
-            <div style="width:1px;height:20px;background:#eee;margin:0 2px;"></div>
-            <button class="quick-menu-btn quick-menu-move" title="上移" data-action="up">
-                <span class="quick-menu-icon">⬆️</span>
-            </button>
-            <button class="quick-menu-btn quick-menu-move" title="下移" data-action="down">
-                <span class="quick-menu-icon">⬇️</span>
+            <button class="quick-menu-btn quick-menu-copy" data-action="copy">
+                <span class="quick-menu-icon">📄</span><span class="btn-text" style="color:#8b5cf6;">复制</span>
             </button>
             <div style="width:1px;height:20px;background:#eee;margin:0 2px;"></div>
-            <button class="quick-menu-btn quick-menu-edit" title="编辑此任务" data-action="edit">
-                <span class="quick-menu-icon">✏️</span>
+            <button class="quick-menu-btn quick-menu-move" data-action="up">
+                <span class="quick-menu-icon">⬆️</span><span class="btn-text">上移</span>
             </button>
-            <button class="quick-menu-btn quick-menu-delete" title="删除此任务" data-action="delete">
-                <span class="quick-menu-icon">🗑️</span>
+            <button class="quick-menu-btn quick-menu-move" data-action="down">
+                <span class="quick-menu-icon">⬇️</span><span class="btn-text">下移</span>
+            </button>
+            <div style="width:1px;height:20px;background:#eee;margin:0 2px;"></div>
+            <button class="quick-menu-btn quick-menu-edit" data-action="edit">
+                <span class="quick-menu-icon">✏️</span><span class="btn-text" style="color:#3b82f6;">编辑</span>
+            </button>
+            <button class="quick-menu-btn quick-menu-delete" data-action="delete">
+                <span class="quick-menu-icon">🗑️</span><span class="btn-text" style="color:#dc3545;">删除</span>
             </button>
         `;
 
@@ -203,11 +227,12 @@
     };
 
     /**
-     * 计算菜单位置
+     * 计算菜单位置 (确保不溢出屏幕)
      */
     GanttChart.prototype.positionQuickMenu = function(menu, target, position) {
         const rect = target.getBoundingClientRect();
-        const menuWidth = 260; // 足够容纳所有按钮
+        // 估算菜单宽度，根据按钮数量预留空间
+        const menuWidth = 280; 
         const menuHeight = 44;
         
         let left, top;
@@ -441,7 +466,7 @@
 
         // 5. 刷新
         this.tasks.forEach(t => t.wbs = this.generateWBS(t.id));
-        this.sortTasksByWBS(); // 根据 WBS 重新排序（对于子任务移动至关重要）
+        this.sortTasksByWBS(); // 根据 WBS 重新排序
         this.render();
         
         addLog(`✅ 任务 "${task.name}" 已${direction === -1 ? '上移' : '下移'}`);
@@ -496,6 +521,6 @@
         }, 100);
     };
 
-    console.log('✅ gantt-events-quickmenu.js loaded successfully (Epsilon7 - 完整版)');
+    console.log('✅ gantt-events-quickmenu.js loaded successfully (Epsilon10 - 完整无省略版)');
 
 })();

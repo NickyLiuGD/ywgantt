@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Epsilon21 - 完整版 (递归折叠 + 锁定渲染 + 表头清理)      ▓▓
+// ▓▓ 版本: Epsilon25 - 完整版 (含就绪高亮、锁定、隐藏完成)          ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -19,6 +19,7 @@
         const dates = this.generateDates();
         const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
         
+        // 构建基础 HTML 结构
         const html = `
             <div class="gantt-wrapper">
                 <div class="gantt-sidebar" id="ganttSidebar">
@@ -86,10 +87,17 @@
         this.attachSidebarResize();
         this.setupScrollSync();
         
-        // 渲染依赖关系（依赖 gantt-dependencies.js 中的 getVisibleTasks）
         console.log('🔄 开始渲染依赖箭头...');
+        
+        // ⭐ 获取可见任务列表，并应用"隐藏已完成"过滤
+        // getVisibleTasks 来自 gantt-dependencies.js，只处理折叠
         const visibleTasks = typeof getVisibleTasks === 'function' ? getVisibleTasks(this.tasks) : this.tasks;
-        this.renderDependencies(dates, visibleTasks);
+        
+        const filteredTasks = this.options.hideCompleted ? 
+            visibleTasks.filter(t => t.progress < 100) : 
+            visibleTasks;
+
+        this.renderDependencies(dates, filteredTasks);
         
         // 绑定事件
         this.attachEvents();
@@ -163,8 +171,9 @@
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
             
+            const finalWidth = sidebar.offsetWidth;
             if (typeof addLog === 'function') {
-                // addLog(`✅ 任务名称栏宽度已调整为 ${sidebar.offsetWidth}px`);
+                // addLog(`✅ 任务名称栏宽度已调整为 ${finalWidth}px`);
             }
         };
 
@@ -180,9 +189,26 @@
         return this.tasks.map(task => {
             if (!task || !task.id) return '';
             
-            // 递归检查可见性
-            if (this.isTaskHidden(task)) {
-                return '';
+            // 1. 递归检查折叠可见性
+            if (this.isTaskHidden(task)) return '';
+            
+            // 2. ⭐ 检查"隐藏已完成"选项
+            if (this.options.hideCompleted && task.progress >= 100) return '';
+
+            // 3. ⭐ 判断任务是否"就绪" (无依赖 或 依赖全完成)
+            let isReady = false;
+            if (task.progress < 100 && !task.isSummary && !task.isMilestone) {
+                if (!task.dependencies || task.dependencies.length === 0) {
+                    isReady = true; // 无依赖
+                } else {
+                    // 检查依赖是否都已完成
+                    const allDepsCompleted = task.dependencies.every(dep => {
+                        const depId = typeof dep === 'string' ? dep : dep.taskId;
+                        const depTask = this.tasks.find(t => t.id === depId);
+                        return depTask && depTask.progress >= 100;
+                    });
+                    if (allDepsCompleted) isReady = true;
+                }
             }
 
             const outlineLevel = task.outlineLevel || 1;
@@ -198,14 +224,15 @@
             return `
                 <div class="gantt-task-name ${this.selectedTask === task.id ? 'selected' : ''} 
                             ${task.isSummary ? 'summary-task' : ''} 
-                            ${task.isMilestone ? 'milestone-task' : ''}" 
+                            ${task.isMilestone ? 'milestone-task' : ''}
+                            ${isReady ? 'task-ready' : ''}" 
                      data-task-id="${task.id}"
                      data-outline-level="${outlineLevel}"
                      role="button"
                      tabindex="0"
                      aria-label="任务: ${this.escapeHtml(task.name)}">
                     ${collapseBtn}
-                    <span class="task-name-content">
+                    <span class="task-name-content" title="${isReady ? '✅ 前置就绪，可以开始' : ''}">
                         ${indent}${icon} ${wbsPrefix}${this.escapeHtml(task.name)}
                     </span>
                 </div>
@@ -280,10 +307,11 @@
     GanttChart.prototype.renderRow = function(task, dates) {
         if (!task || !task.id) return '';
         
-        // 递归检查可见性
-        if (this.isTaskHidden(task)) {
-            return '';
-        }
+        // 1. 折叠隐藏
+        if (this.isTaskHidden(task)) return '';
+        
+        // 2. ⭐ 隐藏已完成任务
+        if (this.options.hideCompleted && task.progress >= 100) return '';
 
         const start = new Date(task.start);
         const end = new Date(task.end || task.start);
@@ -293,7 +321,7 @@
         const progress = Math.min(Math.max(task.progress || 0, 0), 100);
         const isSelected = this.selectedTask === task.id;
         
-        // 判断锁定状态 (100%完成)
+        // ⭐ 判断锁定状态 (100%完成)
         const isCompleted = progress >= 100;
         
         const startDays = typeof daysBetween === 'function' ? daysBetween(this.startDate, start) : 0;
@@ -306,7 +334,6 @@
         const endTimeLabel = typeof formatDate === 'function' ? formatDate(end) : '';
 
         const outlineLevel = task.outlineLevel || 1;
-        // const indent = '　'.repeat(outlineLevel - 1); // 注释掉：条形图区域不需要缩进显示名称
         const icon = task.isMilestone ? '🎯' : (task.isSummary ? '📁' : '📋');
         const wbsPrefix = task.wbs ? `[${task.wbs}] ` : '';
         const indent = '　'.repeat(outlineLevel - 1);
@@ -351,7 +378,7 @@
                          ${isCompleted ? 'title="已完成 (100%) - 锁定"' : ''}>
                         <div class="gantt-bar-progress" style="width: ${progress}%"></div>
                         
-                        <!-- 如果已完成，不渲染调整手柄 -->
+                        <!-- ⭐ 如果任务已完成，不渲染拖拽手柄 -->
                         ${this.options.enableResize && !task.isSummary && !isCompleted ? `
                             <div class="gantt-bar-handle left"></div>
                             <div class="gantt-bar-handle right"></div>
@@ -479,7 +506,6 @@
                 } else {
                     this.options.isOverviewMode = false;
                     this.options.timeScale = scale;
-                    // 需确保 getRecommendedCellWidth 在全局加载
                     this.options.cellWidth = typeof getRecommendedCellWidth === 'function' ? getRecommendedCellWidth(scale) : 50;
                     this.calculateDateRange();
                     this.render();
@@ -522,6 +548,6 @@
         console.log('GanttChart instance destroyed');
     };
 
-    console.log('✅ gantt-render.js loaded successfully (Epsilon21 - 完整版)');
+    console.log('✅ gantt-render.js loaded successfully (Epsilon25 - 完整渲染逻辑)');
 
 })();
