@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 应用初始化模块                                                  ▓▓
 // ▓▓ 路径: js/app/app-init.js                                       ▓▓
-// ▓▓ 版本: Epsilon21 - 完整逻辑复原 + 云端优先 + 非阻塞UI           ▓▓
+// ▓▓ 版本: Epsilon22-Normalize - 强制数据标准化，修复工期问题         ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -76,7 +76,7 @@
                 
                 const data = await response.json();
                 
-                // ⭐ 关键：复原的解析逻辑，处理相对日期
+                // 解析逻辑
                 const tasks = parseJSONTasks(data);
                 
                 initializeGanttData(tasks, data.project);
@@ -97,20 +97,80 @@
     }
 
     /**
+     * ⭐⭐⭐ 核心修复：数据标准化与清洗函数
+     * 根据 Start 和 End 日期，反向计算并覆盖 Duration
+     * 确保甘特图条（视觉）与编辑表单（数据）绝对一致
+     */
+    function normalizeAndFixTasks(tasks) {
+        if (!Array.isArray(tasks)) return [];
+
+        console.log('🔧 正在执行数据标准化与工期校准...');
+        
+        return tasks.map(task => {
+            // 1. 确保工期类型存在
+            if (!task.durationType) {
+                task.durationType = 'days'; 
+            }
+
+            // 2. 里程碑特殊处理
+            if (task.isMilestone) {
+                task.duration = 0;
+                if (task.start && !task.end) task.end = task.start;
+                return task;
+            }
+
+            // 3. 汇总任务特殊处理（通常由子任务决定，但在初始加载时也需要基本校验）
+            if (task.isSummary) {
+                // 汇总任务不做工期强制计算，依赖 updateHeight 时的 recalculate
+                return task;
+            }
+
+            // 4. ⭐ 普通任务：根据 Start 和 End 反算 Duration
+            // 这是解决“显示为1天”问题的关键。我们信任日期（因为甘特图是按日期画的），
+            // 然后强行修正 duration 字段，使其与日期匹配。
+            if (task.start && task.end) {
+                const calculatedDuration = calculateDuration(task.start, task.end, task.durationType);
+                
+                // 只有当计算出的工期有效且大于0时才覆盖
+                if (calculatedDuration > 0) {
+                    // 将字符串或错误的数字覆盖为正确的整数
+                    task.duration = parseInt(calculatedDuration);
+                } else {
+                    // 异常情况兜底
+                    task.duration = 1;
+                }
+            } else if (task.start && !task.end) {
+                // 只有开始日期，缺省工期1天
+                task.duration = 1;
+                task.end = task.start; // 临时修正
+            } else {
+                // 数据严重缺失
+                task.duration = 1;
+            }
+
+            // 5. 确保 duration 是数字类型
+            task.duration = parseInt(task.duration) || 1;
+
+            return task;
+        });
+    }
+
+    /**
      * 更新 Gantt 实例的数据并渲染
      */
     function initializeGanttData(tasks, projectInfo) {
         if (!global.gantt) return;
 
-        global.gantt.tasks = tasks;
+        // ⭐ 在赋值前，先进行数据清洗和工期校准
+        const normalizedTasks = normalizeAndFixTasks(tasks);
+
+        global.gantt.tasks = normalizedTasks;
 
         // 如果有任务，直接计算全貌参数并渲染
-        if (tasks.length > 0) {
-            // switchToOverviewMode 内部会包含 calculateDateRange 和 render
+        if (normalizedTasks.length > 0) {
             global.gantt.switchToOverviewMode();
             console.log('🔭 已自动切换至全貌视图');
         } else {
-            // 无任务时的降级处理
             global.gantt.calculateDateRange();
             global.gantt.render();
         }
@@ -125,33 +185,29 @@
     // ==================== 复原的业务逻辑 (关键) ====================
 
     /**
-     * 解析 JSON 任务数据 (处理 startOffset, UID映射, 父子关系)
+     * 解析 JSON 任务数据
      */
     function parseJSONTasks(data) {
         const today = new Date();
         const uidToIdMap = {};
         
-        // 1. 第一遍：创建任务对象并建立 UID -> UUID 映射
+        // 1. 第一遍：创建任务对象
         const tasks = data.tasks.map(jt => {
             const task = createTaskFromTemplate(jt, today);
             uidToIdMap[jt.uid] = task.id;
             return task;
         });
         
-        // 2. 第二遍：解析引用关系 (parentId, children, dependencies)
+        // 2. 第二遍：解析引用关系
         data.tasks.forEach((jt, i) => {
-            // 解析父任务 ID
             tasks[i].parentId = resolveRef(jt.parentId, uidToIdMap, 'temp-parent-');
             
-            // 解析子任务 ID 列表
             tasks[i].children = (jt.children || [])
                 .map(ref => resolveRef(ref, uidToIdMap, 'temp-child-'))
-                .filter(Boolean); // 过滤掉无效引用
+                .filter(Boolean);
             
-            // 解析依赖关系
             tasks[i].dependencies = (jt.dependencies || [])
                 .map(dep => {
-                    // 兼容 {taskUid: 1} 和 直接UID 的写法
                     const targetUid = typeof dep === 'object' ? dep.taskUid : dep;
                     const depId = resolveRef(targetUid, uidToIdMap);
                     
@@ -168,15 +224,14 @@
     }
 
     /**
-     * 从模板创建任务 (计算 startOffset)
+     * 从模板创建任务
      */
     function createTaskFromTemplate(jt, baseDate) {
-        // 如果有 startOffset，基于 baseDate 计算；否则默认今天
         const startOffset = jt.startOffset !== undefined ? jt.startOffset : 0;
         const start = addDays(baseDate, startOffset);
         
         const durationType = jt.durationType || 'workdays';
-        const duration = jt.duration !== undefined ? jt.duration : 1;
+        const duration = parseInt(jt.duration) || 1;
         
         // 计算结束日期
         const end = calculateEndDate(start, duration, durationType);
@@ -192,43 +247,35 @@
             progress: jt.progress || 0,
             isMilestone: !!jt.isMilestone,
             isSummary: !!jt.isSummary,
-            parentId: null, // 稍后填充
-            children: [],   // 稍后填充
+            parentId: null,
+            children: [],
             outlineLevel: jt.outlineLevel || 1,
             wbs: jt.wbs || '',
             priority: jt.priority || 'medium',
             notes: jt.notes || '',
             isCollapsed: !!jt.isCollapsed,
-            dependencies: [] // 稍后填充
+            dependencies: []
         };
     }
 
     /**
      * 解析引用 (辅助函数)
-     * 支持直接 ID，或带有前缀的临时 ID 字符串
      */
     function resolveRef(ref, map, prefix = '') {
         if (ref === null || ref === undefined) return null;
-        
-        // 情况1: 已经是真实 UUID (虽然在导入模板时少见，但为了健壮性)
         if (typeof ref === 'string' && ref.startsWith('task-')) return ref;
-        
-        // 情况2: 带前缀的字符串 (e.g., "temp-parent-1")
         if (prefix && typeof ref === 'string' && ref.startsWith(prefix)) {
             const uid = parseInt(ref.replace(prefix, ''));
             return map[uid] || null;
         }
-        
-        // 情况3: 直接数字 UID
         if (typeof ref === 'number') {
             return map[ref] || null;
         }
-        
         return null;
     }
 
     /**
-     * 获取最小数据集（兜底方案）
+     * 获取最小数据集
      */
     function getMinimalTasks() {
         const today = new Date();
@@ -237,7 +284,9 @@
                 id: generateId(),
                 name: '项目启动', 
                 start: formatDate(today), 
+                end: formatDate(today), // 确保有结束日期
                 duration: 1, 
+                durationType: 'days',
                 progress: 0 
             }
         ];
