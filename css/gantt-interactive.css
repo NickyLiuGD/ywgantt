@@ -958,3 +958,26 @@
         border-color: rgba(16, 185, 129, 0.4) !important;
     }
 }
+/* ⭐ 新增：锁定任务样式 (100%完成) */
+.gantt-bar.locked {
+    cursor: default !important; /* 强制变为默认光标 */
+    border-color: #10b981 !important; /* 绿色边框 */
+    /* 增加一点纹理表示归档/锁定感 */
+    background-image: repeating-linear-gradient(
+        45deg,
+        rgba(16, 185, 129, 0.05),
+        rgba(16, 185, 129, 0.05) 10px,
+        rgba(16, 185, 129, 0.1) 10px,
+        rgba(16, 185, 129, 0.1) 20px
+    );
+}
+
+.gantt-bar.locked:hover {
+    transform: none !important; /* 禁用悬停上浮效果 */
+    box-shadow: none !important;
+}
+
+/* 隐藏锁定任务的进度条背景，让纹理更明显 */
+.gantt-bar.locked .gantt-bar-progress {
+    opacity: 0.2;
+}
