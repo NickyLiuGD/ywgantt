@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图快捷菜单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-quickmenu.js                      ▓▓
-// ▓▓ 版本: Epsilon5 - 兼容层级任务                                  ▓▓
+// ▓▓ 版本: Epsilon6 - 增加复制/上移/下移功能                        ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -61,10 +61,22 @@
         menu.className = 'quick-menu';
         menu.dataset.taskId = taskId;
         
+        // ⭐ 扩充菜单按钮：添加、复制、上移、下移、编辑、删除
         menu.innerHTML = `
             <button class="quick-menu-btn quick-menu-add" title="在下方添加新任务" data-action="add">
                 <span class="quick-menu-icon">➕</span>
             </button>
+            <button class="quick-menu-btn quick-menu-copy" title="复制任务" data-action="copy">
+                <span class="quick-menu-icon">📄</span>
+            </button>
+            <div style="width:1px;height:20px;background:#eee;margin:0 2px;"></div>
+            <button class="quick-menu-btn quick-menu-move" title="上移" data-action="up">
+                <span class="quick-menu-icon">⬆️</span>
+            </button>
+            <button class="quick-menu-btn quick-menu-move" title="下移" data-action="down">
+                <span class="quick-menu-icon">⬇️</span>
+            </button>
+            <div style="width:1px;height:20px;background:#eee;margin:0 2px;"></div>
             <button class="quick-menu-btn quick-menu-edit" title="编辑此任务" data-action="edit">
                 <span class="quick-menu-icon">✏️</span>
             </button>
@@ -105,11 +117,11 @@
     };
 
     /**
-     * 定位快捷菜单
+     * 定位快捷菜单 (增加宽度适应)
      */
     GanttChart.prototype.positionQuickMenu = function(menu, target, position) {
         const rect = target.getBoundingClientRect();
-        const menuWidth = 140;
+        const menuWidth = 260; // ⭐ 增加宽度以容纳更多按钮
         const menuHeight = 44;
         
         let left, top;
@@ -163,55 +175,24 @@
         const task = this.tasks.find(t => t.id === taskId);
         if (!task) return;
 
+        const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+
         switch (action) {
             case 'add':
-                // 添加同级任务
-                const currentIndex = this.tasks.findIndex(t => t.id === taskId);
-                
-                const newTask = {
-                    id: generateId(),
-                    uid: this.getNextUID(),
-                    name: '新任务',
-                    start: formatDate(addDays(new Date(task.end), 1)),
-                    duration: 1, // ⭐ 默认1天
-                    durationType: 'days', // ⭐ 默认自然日
-                    progress: 0,
-                    isMilestone: false,
-                    isSummary: false,
-                    parentId: task.parentId,
-                    children: [],
-                    outlineLevel: task.outlineLevel || 1,
-                    wbs: '',
-                    priority: 'medium',
-                    notes: '',
-                    isCollapsed: false,
-                    dependencies: [{taskId: taskId, type: 'FS', lag: 0}]
-                };
-                
-                // 计算结束日期
-                const startDate = new Date(newTask.start);
-                const endDate = calculateEndDate(startDate, newTask.duration, newTask.durationType);
-                newTask.end = formatDate(endDate);
-                
-                this.tasks.splice(currentIndex + 1, 0, newTask);
-                
-                if (task.parentId) {
-                    const parent = this.tasks.find(t => t.id === task.parentId);
-                    if (parent) {
-                        if (!parent.children) parent.children = [];
-                        parent.children.push(newTask.id);
-                    }
-                }
-                
-                newTask.wbs = this.generateWBS(newTask.id);
-                this.calculateDateRange();
-                this.render();
-                
-                setTimeout(() => {
-                    this.selectTask(newTask.id);
-                    this.showInlineTaskForm(newTask);
-                    addLog(`✅ 已在"${task.name}"下方添加新任务`);
-                }, 100);
+                this.insertTaskAt(null, taskIndex + 1, task.parentId);
+                addLog(`✅ 已在"${task.name}"下方添加新任务`);
+                break;
+
+            case 'copy':
+                this.duplicateTask(task);
+                break;
+
+            case 'up':
+                this.moveTask(task, -1);
+                break;
+
+            case 'down':
+                this.moveTask(task, 1);
                 break;
 
             case 'edit':
@@ -221,100 +202,233 @@
                 break;
 
             case 'delete':
-                // ⭐⭐⭐ 新删除逻辑 ⭐⭐⭐
                 if (task.children && task.children.length > 0) {
-                    // 有子任务：禁止删除
-                    const childrenNames = task.children
-                        .map(childId => {
-                            const child = this.tasks.find(t => t.id === childId);
-                            return child ? child.name : null;
-                        })
-                        .filter(name => name);
-                    
-                    let message = `❌ 无法删除任务 "${task.name}"\n\n`;
-                    message += `此任务包含 ${task.children.length} 个子任务：\n`;
-                    childrenNames.slice(0, 5).forEach(name => {
-                        message += `  • ${name}\n`;
-                    });
-                    if (task.children.length > 5) {
-                        message += `  ... 等 ${task.children.length} 个子任务\n`;
-                    }
-                    message += `\n💡 建议操作：\n`;
-                    message += `  1. 先删除所有子任务\n`;
-                    message += `  2. 或将子任务移动到其他父任务下`;
-                    
-                    alert(message);
-                    addLog(`❌ 无法删除 "${task.name}"：包含 ${task.children.length} 个子任务`);
-                } else {
-                    // 无子任务：检查依赖并确认删除
-                    const dependentTasks = this.tasks.filter(t => 
-                        t.dependencies && t.dependencies.some(dep => 
-                            (typeof dep === 'string' ? dep : dep.taskId) === task.id
-                        )
-                    );
-                    
-                    let confirmMessage = `确定删除任务 "${task.name}"？\n\n`;
-                    
-                    if (dependentTasks.length > 0) {
-                        confirmMessage += `⚠️ 警告：有 ${dependentTasks.length} 个任务依赖此任务：\n`;
-                        dependentTasks.slice(0, 3).forEach(t => {
-                            confirmMessage += `  • ${t.name}\n`;
-                        });
-                        if (dependentTasks.length > 3) {
-                            confirmMessage += `  ... 等 ${dependentTasks.length} 个任务\n`;
-                        }
-                        confirmMessage += `\n删除后，这些依赖关系将被移除。\n`;
-                    }
-                    
-                    confirmMessage += `\n此操作不可撤销，是否继续？`;
-                    
-                    if (confirm(confirmMessage)) {
-                        this.deleteTaskWithChildren(task.id);
-                    } else {
-                        addLog(`❌ 已取消删除任务 "${task.name}"`);
-                    }
+                    alert(`❌ 无法删除任务 "${task.name}"\n\n此任务包含 ${task.children.length} 个子任务，请先删除子任务。`);
+                    return;
+                }
+                if (confirm(`确定删除任务 "${task.name}"？`)) {
+                    this.deleteTaskWithChildren(task.id);
                 }
                 break;
         }
     };
 
     /**
-     * 在指定位置插入任务
+     * ⭐ 实现任务复制（包含子任务深拷贝）
      */
-    GanttChart.prototype.insertTaskAt = function(task, index) {
-        if (!task || typeof task !== 'object') {
-            console.error('Invalid task object');
-            return;
+    GanttChart.prototype.duplicateTask = function(task) {
+        // 1. 深度克隆任务数据
+        const cloneTaskData = (originalTask, newParentId = null) => {
+            const newTask = JSON.parse(JSON.stringify(originalTask));
+            newTask.id = generateId();
+            newTask.uid = this.getNextUID();
+            newTask.name = `${originalTask.name} (副本)`;
+            newTask.parentId = newParentId;
+            newTask.children = []; // 先清空，稍后填充
+            newTask.wbs = ''; // 稍后生成
+            
+            // 移除不必要的临时状态
+            delete newTask.isCollapsed;
+            
+            return newTask;
+        };
+
+        const newRootTask = cloneTaskData(task, task.parentId);
+        
+        // 插入到当前任务下方
+        const currentIndex = this.tasks.findIndex(t => t.id === task.id);
+        this.tasks.splice(currentIndex + 1, 0, newRootTask);
+
+        // 更新父任务的 children
+        if (task.parentId) {
+            const parent = this.tasks.find(t => t.id === task.parentId);
+            if (parent) {
+                const siblingIndex = parent.children.indexOf(task.id);
+                parent.children.splice(siblingIndex + 1, 0, newRootTask.id);
+            }
         }
 
-        // ⭐ 确保所有必需字段
-        if (!task.id) task.id = generateId();
-        if (!task.uid) task.uid = this.getNextUID();
-        if (!task.name) task.name = '新任务';
-        if (!task.start) task.start = formatDate(new Date());
-        if (!task.end) task.end = formatDate(addDays(new Date(), 3));
-        if (typeof task.duration !== 'number') task.duration = 4;
-        if (typeof task.progress !== 'number') task.progress = 0;
-        if (!Array.isArray(task.dependencies)) task.dependencies = [];
-        if (typeof task.isMilestone !== 'boolean') task.isMilestone = false;
-        if (typeof task.isSummary !== 'boolean') task.isSummary = false;
-        if (task.parentId === undefined) task.parentId = null;
-        if (!Array.isArray(task.children)) task.children = [];
-        if (!task.outlineLevel) task.outlineLevel = 1;
-        if (!task.priority) task.priority = 'medium';
-        if (task.notes === undefined) task.notes = '';
-        if (typeof task.isCollapsed !== 'boolean') task.isCollapsed = false;
+        // 2. 递归复制子任务（如果原任务是汇总任务）
+        if (task.children && task.children.length > 0) {
+            // 收集所有后代任务，保持顺序
+            const descendants = this.getAllDescendantsInOrder(task.id);
+            
+            let insertPos = currentIndex + 2; // 根副本之后
+            const oldIdToNewId = { [task.id]: newRootTask.id };
 
-        const insertIndex = Math.max(0, Math.min(index, this.tasks.length));
-        this.tasks.splice(insertIndex, 0, task);
-        
-        task.wbs = this.generateWBS(task.id);
+            descendants.forEach(oldChild => {
+                const newParentId = oldIdToNewId[oldChild.parentId];
+                const newChild = cloneTaskData(oldChild, newParentId);
+                newChild.name = oldChild.name; // 子任务不加"(副本)"后缀，保持整洁
+                
+                oldIdToNewId[oldChild.id] = newChild.id;
+                
+                // 链接到新父级
+                const newParent = this.tasks.find(t => t.id === newParentId);
+                if (newParent) {
+                    newParent.children.push(newChild.id);
+                }
+
+                this.tasks.splice(insertPos, 0, newChild);
+                insertPos++;
+            });
+        }
+
+        // 3. 刷新
+        this.tasks.forEach(t => t.wbs = this.generateWBS(t.id)); // 重算所有WBS
+        this.sortTasksByWBS(); // 确保顺序
         this.calculateDateRange();
         this.render();
         
-        return task;
+        addLog(`✅ 已复制任务 "${task.name}"`);
     };
 
-    console.log('✅ gantt-events-quickmenu.js loaded successfully (Epsilon5)');
+    /**
+     * ⭐ 辅助：获取所有后代任务（按列表顺序）
+     */
+    GanttChart.prototype.getAllDescendantsInOrder = function(taskId) {
+        const result = [];
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task || !task.children) return result;
+
+        // 简单按当前数组顺序查找，这比递归更能保持视觉顺序
+        const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+        for (let i = taskIndex + 1; i < this.tasks.length; i++) {
+            const t = this.tasks[i];
+            if (this.isDescendantOf(t.id, taskId)) {
+                result.push(t);
+            }
+        }
+        return result;
+    };
+
+    /**
+     * ⭐ 实现任务上移/下移
+     */
+    GanttChart.prototype.moveTask = function(task, direction) {
+        // 1. 确定操作的容器（根列表 或 父任务的children）
+        let siblings = [];
+        if (task.parentId) {
+            const parent = this.tasks.find(t => t.id === task.parentId);
+            if (parent) siblings = parent.children;
+        } else {
+            // 根任务：我们需要从 this.tasks 中提取出所有根任务的 ID
+            siblings = this.tasks.filter(t => !t.parentId).map(t => t.id);
+        }
+
+        const currentIndex = siblings.indexOf(task.id);
+        if (currentIndex === -1) return;
+
+        const newIndex = currentIndex + direction;
+
+        // 2. 边界检查
+        if (newIndex < 0 || newIndex >= siblings.length) {
+            addLog(`⚠️ 已经是${direction === -1 ? '第' : '最后一'}个了`);
+            return;
+        }
+
+        // 3. 交换位置
+        const temp = siblings[currentIndex];
+        siblings[currentIndex] = siblings[newIndex];
+        siblings[newIndex] = temp;
+
+        // 4. 如果是根任务，我们需要重新排列 this.tasks
+        // 策略：利用 generateWBS 和 sortTasksByWBS 的机制
+        // sortTasksByWBS 依赖 wbs 字符串排序。
+        // generateWBS 依赖 siblings 的顺序 (parent.children) 或 根任务在 this.tasks 的顺序。
+        
+        // 如果是根任务移动，我们必须物理调整 this.tasks 中根任务块的顺序
+        if (!task.parentId) {
+            // 这是一个复杂操作，简单起见，我们给根任务赋予一个临时的 sortIndex，然后重排
+            const rootOrderMap = {};
+            siblings.forEach((id, index) => rootOrderMap[id] = index);
+            
+            // 临时覆盖 generateWBS 逻辑或手动重排
+            // 最稳健的方法：重构整个 tasks 数组
+            const newTasksArray = [];
+            
+            // 递归函数：按新顺序推入任务
+            const pushTaskAndChildren = (taskId) => {
+                const t = this.tasks.find(x => x.id === taskId);
+                if(t) {
+                    newTasksArray.push(t);
+                    // 递归子任务（子任务顺序已经在 siblings 交换步骤中处理了，如果它是当前操作对象的父级）
+                    // 这里我们只处理根顺序，子任务顺序由 parent.children 决定
+                    if (t.children) {
+                        // 如果当前移动的是子任务，parent.children 已经变了，这里遍历就是新顺序
+                        t.children.forEach(childId => pushTaskAndChildren(childId));
+                    }
+                }
+            };
+
+            siblings.forEach(rootId => pushTaskAndChildren(rootId));
+            this.tasks = newTasksArray;
+        } else {
+            // 如果是子任务移动，parent.children 已经变了。
+            // 只需要重新生成 WBS，WBS 会根据 children 顺序生成 1.1, 1.2...
+            // 然后 sortTasksByWBS 会根据 WBS 重新排列 tasks 数组
+        }
+
+        // 5. 全局刷新
+        this.tasks.forEach(t => t.wbs = this.generateWBS(t.id));
+        this.sortTasksByWBS();
+        this.render();
+        
+        addLog(`✅ 任务 "${task.name}" 已${direction === -1 ? '上移' : '下移'}`);
+    };
+
+    /**
+     * 辅助：在指定位置插入新任务
+     */
+    GanttChart.prototype.insertTaskAt = function(unused, index, parentId) {
+        const newTask = {
+            id: generateId(),
+            uid: this.getNextUID(),
+            name: '新任务',
+            start: formatDate(new Date()),
+            duration: 1,
+            durationType: 'days',
+            progress: 0,
+            dependencies: [],
+            isMilestone: false,
+            isSummary: false,
+            parentId: parentId || null,
+            children: [],
+            outlineLevel: 1, // 稍后计算
+            priority: 'medium',
+            notes: ''
+        };
+        
+        // 计算结束日期
+        const startDate = new Date(newTask.start);
+        const endDate = calculateEndDate(startDate, newTask.duration, newTask.durationType);
+        newTask.end = formatDate(endDate);
+
+        if (parentId) {
+            const parent = this.tasks.find(t => t.id === parentId);
+            if (parent) {
+                parent.children.push(newTask.id);
+                parent.isSummary = true;
+                newTask.outlineLevel = (parent.outlineLevel || 1) + 1;
+                // 插入位置需要调整到父任务块的末尾，或者简单push然后排序
+                this.tasks.push(newTask);
+            }
+        } else {
+            // 根任务插入
+            this.tasks.splice(index, 0, newTask);
+        }
+
+        this.tasks.forEach(t => t.wbs = this.generateWBS(t.id));
+        this.sortTasksByWBS();
+        this.calculateDateRange();
+        this.render();
+        
+        setTimeout(() => {
+            this.selectTask(newTask.id);
+            this.showInlineTaskForm(newTask);
+        }, 100);
+    };
+
+    console.log('✅ gantt-events-quickmenu.js loaded successfully (Epsilon6 - 增强版)');
 
 })();

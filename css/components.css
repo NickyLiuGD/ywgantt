@@ -501,10 +501,10 @@ input:checked + .switch-slider:before {
 .quick-menu {
     position: fixed;
     display: flex;
-    gap: 6px;
+    gap: 4px;
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(20px);
-    padding: 8px;
+    padding: 6px;
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
     border: 1px solid rgba(102, 126, 234, 0.2);
@@ -582,7 +582,28 @@ input:checked + .switch-slider:before {
     transform: scale(1.25) rotate(10deg);
     filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6));
 }
-
+/* ⭐ 新增：复制按钮 (紫色) */
+.quick-menu-copy .quick-menu-icon { color: #8b5cf6; }
+.quick-menu-copy:hover {
+    background: rgba(139, 92, 246, 0.15);
+}
+.quick-menu-copy:hover .quick-menu-icon {
+    transform: scale(1.25);
+    filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.6));
+}
+/* ⭐ 新增：上移/下移按钮 (灰色/橙色) */
+.quick-menu-move .quick-menu-icon { color: var(--gray-600); font-size: 1rem; }
+.quick-menu-move:hover {
+    background: rgba(245, 158, 11, 0.15);
+}
+.quick-menu-move:hover .quick-menu-icon {
+    color: #f59e0b;
+    transform: translateY(-2px);
+    filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.4));
+}
+.quick-menu-move[data-action="down"]:hover .quick-menu-icon {
+    transform: translateY(2px); /* 下移按钮向下动 */
+}
 .quick-menu-btn:active { transform: scale(0.9); }
 
 /* ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
