@@ -1,8 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图核心类定义                                                ▓▓
 // ▓▓ 路径: js/gantt/gantt-core.js                                   ▓▓
-// ▓▓ 版本: Epsilon34-FullRestore - 逻辑完整复原版                   ▓▓
-// ▓▓ 修复: 缩放强制重绘 + 标尺同步 + 动态边界 + 找回所有原有逻辑    ▓▓
+// ▓▓ 版本: Epsilon35-FullRestore - 完整复原版                       ▓▓
+// ▓▓ 修复: 强制 Reflow + 动态边界 + 标尺同步 + 完整逻辑             ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -15,12 +15,15 @@
     const DEFAULT_CELL_WIDTH = 50; 
     const MAX_DAY_WIDTH = 60;      // 最大放大上限 (60px)
     
-    // 边距常量 (与 render 模块保持一致)
+    // 边距常量 (需与 render 模块逻辑保持一致)
     const LEFT_LABEL_SPACE = 120; 
     const RIGHT_PADDING = 50;     
 
     /**
      * GanttChart 构造函数
+     * @param {string} selector - 容器选择器
+     * @param {Array} tasks - 任务数组
+     * @param {Object} options - 配置选项
      */
     function GanttChart(selector, tasks, options) {
         if (!selector) {
@@ -29,6 +32,8 @@
 
         this.selector = selector;
         this.tasks = Array.isArray(tasks) ? tasks : [];
+        
+        // 合并默认选项
         this.options = Object.assign({
             cellWidth: DEFAULT_CELL_WIDTH,
             showWeekends: true,
@@ -44,6 +49,7 @@
         this.selectedTask = null;
         this.dragState = null;
         this._cachedElements = {};
+        this._dateCache = null;
         
         this.init();
     }
@@ -65,6 +71,7 @@
 
     /**
      * 计算日期范围
+     * 遍历所有任务，找到最早开始时间和最晚结束时间，并增加缓冲
      */
     GanttChart.prototype.calculateDateRange = function() {
         if (this.tasks.length === 0) {
@@ -95,6 +102,7 @@
 
     /**
      * 生成日期数组
+     * 包含缓存机制优化性能
      */
     GanttChart.prototype.generateDates = function() {
         const scale = this.options.timeScale || 'day';
@@ -112,6 +120,7 @@
 
     /**
      * ⭐ 核心辅助：计算“完美适应屏幕”的最小宽度
+     * 用于全貌视图和缩放边界计算
      */
     GanttChart.prototype.calculateFitToScreenParams = function() {
         if (this.tasks.length === 0) return null;
@@ -154,7 +163,7 @@
     };
 
     /**
-     * 切换到项目全貌视图 (完整逻辑回归)
+     * 切换到项目全貌视图
      */
     GanttChart.prototype.switchToOverviewMode = function() {
         const fitParams = this.calculateFitToScreenParams();
@@ -166,7 +175,7 @@
         // 1. 获取下限宽度
         let optimalCellWidth = fitParams.cellWidth;
         
-        // 限制按钮触发的最大宽度，防止极短项目全屏过大
+        // 限制按钮触发的最大宽度
         optimalCellWidth = Math.min(optimalCellWidth, MAX_DAY_WIDTH); 
 
         // 2. 根据宽度自动选择刻度层级
@@ -182,7 +191,7 @@
         this.options.cellWidth = optimalCellWidth;
         this.options.isOverviewMode = true;
         
-        // 4. 调整日期范围
+        // 4. 调整日期范围：左侧向后推
         const leftLabelDays = Math.ceil(LEFT_LABEL_SPACE / optimalCellWidth);
         this.startDate = addDays(fitParams.minDate, -leftLabelDays);
         this.endDate = new Date(fitParams.maxDate);
@@ -198,7 +207,7 @@
             }
         });
         
-        // 7. 详细日志 (恢复)
+        // 7. 详细日志
         const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
         addLog(`╔═══════════════════════════════════════════════════════════╗`);
         addLog(`║  🔭 已切换到项目全貌视图                                  ║`);
@@ -213,7 +222,7 @@
     };
 
     /**
-     * 退出全貌视图 (恢复)
+     * 退出全貌视图
      */
     GanttChart.prototype.exitOverviewMode = function() {
         this.options.isOverviewMode = false;
@@ -225,7 +234,7 @@
     };
 
     /**
-     * ⭐⭐⭐ 处理滚轮缩放逻辑 (逻辑对称 + 强制重绘) ⭐⭐⭐
+     * ⭐⭐⭐ 处理滚轮缩放逻辑 (强制重绘 + 对称边界) ⭐⭐⭐
      */
     GanttChart.prototype.handleWheelZoom = function(delta, mouseX, containerWidth) {
         // 1. 获取缩放边界
@@ -322,6 +331,6 @@
     global.ROW_HEIGHT = ROW_HEIGHT;
     global.HEADER_HEIGHT = HEADER_HEIGHT;
 
-    console.log('✅ gantt-core.js loaded successfully (Epsilon34-FullRestore)');
+    console.log('✅ gantt-core.js loaded successfully (Epsilon35-FullRestore)');
 
 })(typeof window !== 'undefined' ? window : this);
