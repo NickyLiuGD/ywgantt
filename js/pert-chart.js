@@ -1,8 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ PERT 核心渲染模块                                               ▓▓
 // ▓▓ 路径: js/pert-chart.js                                         ▓▓
-// ▓▓ 版本: Epsilon27 Revised - 组合任务视图逻辑 (绝对完整版)          ▓▓
-// ▓▓ 职责: 布局算法、SVG绘制、手柄创建、父子逻辑处理                 ▓▓
+// ▓▓ 版本: Epsilon29 - 终极完整版 (无省略)                          ▓▓
+// ▓▓ 包含: 布局算法、SVG绘制、手柄创建、交互属性注入                ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -53,12 +53,11 @@
     }
 
     /**
-     * ⭐ [新增逻辑] 获取有效的依赖目标 ID
+     * 获取有效的依赖目标 ID
      * 如果依赖的目标任务（子任务）在当前视图中不可见（因为父任务已折叠），
      * 则将依赖关系“重定向”到其可见的父任务上。
      */
     function resolveEffectiveId(rawDepId, displayTasks, allTasks) {
-        // 尝试使用全局定义的依赖解析逻辑 (位于 gantt-dependencies.js)
         if (typeof getEffectiveDependency === 'function') {
             const effectiveId = getEffectiveDependency(rawDepId, allTasks, displayTasks);
             return effectiveId || rawDepId;
@@ -76,6 +75,7 @@
             return;
         }
         
+        // 空数据处理
         if (!allTasks || allTasks.length === 0) {
             pertContainer.innerHTML = `
                 <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #999; background: white; border-radius: 8px;">
@@ -91,12 +91,12 @@
         
         console.log('🔄 开始计算 PERT 布局...');
 
-        // ⭐ [新增逻辑] 数据过滤：准备用于显示的节点列表
-        // 1. 获取甘特图当前的可见任务 (处理折叠逻辑)
+        // 1. 数据过滤：准备用于显示的节点列表
+        // 获取甘特图当前的可见任务 (处理折叠逻辑)
         let displayTasks = (typeof getVisibleTasks === 'function') ? 
                            getVisibleTasks(allTasks) : [...allTasks];
 
-        // 2. 进一步过滤：剔除"已展开的摘要任务"
+        // 进一步过滤：剔除"已展开的摘要任务"
         // 逻辑：如果父任务展开了，PERT图里只显示它的子任务（具体执行者），父任务本身作为容器不显示
         displayTasks = displayTasks.filter(t => {
             if (t.isSummary && !t.isCollapsed) {
@@ -110,24 +110,24 @@
             return;
         }
 
-        // 1. 计算层级布局 (传入过滤后的列表进行排版，传入全量列表用于查询关系)
+        // 2. 计算层级布局 (传入过滤后的列表进行排版，传入全量列表用于查询关系)
         const levels = calculateTaskLevels(displayTasks, allTasks);
         
-        // 2. 计算坐标位置
+        // 3. 计算坐标位置
         const positions = calculateNodePositions(levels);
         
-        // 3. 计算画布尺寸
+        // 4. 计算画布尺寸
         const canvasSize = calculateCanvasSize(levels);
         
-        // 4. 创建 HTML 结构 (工具栏等)
+        // 5. 创建 HTML 结构 (工具栏等)
         createPertHTML(displayTasks, levels, canvasSize);
         
-        // 5. 绘制图形 (延迟以确保 DOM 就绪)
+        // 6. 绘制图形 (延迟以确保 DOM 就绪)
         setTimeout(() => {
             // 传入 displayTasks 用于绘制节点，传入 allTasks 用于查找父级名称
             drawPertGraph(displayTasks, positions, canvasSize, allTasks);
             
-            // 绑定交互事件
+            // 绑定交互事件 (调用外部模块)
             if (typeof attachPertInteractiveEvents === 'function') {
                 attachPertInteractiveEvents(canvasSize);
             }
@@ -163,7 +163,7 @@
 
             if (depsToCheck.length > 0) {
                 depsToCheck.forEach(rawDepId => {
-                    // ⭐ [新增逻辑] 重定向依赖到可见节点
+                    // 重定向依赖到可见节点
                     const effectiveDepId = resolveEffectiveId(rawDepId, displayTasks, allTasks);
                     
                     // 只有当依赖的目标在当前显示列表中时，才增加入度
@@ -267,6 +267,7 @@
     function createPertHTML(tasks, levels, canvasSize) {
         const pertContainer = document.getElementById('pertContainer');
         
+        // ⭐ 确保这里使用 Flex 布局，不写死高度
         pertContainer.innerHTML = `
             <div class="pert-wrapper" style="width: 100%; height: 100%; display: flex; flex-direction: column; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; overflow: hidden; box-shadow: inset 0 0 20px rgba(0,0,0,0.05);">
                 <!-- 工具栏 -->
@@ -308,7 +309,7 @@
                 
                 <!-- 底部提示 -->
                 <div style="position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 8px 16px; border-radius: 20px; font-size: 0.75rem; pointer-events: none; opacity: 0.8;">
-                    💡 提示：拖拽手柄建立依赖 | 悬停查看详情 | 滚轮缩放 | ESC取消
+                    💡 提示：拖拽手柄建立依赖 | 悬停查看详情 | 滚轮缩放 | 双击连线删除
                 </div>
             </div>
         `;
@@ -316,46 +317,32 @@
 
     // ==================== SVG 绘制 ====================
     
-    /**
-     * 绘制 PERT 图形（SVG 主函数）
-     */
     function drawPertGraph(displayTasks, positions, canvasSize, allTasks) {
         const svgContainer = document.getElementById('pertSvgContainer');
-        if (!svgContainer) {
-            console.error('❌ SVG 容器未找到');
-            return;
-        }
+        if (!svgContainer) return;
         
-        // 创建 SVG 元素
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('id', 'pertSvg');
         svg.setAttribute('width', canvasSize.width);
         svg.setAttribute('height', canvasSize.height);
         svg.style.display = 'block';
         
-        // 定义渐变、滤镜、箭头
         const defs = createSvgDefs();
         svg.appendChild(defs);
         
-        // 创建内容组（用于缩放和平移）
         const content = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         content.setAttribute('id', 'pertContent');
         svg.appendChild(content);
         
         svgContainer.appendChild(svg);
         
-        // 绘制连接线和节点
         drawConnections(displayTasks, positions, content, allTasks);
         drawNodes(displayTasks, positions, content, allTasks);
     }
 
-    /**
-     * 创建 SVG 定义（渐变、滤镜、箭头）
-     */
     function createSvgDefs() {
         const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
         defs.innerHTML = `
-            <!-- 箭头标记 -->
             <marker id="pert-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc3545" />
             </marker>
@@ -368,8 +355,6 @@
             <marker id="pert-arrow-temp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto">
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#06b6d4" />
             </marker>
-            
-            <!-- 节点渐变 -->
             <linearGradient id="pert-nodeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.15" />
                 <stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.05" />
@@ -382,8 +367,6 @@
                 <stop offset="0%" style="stop-color:#ffc107;stop-opacity:0.35" />
                 <stop offset="100%" style="stop-color:#ff9800;stop-opacity:0.15" />
             </linearGradient>
-            
-            <!-- 阴影滤镜 -->
             <filter id="pert-nodeShadow" x="-50%" y="-50%" width="200%" height="200%">
                 <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
                 <feOffset dx="0" dy="2" result="offsetblur"/>
@@ -395,8 +378,6 @@
                     <feMergeNode in="SourceGraphic"/>
                 </feMerge>
             </filter>
-            
-            <!-- 手柄发光滤镜 -->
             <filter id="pert-handleGlow">
                 <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
                 <feMerge>
@@ -409,8 +390,8 @@
     }
 
     /**
-     * 绘制连接线（任务依赖关系）
-     * ⭐ 支持依赖重定向
+     * 绘制连接线
+     * ⭐ 增强版：支持聚合依赖、重定向、删除操作
      */
     function drawConnections(displayTasks, positions, content, allTasks) {
         const gap = 10;
@@ -429,7 +410,7 @@
             if (aggregatedDeps.length === 0) return;
             
             aggregatedDeps.forEach(rawDepId => {
-                // ⭐ 关键：重定向依赖到可见节点
+                // 重定向依赖到可见节点
                 const effectiveDepId = resolveEffectiveId(rawDepId, displayTasks, allTasks);
                 
                 const from = positions[effectiveDepId];
@@ -447,18 +428,21 @@
                 // 生成路径（水平-斜线-水平）
                 let pathData = '';
                 if (Math.abs(y2 - y1) < 5) {
-                    // 同一行：直线
                     pathData = `M ${x1} ${y1} L ${x2 - gap} ${y2}`;
                 } else {
-                    // 不同行：折线
                     pathData = `M ${x1} ${y1} L ${x1 + hLength} ${y1} L ${x2 - hLength} ${y2} L ${x2 - gap} ${y2}`;
                 }
                 
                 // 创建路径元素
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('class', 'pert-connection');
-                path.setAttribute('data-from', effectiveDepId); // 存储有效ID
+                
+                // ⭐ 关键：记录 ID，方便点击删除和高亮
+                path.setAttribute('data-from', effectiveDepId); 
                 path.setAttribute('data-to', task.id);
+                // ⭐ 新增：记录原始依赖ID (因为如果是聚合依赖，rawDepId 才是真正存储在 task.dependencies 里的数据)
+                path.setAttribute('data-original-from', rawDepId); 
+                
                 path.setAttribute('d', pathData);
                 path.setAttribute('stroke', '#dc3545');
                 path.setAttribute('stroke-width', '2');
@@ -466,7 +450,18 @@
                 path.setAttribute('stroke-linecap', 'round');
                 path.setAttribute('stroke-linejoin', 'round');
                 path.setAttribute('marker-end', 'url(#pert-arrow)');
-                path.style.transition = 'all 0.3s ease';
+                
+                // ⭐ 新增：交互样式属性，允许鼠标捕捉线条
+                path.setAttribute('pointer-events', 'stroke');
+                
+                // ⭐ 新增：添加提示标题
+                const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                const fromTask = allTasks.find(t => t.id === rawDepId);
+                const fromName = fromTask ? fromTask.name : '未知任务';
+                title.textContent = `${fromName} ➔ ${task.name} (双击删除)`;
+                path.appendChild(title);
+                
+                path.style.transition = 'all 0.2s ease';
                 path.style.opacity = '0.7';
                 
                 content.appendChild(path);
@@ -478,22 +473,19 @@
     }
 
     /**
-     * 绘制节点（任务卡片）
-     * ⭐ 增加父任务标签
+     * 绘制节点
      */
     function drawNodes(displayTasks, positions, content, allTasks) {
         displayTasks.forEach(task => {
             const pos = positions[task.id];
             if (!pos) return;
             
-            // 兼容 duration 计算
             const duration = (typeof daysBetween === 'function') ? 
                 daysBetween(task.start, task.end) + 1 : 
                 (task.duration || 1);
-                
+            
             const taskName = task.name.length > 18 ? task.name.substring(0, 16) + '...' : task.name;
             
-            // 创建节点组
             const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             g.setAttribute('class', 'pert-node');
             g.setAttribute('data-task-id', task.id);
@@ -506,7 +498,7 @@
             g.style.cursor = 'pointer';
             g.style.transition = 'all 0.3s ease';
             
-            // 节点背景矩形
+            // 背景
             const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             rect.setAttribute('class', 'node-rect');
             rect.setAttribute('width', pertConfig.nodeWidth);
@@ -515,19 +507,14 @@
             rect.setAttribute('fill', 'url(#pert-nodeGradient)');
             rect.setAttribute('stroke', '#667eea');
             rect.setAttribute('stroke-width', '2');
-            rect.style.transition = 'all 0.3s ease';
             rect.style.filter = 'url(#pert-nodeShadow)';
             g.appendChild(rect);
             
-            // ⭐ 左侧手柄（接收依赖）
-            const leftHandle = createHandle('left', pertConfig.nodeHeight / 2, task.id);
-            g.appendChild(leftHandle);
+            // 手柄
+            g.appendChild(createHandle('left', pertConfig.nodeHeight / 2, task.id));
+            g.appendChild(createHandle('right', pertConfig.nodeHeight / 2, task.id));
             
-            // ⭐ 右侧手柄（创建依赖）
-            const rightHandle = createHandle('right', pertConfig.nodeHeight / 2, task.id);
-            g.appendChild(rightHandle);
-            
-            // ⭐ [新增逻辑] 绘制父任务归属标签
+            // 父任务标签
             let parentLabel = '';
             if (task.parentId && allTasks) {
                 const parent = allTasks.find(t => t.id === task.parentId);
@@ -539,27 +526,25 @@
             if (parentLabel) {
                 const parentText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 parentText.setAttribute('x', pertConfig.nodeWidth / 2);
-                parentText.setAttribute('y', '18'); // 顶部靠上
+                parentText.setAttribute('y', '18');
                 parentText.setAttribute('text-anchor', 'middle');
                 parentText.setAttribute('font-size', '10');
-                parentText.setAttribute('fill', '#6c757d'); // 灰色
+                parentText.setAttribute('fill', '#6c757d');
                 parentText.textContent = parentLabel;
                 g.appendChild(parentText);
             }
 
-            // 任务名称 (如果有父级标签，位置下移)
             const textY = parentLabel ? '38' : '32';
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             text.setAttribute('x', pertConfig.nodeWidth / 2);
             text.setAttribute('y', textY);
             text.setAttribute('text-anchor', 'middle');
-            text.setAttribute('font-size', '14'); // 稍微调小以容纳
+            text.setAttribute('font-size', '14');
             text.setAttribute('font-weight', '600');
             text.setAttribute('fill', '#2c3e50');
             text.textContent = taskName;
             g.appendChild(text);
             
-            // 分隔线
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', '20');
             line.setAttribute('y1', '50');
@@ -569,101 +554,76 @@
             line.setAttribute('stroke-width', '1.5');
             g.appendChild(line);
             
-            // 工期 & 进度文字
             const infoText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             infoText.setAttribute('x', pertConfig.nodeWidth / 2);
             infoText.setAttribute('y', '68');
             infoText.setAttribute('text-anchor', 'middle');
             infoText.setAttribute('font-size', '13');
             infoText.setAttribute('fill', '#495057');
-            infoText.setAttribute('font-weight', '500');
             infoText.textContent = `📅 ${duration}天  📊 ${task.progress}%`;
             g.appendChild(infoText);
             
-            // 进度条背景
-            const progressBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            progressBg.setAttribute('x', '20');
-            progressBg.setAttribute('y', pertConfig.nodeHeight - 18);
-            progressBg.setAttribute('width', pertConfig.nodeWidth - 40);
-            progressBg.setAttribute('height', '6');
-            progressBg.setAttribute('rx', '3');
-            progressBg.setAttribute('fill', '#e9ecef');
-            g.appendChild(progressBg);
+            const pBarBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            pBarBg.setAttribute('x', '20');
+            pBarBg.setAttribute('y', pertConfig.nodeHeight - 18);
+            pBarBg.setAttribute('width', pertConfig.nodeWidth - 40);
+            pBarBg.setAttribute('height', '6');
+            pBarBg.setAttribute('rx', '3');
+            pBarBg.setAttribute('fill', '#e9ecef');
+            g.appendChild(pBarBg);
             
-            // 进度条
-            const progressBar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            progressBar.setAttribute('x', '20');
-            progressBar.setAttribute('y', pertConfig.nodeHeight - 18);
-            progressBar.setAttribute('width', Math.max((pertConfig.nodeWidth - 40) * task.progress / 100, 0));
-            progressBar.setAttribute('height', '6');
-            progressBar.setAttribute('rx', '3');
-            progressBar.setAttribute('fill', task.progress >= 100 ? '#10b981' : '#667eea');
-            progressBar.style.transition = 'width 0.3s ease';
-            g.appendChild(progressBar);
+            const pBar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            pBar.setAttribute('x', '20');
+            pBar.setAttribute('y', pertConfig.nodeHeight - 18);
+            pBar.setAttribute('width', Math.max((pertConfig.nodeWidth - 40) * task.progress / 100, 0));
+            pBar.setAttribute('height', '6');
+            pBar.setAttribute('rx', '3');
+            pBar.setAttribute('fill', task.progress >= 100 ? '#10b981' : '#667eea');
+            g.appendChild(pBar);
             
-            // 日期范围
             const dateText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             dateText.setAttribute('x', pertConfig.nodeWidth / 2);
             dateText.setAttribute('y', pertConfig.nodeHeight + 18);
             dateText.setAttribute('text-anchor', 'middle');
             dateText.setAttribute('font-size', '10');
             dateText.setAttribute('fill', '#adb5bd');
-            dateText.setAttribute('font-weight', '500');
             
             const formatDateSafe = (d) => (typeof formatDate === 'function') ? formatDate(new Date(d)).substring(5) : '';
-            const startStr = formatDateSafe(task.start);
-            const endStr = formatDateSafe(task.end);
-            dateText.textContent = `${startStr} ~ ${endStr}`;
+            dateText.textContent = `${formatDateSafe(task.start)}~${formatDateSafe(task.end)}`;
             g.appendChild(dateText);
             
             content.appendChild(g);
         });
     }
 
-    // ==================== 手柄创建 ====================
-    
-    /**
-     * 创建拖拽手柄（左侧或右侧）
-     * @param {string} side - 'left' 或 'right'
-     * @param {number} centerY - 中心 Y 坐标
-     * @param {string} taskId - 任务 ID
-     * @returns {SVGElement} 手柄组
-     */
     function createHandle(side, centerY, taskId) {
-        const handleGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        handleGroup.setAttribute('class', `pert-handle pert-handle-${side}`);
-        handleGroup.setAttribute('data-task-id', taskId);
-        handleGroup.setAttribute('data-handle-side', side);
-        handleGroup.style.cursor = 'crosshair';
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('class', `pert-handle pert-handle-${side}`);
+        g.setAttribute('data-task-id', taskId);
+        g.setAttribute('data-handle-side', side);
+        g.style.cursor = 'crosshair';
         
         const x = side === 'left' ? 0 : pertConfig.nodeWidth;
-        const size = pertConfig.handleSize;
         
-        // 外圈发光效果
-        const outerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        outerCircle.setAttribute('cx', x);
-        outerCircle.setAttribute('cy', centerY);
-        outerCircle.setAttribute('r', size / 2 + 2);
-        outerCircle.setAttribute('fill', 'rgba(102, 126, 234, 0.2)');
-        outerCircle.setAttribute('class', 'handle-glow');
-        outerCircle.style.opacity = '0';
-        outerCircle.style.transition = 'all 0.3s ease';
-        handleGroup.appendChild(outerCircle);
+        const glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        glow.setAttribute('cx', x);
+        glow.setAttribute('cy', centerY);
+        glow.setAttribute('r', pertConfig.handleSize / 2 + 2);
+        glow.setAttribute('fill', 'rgba(102, 126, 234, 0.2)');
+        glow.setAttribute('class', 'handle-glow');
+        glow.style.opacity = '0';
+        g.appendChild(glow);
         
-        // 主圆圈
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('cx', x);
         circle.setAttribute('cy', centerY);
-        circle.setAttribute('r', size / 2);
+        circle.setAttribute('r', pertConfig.handleSize / 2);
         circle.setAttribute('fill', 'white');
         circle.setAttribute('stroke', pertConfig.handleColor);
         circle.setAttribute('stroke-width', '2');
         circle.setAttribute('class', 'handle-circle');
-        circle.style.transition = 'all 0.3s ease';
-        circle.style.filter = 'url(#pert-handleGlow)';
-        handleGroup.appendChild(circle);
+        g.appendChild(circle);
         
-        // 箭头图标
         const icon = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         icon.setAttribute('x', x);
         icon.setAttribute('y', centerY);
@@ -671,34 +631,28 @@
         icon.setAttribute('dominant-baseline', 'central');
         icon.setAttribute('font-size', '10');
         icon.setAttribute('fill', pertConfig.handleColor);
-        icon.setAttribute('font-weight', '700');
         icon.setAttribute('class', 'handle-icon');
         icon.textContent = side === 'left' ? '◀' : '▶';
         icon.style.pointerEvents = 'none';
-        icon.style.transition = 'all 0.3s ease';
-        handleGroup.appendChild(icon);
+        g.appendChild(icon);
         
-        // 提示文字
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        label.setAttribute('x', side === 'left' ? x - 25 : x + 25);
+        label.setAttribute('x', side === 'left' ? x - 20 : x + 20);
         label.setAttribute('y', centerY);
         label.setAttribute('text-anchor', side === 'left' ? 'end' : 'start');
         label.setAttribute('dominant-baseline', 'central');
         label.setAttribute('font-size', '11');
         label.setAttribute('fill', '#667eea');
-        label.setAttribute('font-weight', '600');
         label.setAttribute('class', 'handle-label');
         label.textContent = side === 'left' ? '被依赖' : '依赖';
         label.style.opacity = '0';
         label.style.pointerEvents = 'none';
-        label.style.transition = 'all 0.3s ease';
-        handleGroup.appendChild(label);
+        g.appendChild(label);
         
-        return handleGroup;
+        return g;
     }
 
     // ==================== 导出到全局 ====================
-    
     global.renderPertChart = renderPertChart;
     global.pertState = pertState;
     global.pertConfig = pertConfig;
@@ -707,6 +661,6 @@
     global.calculateCanvasSize = calculateCanvasSize;
     global.createHandle = createHandle;
 
-    console.log('✅ pert-chart.js loaded successfully (Epsilon27 - 组合任务优化)');
+    console.log('✅ pert-chart.js loaded successfully (Epsilon29 - 终极完整版)');
 
 })(typeof window !== 'undefined' ? window : this);

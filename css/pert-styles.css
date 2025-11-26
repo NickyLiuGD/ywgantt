@@ -183,3 +183,64 @@
         display: none !important;
     }
 }
+/* ======================
+   PERT 视图全屏适配
+   ====================== */
+
+/* 确保主容器填满剩余空间 */
+#pertContainer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* 关键：允许 flex 子项收缩 */
+    overflow: hidden;
+    background: white;
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 15px;
+}
+
+/* 内部包装器也要填满 */
+.pert-wrapper {
+    height: 100% !important; /* 强制填满父容器 */
+    width: 100% !important;
+}
+
+.pert-canvas {
+    flex: 1;
+    height: 100%; /* 确保 canvas 占满剩余高度 */
+}
+
+/* ======================
+   依赖连线交互样式
+   ====================== */
+
+/* 增加点击区域和鼠标手势 */
+.pert-connection {
+    pointer-events: stroke !important; /* 允许鼠标捕捉线条 */
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* 为了更容易点击，我们可以增加一根透明的宽线条作为点击热区，
+   或者简单地利用 SVG 的 stroke-width 增加悬停效果。
+   这里采用悬停加粗方案。 */
+
+.pert-connection:hover {
+    stroke-width: 6 !important; /* 悬停时显著加粗 */
+    stroke: #ef4444 !important; /* 悬停变红，提示可删除 */
+    opacity: 1 !important;
+    z-index: 100; /* 尝试提升层级（SVG中取决于DOM顺序，但在视觉上变粗） */
+    filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
+}
+
+/* 正在被删除时的动画 */
+.pert-connection.deleting {
+    stroke-dasharray: 10;
+    animation: dashDelete 0.5s linear infinite;
+    opacity: 0.5;
+}
+
+@keyframes dashDelete {
+    to { stroke-dashoffset: -20; }
+}
