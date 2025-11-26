@@ -196,29 +196,20 @@
      * 添加任务
      */
     GanttChart.prototype.addTask = function(task) {
-        if (!task || typeof task !== 'object') {
-            console.error('Invalid task object');
-            return;
-        }
+        if (!task || typeof task !== 'object') return;
 
-        // 自动补全所有必需字段
+        // 自动补全字段
         if (!task.id) task.id = generateId();
         if (!task.uid) task.uid = this.getNextUID();
         if (!task.name) task.name = '新任务';
         if (!task.start) task.start = formatDate(new Date());
-        
         if (typeof task.duration !== 'number') task.duration = 1;
         if (!task.durationType) task.durationType = 'days';
-        
         if (!task.end) {
-            const startDate = new Date(task.start);
-            const endDate = calculateEndDate(startDate, task.duration, task.durationType);
-            task.end = formatDate(endDate);
+            task.end = formatDate(calculateEndDate(new Date(task.start), task.duration, task.durationType));
         }
-        
         if (typeof task.progress !== 'number') task.progress = 0;
         if (!Array.isArray(task.dependencies)) task.dependencies = [];
-        
         if (typeof task.isMilestone !== 'boolean') task.isMilestone = false;
         if (typeof task.isSummary !== 'boolean') task.isSummary = false;
         if (task.parentId === undefined) task.parentId = null;
@@ -231,13 +222,23 @@
         this.tasks.push(task);
         
         task.wbs = this.generateWBS(task.id);
-        
         this.sortTasksByWBS();
         this.calculateDateRange();
         this.render();
         
-        const typeLabel = task.durationType === 'workdays' ? '工作日' : '自然日';
-        addLog(`✅ 已添加任务 "${task.name}"（${task.duration}${typeLabel}）`);
+        // ⭐ 记录历史
+        if (window.historyManager) {
+            // 深拷贝一份以存入历史
+            const snapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
+            historyManager.record(
+                'ADD',
+                { addedTask: snapshot }, // Undo: 删掉它
+                { addedTask: snapshot }, // Redo: 加回它
+                `创建任务 "${task.name}"`
+            );
+        }
+        
+        addLog(`✅ 已添加任务 "${task.name}"`);
     };
 
     /**
@@ -252,25 +253,22 @@
      */
     GanttChart.prototype.deleteTaskWithChildren = function(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
-        if (!task) {
-            console.warn('Task not found:', taskId);
-            return;
-        }
+        if (!task) return;
 
         if (task.children && task.children.length > 0) {
             console.warn(`Cannot delete task with children: ${task.name}`);
             return;
         }
 
+        const deletedTaskSnapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
+
         // 从父任务移除
         if (task.parentId) {
             const parent = this.tasks.find(t => t.id === task.parentId);
             if (parent && parent.children) {
                 parent.children = parent.children.filter(cid => cid !== taskId);
-                
                 if (parent.children.length === 0) {
                     parent.isSummary = false;
-                    addLog(`   "${parent.name}" 已自动取消汇总任务状态`);
                 } else {
                     this.recalculateSummaryTask(parent.id);
                 }
@@ -285,41 +283,35 @@
         this.tasks.forEach(t => {
             if (t.dependencies && t.dependencies.length > 0) {
                 const originalCount = t.dependencies.length;
-                
                 t.dependencies = t.dependencies.filter(dep => {
                     const depId = typeof dep === 'string' ? dep : dep.taskId;
                     return depId !== taskId;
                 });
-                
-                const removed = originalCount - t.dependencies.length;
-                if (removed > 0) {
-                    removedDepsCount += removed;
-                    addLog(`   "${t.name}" 移除了对 "${task.name}" 的依赖`);
-                }
+                removedDepsCount += (originalCount - t.dependencies.length);
             }
         });
 
-        // 取消选择
-        if (this.selectedTask === taskId) {
-            this.selectedTask = null;
-        }
+        if (this.selectedTask === taskId) this.selectedTask = null;
 
-        // 重新生成所有 WBS
-        this.tasks.forEach(t => {
-            t.wbs = this.generateWBS(t.id);
-        });
-
+        this.tasks.forEach(t => t.wbs = this.generateWBS(t.id));
         this.calculateDateRange();
         this.render();
 
-        addLog(`✅ 已删除任务 "${task.name}"${removedDepsCount > 0 ? `（清理了 ${removedDepsCount} 个依赖关系）` : ''}`);
+        // ⭐ 记录历史
+        if (window.historyManager) {
+            historyManager.record(
+                'DELETE',
+                { deletedTask: deletedTaskSnapshot }, // Undo: 恢复它
+                { deletedTask: deletedTaskSnapshot }, // Redo: 再次删除
+                `删除任务 "${task.name}"`
+            );
+        }
+
+        addLog(`✅ 已删除任务 "${task.name}"`);
     };
 
     // ==================== 子任务管理 ====================
 
-    /**
-     * 添加子任务
-     */
     GanttChart.prototype.addChildTask = function(parentId) {
         const parent = this.tasks.find(t => t.id === parentId);
         if (!parent) return;
@@ -344,9 +336,7 @@
             dependencies: []
         };
         
-        const startDate = new Date(newTask.start);
-        const endDate = calculateEndDate(startDate, newTask.duration, newTask.durationType);
-        newTask.end = formatDate(endDate);
+        newTask.end = formatDate(calculateEndDate(new Date(newTask.start), newTask.duration, newTask.durationType));
 
         if (!parent.children) parent.children = [];
         parent.children.push(newTask.id);
@@ -360,10 +350,21 @@
         this.calculateDateRange();
         this.render();
 
+        // ⭐ 记录历史
+        if (window.historyManager) {
+            const snapshot = typeof deepClone === 'function' ? deepClone(newTask) : JSON.parse(JSON.stringify(newTask));
+            historyManager.record(
+                'ADD',
+                { addedTask: snapshot },
+                { addedTask: snapshot },
+                `为 "${parent.name}" 添加子任务`
+            );
+        }
+
         setTimeout(() => {
             this.selectTask(newTask.id);
             this.showInlineTaskForm(newTask);
-            addLog(`✅ 已为 "${parent.name}" 添加子任务 [${newTask.wbs}]`);
+            addLog(`✅ 已为 "${parent.name}" 添加子任务`);
         }, 100);
     };
 

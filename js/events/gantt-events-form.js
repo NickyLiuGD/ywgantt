@@ -799,15 +799,9 @@
         addLog(`✅ 已移除依赖：${depName}`);
     };
 
-    /**
-     * ⭐ 核心修改：保存任务表单（包含完工验证）
-     */
-    GanttChart.prototype.saveTaskForm = function(form, task) {
+     GanttChart.prototype.saveTaskForm = function(form, task) {
         const newName = form.querySelector('#editName').value.trim();
-        if (!newName) { 
-            alert('任务名称不能为空'); 
-            return; 
-        }
+        if (!newName) { alert('任务名称不能为空'); return; }
 
         const progress = parseInt(form.querySelector('#editProgress')?.value) || 0;
         const startStr = form.querySelector('#editStart').value;
@@ -816,70 +810,37 @@
         const isMilestone = form.querySelector('#editMilestone').checked;
         const hasChildren = task.children && task.children.length > 0;
 
-        // ⭐⭐⭐ 完工验证逻辑 ⭐⭐⭐
+        // 完工验证
         if (progress >= 100) {
-            // 1. 检查依赖任务是否已完成
-            if (task.dependencies && task.dependencies.length > 0) {
-                const incompleteDeps = [];
-                task.dependencies.forEach(dep => {
-                    const depId = typeof dep === 'string' ? dep : dep.taskId;
-                    const depTask = this.tasks.find(t => t.id === depId);
-                    if (depTask && depTask.progress < 100) {
-                        incompleteDeps.push(depTask.name);
-                    }
-                });
-
-                if (incompleteDeps.length > 0) {
-                    alert(`❌ 无法完成任务 "${task.name}"\n\n以下前置依赖尚未完成：\n• ${incompleteDeps.join('\n• ')}\n\n请先完成所有前置任务。`);
-                    if (typeof addLog === 'function') addLog(`❌ 拒绝完成 "${task.name}"：依赖未完成`);
-                    return; // ⛔ 阻止保存
-                }
-            }
-
-            // 2. 检查任务是否在未来（仅对非里程碑有效）
-            if (!isMilestone && !hasChildren && startStr) {
-                const startDate = new Date(startStr);
-                const endDate = calculateEndDate(startDate, duration, durationType);
-                
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const endCheck = new Date(endDate);
-                endCheck.setHours(0, 0, 0, 0);
-
-                if (endCheck > today) {
-                    alert(`❌ 无法完成任务 "${task.name}"\n\n任务计划结束日期 (${formatDate(endDate)}) 在未来。\n不能提前标记为 100% 完成。`);
-                    if (typeof addLog === 'function') addLog(`❌ 拒绝完成 "${task.name}"：任务结束日期在未来`);
-                    return; // ⛔ 阻止保存
-                }
+            if (task.dependencies?.some(d => {
+                const dt = this.tasks.find(t => t.id === (d.taskId||d));
+                return dt && dt.progress < 100;
+            })) {
+                alert('❌ 前置任务未完成，无法完成此任务。'); return;
             }
         }
-        // ⭐⭐⭐ 验证结束 ⭐⭐⭐
+
+        // ⭐ 1. 记录历史：修改前快照
+        const oldSnapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
 
         // 常规保存逻辑
         const newParentId = form.querySelector('#editParent').value || null;
-        const priority = form.querySelector('#editPriority').value;
-        const notes = form.querySelector('#editNotes').value.trim();
-
-        const oldDepsCount = task.dependencies ? task.dependencies.length : 0;
-
         task.name = newName;
-        task.priority = priority;
-        task.notes = notes;
+        task.priority = form.querySelector('#editPriority').value;
+        task.notes = form.querySelector('#editNotes').value.trim();
         task.isMilestone = isMilestone && !hasChildren;
         task.isSummary = hasChildren;
         task.durationType = durationType;
 
         if (!hasChildren) {
             task.start = startStr;
-            
             if (isMilestone) {
                 task.end = startStr;
                 task.duration = 0;
                 task.progress = 100;
                 task.durationType = 'days';
             } else {
-                const startDate = new Date(startStr);
-                const endDate = calculateEndDate(startDate, duration, durationType);
+                const endDate = calculateEndDate(new Date(startStr), duration, durationType);
                 task.end = formatDate(endDate);
                 task.duration = duration;
                 task.progress = progress;
@@ -891,51 +852,25 @@
         }
 
         task.wbs = this.generateWBS(task.id);
-
-        if (!Array.isArray(task.dependencies)) {
-            task.dependencies = [];
-        }
-
-        // 确保依赖格式正确
-        task.dependencies = task.dependencies.map(dep => {
-            if (typeof dep === 'string') {
-                return { taskId: dep, type: 'FS', lag: 0 };
-            } else if (typeof dep === 'object' && dep.taskId) {
-                return dep;
-            }
-            return null;
-        }).filter(dep => dep);
-
-        const newDepsCount = task.dependencies.length;
-
-        if (hasChildren) {
-            this.recalculateSummaryTask(task.id);
-        }
-
+        if (hasChildren) this.recalculateSummaryTask(task.id);
         this.updateParentTasks(task.id);
         this.sortTasksByWBS();
-        this.cleanupForm(form);
         this.calculateDateRange();
-        
         this.render();
-        
-        setTimeout(() => {
-            const dates = this.generateDates();
-            const visibleTasks = getVisibleTasks(this.tasks);
-            this.renderDependencies(dates, visibleTasks);
-            console.log('🔄 依赖箭头已重新渲染');
-        }, 50);
-        
-        const typeLabel = isMilestone ? '（里程碑）' : 
-                        hasChildren ? '（汇总任务）' : 
-                        `（${task.duration}${durationType === 'workdays' ? '工作日' : '自然日'}）`;
-        
-        addLog(`✅ 任务已更新：${task.wbs ? '[' + task.wbs + '] ' : ''}${task.name}${typeLabel}`);
-        
-        if (oldDepsCount !== newDepsCount) {
-            addLog(`   依赖关系：${oldDepsCount} → ${newDepsCount} 个`);
+
+        // ⭐ 2. 记录历史：修改后快照
+        if (window.historyManager) {
+            const newSnapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
+            historyManager.record(
+                'UPDATE',
+                { task: oldSnapshot },
+                { task: newSnapshot },
+                `更新任务 "${task.name}"`
+            );
         }
         
+        addLog(`✅ 任务已更新：${task.name}`);
+        this.cleanupForm(form);
         form.remove();
     };
 

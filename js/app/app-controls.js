@@ -156,24 +156,71 @@
             };
         }
 
-        // 云端保存
+        // ==================== ⭐ 新增：历史记录控制 ====================
+        const btnUndo = document.getElementById('btnUndo');
+        const btnRedo = document.getElementById('btnRedo');
+
+        if (btnUndo) {
+            btnUndo.onclick = () => {
+                if (window.historyManager) window.historyManager.undo();
+            };
+        }
+
+        if (btnRedo) {
+            btnRedo.onclick = () => {
+                if (window.historyManager) window.historyManager.redo();
+            };
+        }
+
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+Z / Command+Z
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                if (window.historyManager) window.historyManager.undo();
+            }
+            // Ctrl+Y / Command+Y / Ctrl+Shift+Z
+            if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+                e.preventDefault();
+                if (window.historyManager) window.historyManager.redo();
+            }
+        });
+
+        // ==================== 云端保存 (全量) ====================
         const quickSaveBtn = document.getElementById('quickCloudSave');
         if (quickSaveBtn) {
             quickSaveBtn.onclick = async () => {
                 if (typeof saveToKV !== 'function') { alert('存储模块未就绪'); return; }
                 const name = document.getElementById('projectTitle').textContent.trim();
-                const filename = generateSafeFilename(name);
+                
+                // 如果 HistoryManager 已经有关联文件名，则复用（覆盖主文件）
+                // 否则生成新文件名
+                let filename = window.historyManager ? window.historyManager.filename : null;
+                if (!filename) {
+                    filename = generateSafeFilename(name);
+                    // 首次保存，关联到 HistoryManager
+                    if (window.historyManager) window.historyManager.filename = filename;
+                }
                 
                 try {
                     quickSaveBtn.disabled = true;
                     quickSaveBtn.innerHTML = '⏳';
+                    
+                    // 1. 保存主文件 (全量)
                     await saveToKV(filename, {
                         project: { name: name, updated: Date.now() },
                         tasks: window.gantt.tasks
                     });
-                    if(typeof addLog === 'function') addLog(`☁️ 保存成功: ${filename}`);
+                    
+                    // 2. 触发一次历史同步 (确保 history 文件也存在)
+                    if (window.historyManager) await window.historyManager.syncToCloud();
+
+                    if(typeof addLog === 'function') addLog(`☁️ 全量保存成功: ${filename}`);
                     quickSaveBtn.innerHTML = '✅';
-                    setTimeout(() => { quickSaveBtn.innerHTML = '<span class="btn-icon icon">☁️</span><span class="btn-text">云保存</span>'; quickSaveBtn.disabled = false; }, 1500);
+                    setTimeout(() => { 
+                        quickSaveBtn.innerHTML = '<span class="btn-icon icon">☁️</span><span class="btn-text">云保存</span>'; 
+                        quickSaveBtn.disabled = false; 
+                    }, 1500);
                 } catch (e) {
                     alert('保存失败: ' + e.message);
                     quickSaveBtn.disabled = false;

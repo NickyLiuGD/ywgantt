@@ -1,8 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 云端文件管理模块                                                ▓▓
 // ▓▓ 路径: js/app/app-file-manager.js                                ▓▓
-// ▓▓ 版本: Epsilon30-FixRefError                                    ▓▓
-// ▓▓ 修复: 解决 manageFilesBtn 未定义错误 + 支持多按钮触发          ▓▓
+// ▓▓ 版本: Epsilon33 - 集成 HistoryManager (过滤/加载/删除)          ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -10,7 +9,7 @@
 
     let _fileListCache = null;
     let _lastFetchTime = 0;
-    const CACHE_DURATION = 30 * 1000;
+    const CACHE_DURATION = 30 * 1000; // 30秒缓存
 
     // 定义所有可能触发文件管理的按钮 ID
     const triggerButtonIds = ['manageFiles', 'btnSwitchProject'];
@@ -41,17 +40,28 @@
         }
     }
 
+    /**
+     * 获取文件列表并渲染
+     */
     async function fetchAndRender(modal) {
         try {
-            const files = await listKVFiles();
-            _fileListCache = files;
+            const allFiles = await listKVFiles();
+            
+            // ⭐ 核心修改 1: 过滤掉历史记录文件 (_history.json)
+            // 我们只显示主项目文件，避免列表混乱
+            const projectFiles = allFiles.filter(f => !f.name.endsWith('_history.json'));
+            
+            _fileListCache = projectFiles;
             _lastFetchTime = Date.now();
-            renderFileList(modal, files);
+            renderFileList(modal, projectFiles);
         } catch (error) {
             renderErrorState(modal, error.message);
         }
     }
 
+    /**
+     * 创建模态框 DOM 结构
+     */
     function createModalShell() {
         const oldModal = document.querySelector('.dependency-selector-modal');
         if (oldModal) oldModal.remove();
@@ -74,7 +84,7 @@
                 </div>
                 <div class="dependency-selector-body" id="fileManagerBody" style="padding: 0; background: #f8f9fa; min-height: 300px;"></div>
                 <div class="dependency-selector-footer bg-light border-top">
-                    <small class="text-muted">💡 提示：点击 📤 可直接将本地 JSON 导入云端并打开。</small>
+                    <small class="text-muted">💡 提示：列表已自动隐藏历史增量文件 (_history.json)。</small>
                 </div>
             </div>
         `;
@@ -84,6 +94,9 @@
         return modal;
     }
 
+    /**
+     * 处理本地文件上传
+     */
     function handleFileUpload(modal) {
         const input = document.createElement('input');
         input.type = 'file';
@@ -100,7 +113,7 @@
                 let jsonData;
                 try { jsonData = JSON.parse(text); } catch(err) { throw new Error('无效的 JSON 文件'); }
 
-                // 尝试调用 KV 保存，如果未配置 KV 则仅本地加载
+                // 尝试调用 KV 保存
                 if (typeof saveToKV === 'function') {
                     await saveToKV(file.name, jsonData);
                     addLog(`☁️ 文件已上传: ${file.name}`);
@@ -117,19 +130,21 @@
                 }));
                 
                 if (window.gantt) {
-                    // 更新数据
                     window.gantt.tasks = tasks;
                     
-                    // 更新标题
                     const titleEl = document.getElementById('projectTitle');
                     if (titleEl) titleEl.textContent = projectInfo.name;
                     
-                    // 切换视图
                     window.gantt.switchToOverviewMode();
                     if(typeof refreshPertViewIfActive === 'function') refreshPertViewIfActive();
+                    
+                    // 上传新文件视为新项目，初始化空白历史
+                    if (window.historyManager) {
+                        window.historyManager.init(file.name); // 关联文件名
+                    }
                 }
 
-                _fileListCache = null; // 清除缓存以显示新文件
+                _fileListCache = null; // 清除缓存
                 modal.querySelector('#closeFileManager').click();
                 
             } catch (error) {
@@ -141,6 +156,9 @@
         input.click();
     }
 
+    /**
+     * 渲染骨架屏
+     */
     function renderSkeleton(modal) {
         const body = modal.querySelector('#fileManagerBody');
         body.innerHTML = `<div class="list-group list-group-flush">${
@@ -154,6 +172,9 @@
             </div>`.repeat(5)}</div>`;
     }
 
+    /**
+     * 渲染文件列表
+     */
     function renderFileList(modal, files) {
         const body = modal.querySelector('#fileManagerBody');
         const badge = modal.querySelector('#fileCountBadge');
@@ -191,10 +212,16 @@
         bindListItemEvents(modal);
     }
 
+    /**
+     * 渲染错误状态
+     */
     function renderErrorState(modal, msg) { 
         modal.querySelector('#fileManagerBody').innerHTML = `<div class="text-center py-5 text-danger"><p>${msg}</p><button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('refreshFilesBtn').click()">🔄 重试</button></div>`; 
     }
 
+    /**
+     * 绑定基础事件 (关闭、刷新、上传)
+     */
     function bindBaseEvents(modal) {
         const closeModal = () => { modal.classList.remove('show'); setTimeout(() => modal.remove(), 200); };
         modal.querySelector('#closeFileManager').onclick = closeModal;
@@ -208,9 +235,13 @@
         modal.querySelector('#modalUploadBtn').onclick = () => handleFileUpload(modal);
     }
 
+    /**
+     * 绑定列表项事件 (加载、下载、删除)
+     */
     function bindListItemEvents(modal) {
         const closeModal = () => modal.querySelector('#closeFileManager').click();
         
+        // 1. 加载按钮逻辑
         modal.querySelectorAll('.load-file-btn').forEach(btn => {
             btn.onclick = async () => {
                 const filename = btn.dataset.filename;
@@ -225,32 +256,56 @@
                     if (window.gantt) {
                         window.gantt.tasks = tasks;
                         
-                        // 更新标题
                         const titleEl = document.getElementById('projectTitle');
                         if (titleEl) titleEl.textContent = projectInfo.name;
 
-                        // ⭐ 加载成功后自动切换全貌
                         window.gantt.switchToOverviewMode();
                         
                         if(typeof refreshPertViewIfActive === 'function') refreshPertViewIfActive();
                         addLog(`✅ 加载成功：${filename}`); 
+
+                        // ⭐ 核心修改 2: 关联并初始化历史管理器
+                        // 加载主文件后，告诉 HistoryManager 去加载对应的 _history.json
+                        if (window.historyManager) {
+                            await window.historyManager.init(filename);
+                        }
                     }
                     closeModal();
                 } catch(e) { alert(e.message); btn.disabled=false; btn.innerHTML='📂 加载'; }
             };
         });
 
+        // 2. 下载按钮逻辑
         modal.querySelectorAll('.download-file-btn').forEach(btn => {
-            btn.onclick = async () => { try { const data = await loadFromKV(btn.dataset.filename); downloadJSON(data, btn.dataset.filename); } catch(e){ alert('下载失败'); } };
+            btn.onclick = async () => { 
+                try { 
+                    const data = await loadFromKV(btn.dataset.filename); 
+                    downloadJSON(data, btn.dataset.filename); 
+                } catch(e){ alert('下载失败'); } 
+            };
         });
 
+        // 3. 删除按钮逻辑
         modal.querySelectorAll('.delete-file-btn').forEach(btn => {
             btn.onclick = async () => {
                 if(!confirm(`确定删除 ${btn.dataset.filename}?`)) return;
-                try { await deleteFromKV(btn.dataset.filename); _fileListCache=null; btn.closest('.list-group-item').remove(); addLog(`🗑️ 已删除: ${btn.dataset.filename}`); } catch(e) { alert('删除失败'); }
+                try { 
+                    const filename = btn.dataset.filename;
+                    // 删除主文件
+                    await deleteFromKV(filename); 
+                    
+                    // ⭐ 核心修改 3: 级联删除历史记录文件
+                    // 静默尝试删除对应的 _history.json，即使不存在也不报错
+                    const historyFile = filename.replace('.json', '_history.json');
+                    deleteFromKV(historyFile).catch(() => {}); // 忽略错误
+
+                    _fileListCache = null; 
+                    btn.closest('.list-group-item').remove(); 
+                    addLog(`🗑️ 已删除: ${filename} (含历史记录)`); 
+                } catch(e) { alert('删除失败'); }
             };
         });
     }
 
-    console.log('✅ app-file-manager.js loaded (Epsilon30-FixRefError)');
+    console.log('✅ app-file-manager.js loaded (Epsilon33 - With History Hooks)');
 })();

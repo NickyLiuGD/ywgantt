@@ -12,7 +12,7 @@
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" integrity="sha512-b2QcS5SsA8tZodcDtGRELiGv5SaKSk1vDHDaQRda0htPYWZ6046lr3kJ5bAAQdpV2mmA/4v0wQF9MyU6/pDIAg==" crossorigin="anonymous">
     
-    <!-- 静态 CSS (利用浏览器缓存 + 并行下载) -->
+    <!-- 静态 CSS -->
     <link rel="stylesheet" href="css/base.css?v=1.0">
     <link rel="stylesheet" href="css/utilities.css?v=1.0">
     <link rel="stylesheet" href="css/components.css?v=1.0">
@@ -38,14 +38,14 @@
         body { opacity: 0; transition: opacity 0.3s ease-in; }
         body.loaded { opacity: 1; }
 
+        /* ⭐ 强制提升工具栏层级 (核心修复) */
         #toolbarCollapsed, 
         #floatingToolbarExpanded {
             z-index: 3000 !important; 
-            top: 10px !important; /* 稍微调整顶部距离，确保垂直居中 */
+            top: 10px !important;
         }
     </style>
 </head>
-<!-- index.html -->
 
 <body>
     <!-- 1. 加载动画 -->
@@ -56,12 +56,11 @@
 
     <!-- 2. 顶部导航栏 (Header) -->
     <header class="app-header">
-        <!-- 左侧：留白或放Logo (为下方工具栏腾出视觉空间) -->
         <div class="header-left">
-            <!-- 这里留空，让视觉焦点集中在下方浮动出的工具栏 -->
+            <!-- 留空给浮动工具栏 -->
         </div>
 
-        <!-- 中间：项目名称 (带悬停菜单) -->
+        <!-- 中间：项目名称 -->
         <div class="header-center">
             <div class="project-menu-wrapper">
                 <div class="project-title-box">
@@ -69,56 +68,56 @@
                     <span class="badge bg-light text-dark border ms-2" id="versionBadge">v1.0</span>
                     <span class="dropdown-arrow">▼</span>
                 </div>
-                
-                <!-- 悬停浮出菜单 -->
+                <!-- 下拉菜单 -->
                 <div class="project-dropdown-menu">
-                    <button class="dropdown-item" id="btnNewProject">
-                        <span class="icon">📄</span> 新建项目
-                    </button>
-                    <button class="dropdown-item" id="btnSwitchProject">
-                        <span class="icon">📂</span> 切换/加载项目
-                    </button>
+                    <button class="dropdown-item" id="btnNewProject"><span class="icon">📄</span> 新建项目</button>
+                    <button class="dropdown-item" id="btnSwitchProject"><span class="icon">📂</span> 切换/加载项目</button>
                     <div class="dropdown-divider"></div>
-                    <button class="dropdown-item" id="btnRenameProject">
-                        <span class="icon">✏️</span> 重命名项目
-                    </button>
-                    <button class="dropdown-item" id="btnCopyProject">
-                        <span class="icon">📑</span> 建立项目副本
-                    </button>
+                    <button class="dropdown-item" id="btnRenameProject"><span class="icon">✏️</span> 重命名项目</button>
+                    <button class="dropdown-item" id="btnCopyProject"><span class="icon">📑</span> 建立项目副本</button>
                 </div>
             </div>
         </div>
 
-        <!-- 右侧：视图切换 + 用户 + 设置 -->
+        <!-- 右侧：Undo/Redo + 视图 + 登录 -->
         <div class="header-right">
-            <!-- PERT 视图切换按钮 (移至此处) -->
+            <!-- ⭐ 新增：历史回溯控件 -->
+            <div class="history-controls d-flex align-items-center gap-1 me-2">
+                <button class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" id="btnUndo" title="撤销 (Ctrl+Z)" disabled style="width:32px; height:32px;">
+                    ↩️
+                </button>
+                <button class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" id="btnRedo" title="重做 (Ctrl+Y)" disabled style="width:32px; height:32px;">
+                    ↪️
+                </button>
+                <span id="historyLabel" class="badge bg-light text-secondary border ms-1" style="font-weight:normal; font-size: 0.7rem;">v:0</span>
+                <span id="historySyncStatus" style="opacity:0; transition:opacity 0.5s; font-size: 0.7rem; margin-left:4px;">☁️</span>
+            </div>
+
+            <div class="header-divider"></div>
+
+            <!-- PERT 视图切换按钮 -->
             <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2" id="btnHeaderTogglePert" title="切换 PERT 网络图">
                 <span class="icon">🔄</span> <span class="btn-text-pert">PERT视图</span>
             </button>
             
             <div class="header-divider"></div>
 
-            <!-- 用户登录 -->
             <button class="btn btn-dark btn-sm d-flex align-items-center gap-2" id="btnLogin">
                 <span class="icon">👤</span> 登录
             </button>
             
-            <!-- 设置 -->
             <button class="btn btn-link text-secondary settings-trigger" id="settingsTrigger" title="设置">
                 <span class="icon" style="font-size: 1.2rem;">⚙️</span>
             </button>
         </div>
     </header>
-    <!-- 3. 浮动工具栏 (恢复原有左上角交互逻辑) -->
-    <!-- 收起状态 (呼吸灯按钮) -->
+
+    <!-- 3. 浮动工具栏 -->
     <div class="toolbar-collapsed" id="toolbarCollapsed" title="工具菜单">
         <span class="toolbar-icon">🛠️</span>
     </div>
     
-    <!-- 展开状态 -->
     <div class="floating-toolbar-expanded" id="floatingToolbarExpanded">
-
-        <!-- 任务编辑组 -->
         <div class="toolbar-section">
             <button class="toolbar-btn" id="addTask" title="添加新任务">
                 <span class="btn-icon icon">➕</span><span class="btn-text">添加任务</span>
@@ -127,10 +126,7 @@
                 <span class="btn-icon icon">☁️</span><span class="btn-text">云保存</span>
             </button>
         </div>
-        
         <div class="toolbar-divider"></div>
-        
-        <!-- 智能组 -->
         <div class="toolbar-section">
             <button class="toolbar-btn" id="checkConflicts" title="检测冲突">
                 <span class="btn-icon icon">🔍</span><span class="btn-text">检测冲突</span>
@@ -144,8 +140,8 @@
         </div>
     </div>
 
-    <div class="container-fluid main-layout">   
-        <!-- 4. 设置面板 (保持不变) -->
+    <!-- 主要内容布局 -->
+    <div class="container-fluid main-layout">
         <aside class="settings-panel" id="settingsPanel" role="complementary">
             <div class="settings-header">
                 <h6>编辑设置</h6>
@@ -182,24 +178,24 @@
             </div>
         </aside>
         
-        <!-- 5. 日志区域 -->
         <section class="log-panel hidden" id="logPanel">
             <div class="log-header" id="logHeader"><span>操作日志</span><button class="log-toggle" id="logToggle">−</button></div>
             <div class="log-body" id="logArea"></div>
         </section>
         
-        <!-- 6. 主内容区域 (上边距避让 Header) -->
         <main class="gantt-container" id="ganttContainer" style="margin-top: 70px;">
             <div id="gantt"></div>
         </main>
         <div id="pertContainer" style="display: none; margin-top: 70px;"></div>
     </div>        
  
-    <!-- 7. JS 模块 (使用 defer 确保顺序执行) -->
+    <!-- JS 模块 -->
+    <!-- ⭐ 引入 history-manager.js，位置在 date-utils 之后，gantt-core 之前 -->
     <script src="js/utils/date-utils.js?v=1.0" defer></script>
     <script src="js/utils/log-utils.js?v=1.0" defer></script>
     <script src="js/utils/data-utils.js?v=1.0" defer></script>
     <script src="js/utils/kv-storage.js?v=1.0" defer></script>
+    <script src="js/utils/history-manager.js?v=1.0" defer></script> 
     <script src="js/utils/time-scale-utils.js?v=1.0" defer></script>
     <script src="js/utils/common-utils.js?v=1.0" defer></script>
     <script src="js/utils/data-loader.js?v=1.0" defer></script>
@@ -225,10 +221,8 @@
 
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
     
-    <!-- 8. 启动逻辑 -->
     <script defer>
         window.addEventListener('error', e => console.error('⚠️ 全局错误:', e.message));
-        
         document.addEventListener('DOMContentLoaded', function() {
             console.log('✅ DOMContentLoaded - 模块下载完成');
             const loader = document.getElementById('app-loader');
