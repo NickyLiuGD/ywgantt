@@ -10,10 +10,32 @@
     let _fileListCache = null;
     let _lastFetchTime = 0;
     const CACHE_DURATION = 30 * 1000;
-    // 同时支持新旧按钮 ID
-    const manageFilesBtn = document.getElementById('btnSwitchProject') || document.getElementById('manageFiles');
-    
-    if (!manageFilesBtn) return;
+
+    // ⭐ 修改：同时支持新旧按钮 ID
+    // manageFiles 是旧ID (如果有的话)，btnSwitchProject 是新下拉菜单里的按钮
+    const triggerBtns = [
+        document.getElementById('manageFiles'), 
+        document.getElementById('btnSwitchProject')
+    ];
+
+    // 为所有存在的触发按钮绑定点击事件
+    triggerBtns.forEach(btn => {
+        if (btn) {
+            btn.onclick = (e) => {
+                // 阻止冒泡，防止菜单关闭或其他影响
+                if(e) e.stopPropagation();
+                
+                const modal = createModalShell();
+                const now = Date.now();
+                if (_fileListCache && (now - _lastFetchTime < CACHE_DURATION)) {
+                    renderFileList(modal, _fileListCache);
+                } else {
+                    renderSkeleton(modal);
+                    fetchAndRender(modal);
+                }
+            };
+        }
+    });
 
     manageFilesBtn.onclick = () => {
         const modal = createModalShell();
