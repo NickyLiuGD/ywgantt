@@ -354,20 +354,84 @@ h1 {
 }
 
 /* ======================
-   浮动工具栏复原 (恢复左上角交互)
+   布局修正：工具栏并入 Header
    ====================== */
-.toolbar-collapsed {
-    position: fixed !important;
-    top: 80px !important; /* 位于 Header 下方 */
-    left: 20px !important;
-    z-index: 1000;
-    /* 保持原有呼吸灯样式 */
+
+/* 1. 主容器布局 */
+/* 只需要留出 Header 的高度 (60px) + 少量呼吸空间 (10px) */
+.main-layout {
+    padding-top: 70px !important; 
+    height: 100vh;
+    box-sizing: border-box;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
+/* 2. 甘特图容器 */
+/* 移除之前的 margin-top，因为工具栏不再占用下方空间 */
+.gantt-container {
+    margin-top: 0 !important; 
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    /* 可选：加一个顶部边框分割线 */
+    border-top: 1px solid #eee; 
+}
+
+#pertContainer {
+    margin-top: 0 !important;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ======================
+   3. 工具栏定位 (核心修改)
+   将其定位坐标上移，使其视觉上位于 Header 内部
+   ====================== */
+
+/* 收起状态 (呼吸灯图标) */
+.toolbar-collapsed {
+    position: fixed !important;
+    /* Header高度60px，图标约40-48px，垂直居中 */
+    top: 8px !important;  
+    left: 15px !important;
+    z-index: 2100; /* 必须高于 Header (2000) */
+    
+    /* 稍微缩小一点尺寸以适应 Header */
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 1.2rem !important;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3) !important;
+}
+
+/* 展开状态 (长条菜单) */
 .floating-toolbar-expanded {
     position: fixed !important;
-    top: 80px !important;
-    left: 20px !important; /* 恢复从左侧展开 */
-    transform: none !important;
-    /* 其他样式继承 components.css */
+    /* 与收起图标对齐 */
+    top: 8px !important;
+    left: 15px !important;
+    transform: none !important; /* 左对齐 */
+    z-index: 2100; /* 必须高于 Header */
+    
+    /* 样式微调，使其看起来像 Header 的一部分 */
+    height: 44px !important; /* 限制高度 */
+    padding: 0 12px 0 54px !important; /* 左侧留出圆钮位置 */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    border: 1px solid #e0e0e0 !important;
+}
+
+/* 展开时，确保它盖住后面的项目标题 (防止文字重叠干扰) */
+.floating-toolbar-expanded.active {
+    /* 确保背景不透明 */
+    background: #fff !important; 
+}
+
+/* 4. 微调 Header 左侧区域，确保不遮挡其他可能存在的元素 */
+.header-left {
+    /* 给工具栏留出至少 60px 的宽度，虽然现在左侧是空的 */
+    min-width: 60px; 
 }

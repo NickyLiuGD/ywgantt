@@ -1,7 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 云端文件管理模块                                                ▓▓
 // ▓▓ 路径: js/app/app-file-manager.js                                ▓▓
-// ▓▓ 版本: Epsilon26 - 加载/上传后自动全貌                          ▓▓
+// ▓▓ 版本: Epsilon30-FixRefError                                    ▓▓
+// ▓▓ 修复: 解决 manageFilesBtn 未定义错误 + 支持多按钮触发          ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -11,42 +12,34 @@
     let _lastFetchTime = 0;
     const CACHE_DURATION = 30 * 1000;
 
-    // ⭐ 修改：同时支持新旧按钮 ID
-    // manageFiles 是旧ID (如果有的话)，btnSwitchProject 是新下拉菜单里的按钮
-    const triggerBtns = [
-        document.getElementById('manageFiles'), 
-        document.getElementById('btnSwitchProject')
-    ];
+    // 定义所有可能触发文件管理的按钮 ID
+    const triggerButtonIds = ['manageFiles', 'btnSwitchProject'];
 
-    // 为所有存在的触发按钮绑定点击事件
-    triggerBtns.forEach(btn => {
+    // 遍历绑定事件
+    triggerButtonIds.forEach(id => {
+        const btn = document.getElementById(id);
         if (btn) {
             btn.onclick = (e) => {
-                // 阻止冒泡，防止菜单关闭或其他影响
-                if(e) e.stopPropagation();
-                
-                const modal = createModalShell();
-                const now = Date.now();
-                if (_fileListCache && (now - _lastFetchTime < CACHE_DURATION)) {
-                    renderFileList(modal, _fileListCache);
-                } else {
-                    renderSkeleton(modal);
-                    fetchAndRender(modal);
-                }
+                if (e) e.stopPropagation(); // 防止冒泡关闭菜单
+                openFileManager();
             };
         }
     });
 
-    manageFilesBtn.onclick = () => {
+    /**
+     * 打开文件管理器主逻辑
+     */
+    function openFileManager() {
         const modal = createModalShell();
         const now = Date.now();
+        
         if (_fileListCache && (now - _lastFetchTime < CACHE_DURATION)) {
             renderFileList(modal, _fileListCache);
         } else {
             renderSkeleton(modal);
             fetchAndRender(modal);
         }
-    };
+    }
 
     async function fetchAndRender(modal) {
         try {
@@ -107,24 +100,40 @@
                 let jsonData;
                 try { jsonData = JSON.parse(text); } catch(err) { throw new Error('无效的 JSON 文件'); }
 
-                await saveToKV(file.name, jsonData);
-                addLog(`☁️ 文件已上传: ${file.name}`);
+                // 尝试调用 KV 保存，如果未配置 KV 则仅本地加载
+                if (typeof saveToKV === 'function') {
+                    await saveToKV(file.name, jsonData);
+                    addLog(`☁️ 文件已上传: ${file.name}`);
+                }
 
+                // 加载数据到甘特图
                 const tasksRaw = Array.isArray(jsonData) ? jsonData : (jsonData.tasks || []);
-                const tasks = tasksRaw.map(t => ({...t, id: t.id||generateId(), dependencies: t.dependencies||[]}));
+                const projectInfo = jsonData.project || { name: file.name.replace('.json', '') };
                 
-                gantt.tasks = tasks;
+                const tasks = tasksRaw.map(t => ({
+                    ...t, 
+                    id: t.id || generateId(), 
+                    dependencies: t.dependencies || []
+                }));
                 
-                // ⭐ 上传成功后自动切换全貌
-                gantt.switchToOverviewMode();
-                
-                if(typeof refreshPertViewIfActive === 'function') refreshPertViewIfActive();
+                if (window.gantt) {
+                    // 更新数据
+                    window.gantt.tasks = tasks;
+                    
+                    // 更新标题
+                    const titleEl = document.getElementById('projectTitle');
+                    if (titleEl) titleEl.textContent = projectInfo.name;
+                    
+                    // 切换视图
+                    window.gantt.switchToOverviewMode();
+                    if(typeof refreshPertViewIfActive === 'function') refreshPertViewIfActive();
+                }
 
-                _fileListCache = null;
+                _fileListCache = null; // 清除缓存以显示新文件
                 modal.querySelector('#closeFileManager').click();
-                setTimeout(() => alert(`✅ 上传并加载成功: ${file.name}`), 300);
+                
             } catch (error) {
-                alert(`上传失败: ${error.message}`);
+                alert(`加载失败: ${error.message}`);
             } finally {
                 if(uploadBtn) { uploadBtn.innerHTML = '📤'; uploadBtn.disabled = false; }
             }
@@ -156,14 +165,19 @@
         }
 
         const formatSize = b => b > 1048576 ? `${(b/1048576).toFixed(2)} MB` : `${(b/1024).toFixed(1)} KB`;
+        
         body.innerHTML = `<div class="list-group list-group-flush fade-in">${files.map(f => `
             <div class="list-group-item px-3 py-3" data-filename="${f.name}" style="background:white;border-bottom:1px solid #eee;">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-3" style="flex:1;min-width:0;">
                         <div class="fs-4 text-primary opacity-75">📄</div>
                         <div style="min-width:0;">
-                            <h6 class="mb-1 fw-bold text-truncate text-dark" title="${f.name}">${f.name}</h6>
-                            <div class="d-flex align-items-center gap-2 text-muted small"><span>📅 ${new Date(f.timestamp).toLocaleString('zh-CN')}</span><span class="border-start ps-2">📊 ${f.taskCount} 任务</span><span class="border-start ps-2">💾 ${formatSize(f.size)}</span></div>
+                            <h6 class="mb-1 fw-bold text-truncate text-dark" title="${f.name}" style="cursor:pointer;" onclick="this.closest('.list-group-item').querySelector('.load-file-btn').click()">${f.name}</h6>
+                            <div class="d-flex align-items-center gap-2 text-muted small">
+                                <span>📅 ${new Date(f.timestamp).toLocaleString('zh-CN')}</span>
+                                <span class="border-start ps-2">📊 ${f.taskCount} 任务</span>
+                                <span class="border-start ps-2">💾 ${formatSize(f.size)}</span>
+                            </div>
                         </div>
                     </div>
                     <div class="d-flex gap-2 ms-3">
@@ -173,6 +187,7 @@
                     </div>
                 </div>
             </div>`).join('')}</div>`;
+            
         bindListItemEvents(modal);
     }
 
@@ -202,15 +217,25 @@
                 try {
                     btn.disabled = true; btn.innerHTML = '⏳';
                     const data = await loadFromKV(filename);
-                    const tasks = (Array.isArray(data) ? data : data.tasks || []).map(t => ({...t, id: t.id||generateId(), dependencies: t.dependencies||[]}));
+                    const tasksRaw = Array.isArray(data) ? data : (data.tasks || []);
+                    const projectInfo = data.project || { name: filename.replace('.json', '') };
                     
-                    gantt.tasks = tasks;
+                    const tasks = tasksRaw.map(t => ({...t, id: t.id||generateId(), dependencies: t.dependencies||[]}));
                     
-                    // ⭐ 加载成功后自动切换全貌
-                    gantt.switchToOverviewMode();
-                    
-                    if(typeof refreshPertViewIfActive === 'function') refreshPertViewIfActive();
-                    addLog(`✅ 加载成功：${filename}`); closeModal();
+                    if (window.gantt) {
+                        window.gantt.tasks = tasks;
+                        
+                        // 更新标题
+                        const titleEl = document.getElementById('projectTitle');
+                        if (titleEl) titleEl.textContent = projectInfo.name;
+
+                        // ⭐ 加载成功后自动切换全貌
+                        window.gantt.switchToOverviewMode();
+                        
+                        if(typeof refreshPertViewIfActive === 'function') refreshPertViewIfActive();
+                        addLog(`✅ 加载成功：${filename}`); 
+                    }
+                    closeModal();
                 } catch(e) { alert(e.message); btn.disabled=false; btn.innerHTML='📂 加载'; }
             };
         });
@@ -227,5 +252,5 @@
         });
     }
 
-    console.log('✅ app-file-manager.js loaded (Epsilon26)');
+    console.log('✅ app-file-manager.js loaded (Epsilon30-FixRefError)');
 })();
