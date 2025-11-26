@@ -37,6 +37,12 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         body { opacity: 0; transition: opacity 0.3s ease-in; }
         body.loaded { opacity: 1; }
+
+        #toolbarCollapsed, 
+        #floatingToolbarExpanded {
+            z-index: 3000 !important; 
+            top: 10px !important; /* 稍微调整顶部距离，确保垂直居中 */
+        }
     </style>
 </head>
 <!-- index.html -->
@@ -109,8 +115,9 @@
         <span class="toolbar-icon">🛠️</span>
     </div>
     
-    <!-- 展开状态 (左上角浮出) -->
+    <!-- 展开状态 -->
     <div class="floating-toolbar-expanded" id="floatingToolbarExpanded">
+
         <!-- 任务编辑组 -->
         <div class="toolbar-section">
             <button class="toolbar-btn" id="addTask" title="添加新任务">
