@@ -1,8 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Epsilon35-Decompressed - 逻辑完整还原版                  ▓▓
-// ▓▓ 特性: 零延迟同步 + 完整HTML构建 + 详细注释                     ▓▓
+// ▓▓ 版本: Epsilon37-Ultimate - 逻辑完整还原版                      ▓▓
+// ▓▓ 修复: 零延迟同步 + 完整 DOM 构建逻辑 + 日视图强制标准宽        ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -10,7 +10,6 @@
 
     /**
      * 渲染甘特图（主入口）
-     * 负责 DOM 结构的生成、样式的应用及核心事件的绑定
      */
     GanttChart.prototype.render = function() {
         if (!this.container) {
@@ -18,24 +17,21 @@
             return;
         }
 
-        console.log('🎨 开始渲染甘特图...');
-
         const dates = this.generateDates();
         const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
 
-        // 1. 计算精确的总宽度 (避免浮点数累积误差导致上下宽度不一致)
+        // 1. 计算精确的总宽度 (避免浮点数累积误差)
         const totalWidth = calculateTotalWidth(dates, this.options.cellWidth);
 
-        // 2. 记录当前滚动位置，以便重新渲染后恢复
+        // 2. 记录滚动位置
         const rowsContainer = this.container.querySelector('.gantt-rows-container');
         const prevScrollTop = rowsContainer ? rowsContainer.scrollTop : 0;
         const prevScrollLeft = rowsContainer ? rowsContainer.scrollLeft : 0;
         
-        // 3. 构建基础 HTML 结构
-        // 显式设置 gantt-timeline-header 和 gantt-rows 的宽度，确保对齐
+        // 3. 构建完整 HTML 结构
+        // 显式设置 gantt-timeline-header 和 gantt-rows 的宽度
         const html = `
             <div class="gantt-wrapper">
-                <!-- 左侧：任务名称栏 -->
                 <div class="gantt-sidebar" id="ganttSidebar">
                     <div class="gantt-sidebar-header" id="taskNameHeader">
                         <span>任务名称</span>
@@ -43,16 +39,10 @@
                     <div class="gantt-sidebar-body" id="ganttSidebarBody">
                         ${this.renderTaskNames()}
                     </div>
-                    <!-- 拖拽调整宽度手柄 -->
-                    <div class="sidebar-resize-handle" id="sidebarResizeHandle" 
-                         title="拖拽调整宽度" 
-                         aria-label="调整侧边栏宽度"></div>
+                    <div class="sidebar-resize-handle" id="sidebarResizeHandle" title="拖拽调整宽度"></div>
                 </div>
-
-                <!-- 右侧：时间轴与任务条 -->
                 <div class="gantt-timeline-wrapper">
                     <div class="gantt-timeline">
-                        <!-- 时间轴表头 -->
                         <div class="gantt-timeline-header-wrapper" id="ganttTimelineHeaderWrapper">
                             <div class="gantt-timeline-header" id="ganttTimelineHeader">
                                 <div style="width: ${totalWidth}px; height: 100%; display: flex;">
@@ -60,41 +50,24 @@
                                 </div>
                             </div>
                             
-                            <!-- 悬停视图切换菜单 -->
+                            <!-- 视图菜单 -->
                             <div class="timeline-view-menu" id="timelineViewMenu">
                                 <div class="view-menu-title">时间刻度</div>
                                 <button class="view-menu-btn ${this.options.timeScale === 'day' && !this.options.isOverviewMode ? 'active' : ''}" 
-                                        data-scale="day" title="按天显示">
-                                    <span class="view-icon">📅</span>
-                                    <span class="view-text">日视图</span>
-                                </button>
+                                        data-scale="day"><span class="view-icon">📅</span><span class="view-text">日视图</span></button>
                                 <button class="view-menu-btn ${this.options.timeScale === 'week' && !this.options.isOverviewMode ? 'active' : ''}" 
-                                        data-scale="week" title="按周显示">
-                                    <span class="view-icon">📆</span>
-                                    <span class="view-text">周视图</span>
-                                </button>
+                                        data-scale="week"><span class="view-icon">📆</span><span class="view-text">周视图</span></button>
                                 <button class="view-menu-btn ${this.options.timeScale === 'month' && !this.options.isOverviewMode ? 'active' : ''}" 
-                                        data-scale="month" title="按月显示">
-                                    <span class="view-icon">🗓️</span>
-                                    <span class="view-text">月视图</span>
-                                </button>
-                                
+                                        data-scale="month"><span class="view-icon">🗓️</span><span class="view-text">月视图</span></button>
                                 <div class="view-menu-divider"></div>
-                                
                                 <button class="view-menu-btn view-menu-overview ${this.options.isOverviewMode ? 'active' : ''}" 
-                                        data-scale="overview" title="自适应显示整个项目">
-                                    <span class="view-icon">🔭</span>
-                                    <span class="view-text">全貌视图</span>
-                                </button>
+                                        data-scale="overview"><span class="view-icon">🔭</span><span class="view-text">全貌视图</span></button>
                             </div>
                         </div>
-
-                        <!-- 任务行容器 -->
                         <div class="gantt-rows-container" id="ganttRowsContainer">
                             <div class="gantt-rows" style="width: ${totalWidth}px;">
                                 ${this.renderTaskRows(dates)}
                             </div>
-                            <!-- 依赖关系 SVG 层 -->
                             <svg class="gantt-dependencies" style="position: absolute; top: 0; left: 0; pointer-events: none;"></svg>
                         </div>
                     </div>
@@ -111,63 +84,49 @@
         if (newRowsContainer) {
             newRowsContainer.scrollTop = prevScrollTop;
             newRowsContainer.scrollLeft = prevScrollLeft;
-            // 立即同步表头位置
+            // 立即同步表头
             if (newHeader) newHeader.scrollLeft = prevScrollLeft;
         }
 
-        // 5. 绑定交互功能模块
+        // 5. 绑定模块
         this.attachSidebarResize();
-        this.setupScrollSync(); // ⭐ 使用零延迟同步
+        this.setupScrollSync(); // ⭐ 使用新的零延迟同步
         
-        // 6. 渲染依赖关系箭头
-        // 获取可见任务并应用过滤
+        // 6. 渲染依赖
         const visibleTasks = typeof getVisibleTasks === 'function' ? getVisibleTasks(this.tasks) : this.tasks;
         const filteredTasks = this.options.hideCompleted ? 
-            visibleTasks.filter(t => t.progress < 100) : 
-            visibleTasks;
+            visibleTasks.filter(t => t.progress < 100) : visibleTasks;
 
         this.renderDependencies(dates, filteredTasks);
         
-        // 7. 绑定事件监听器
+        // 7. 事件绑定
         this.attachEvents();
         this.attachQuickMenus();
-        
-        // 延迟绑定视图菜单，确保 DOM 就绪
-        setTimeout(() => {
-            this.attachTimelineViewMenu();
-        }, 100);
-
-        // 更新整体高度
+        setTimeout(() => this.attachTimelineViewMenu(), 100);
         this.updateHeight();
     };
 
     /**
-     * 递归检查任务是否应该隐藏 (处理多级折叠)
+     * 递归检查任务是否应该隐藏
      */
     GanttChart.prototype.isTaskHidden = function(task) {
         if (!task.parentId) return false;
-        
         let current = task;
-        // 向上遍历所有祖先
         while (current.parentId) {
             const parent = this.tasks.find(t => t.id === current.parentId);
             if (!parent) break;
-            
-            // 如果任何一个祖先是折叠状态，则当前任务隐藏
             if (parent.isCollapsed) return true;
-            
             current = parent;
         }
         return false;
     };
 
     /**
-     * 绑定侧边栏拖拽调整宽度事件
+     * 侧边栏调整
      */
     GanttChart.prototype.attachSidebarResize = function() {
         const handle = document.getElementById('sidebarResizeHandle');
         const sidebar = document.getElementById('ganttSidebar');
-        
         if (!handle || !sidebar) return;
 
         let isResizing = false;
@@ -186,17 +145,14 @@
 
         const onMouseMove = (e) => {
             if (!isResizing) return;
-            
             const deltaX = e.clientX - startX;
             const newWidth = Math.max(100, Math.min(400, startWidth + deltaX));
-            
             sidebar.style.width = newWidth + 'px';
             sidebar.style.minWidth = newWidth + 'px';
         };
 
         const onMouseUp = () => {
             if (!isResizing) return;
-            
             isResizing = false;
             sidebar.classList.remove('resizing');
             document.body.style.cursor = '';
@@ -209,23 +165,20 @@
     };
 
     /**
-     * 渲染左侧任务名称列表
+     * 渲染任务名称列表 (逻辑完全展开)
      */
     GanttChart.prototype.renderTaskNames = function() {
         return this.tasks.map(task => {
+            // 基本检查
             if (!task || !task.id) return '';
-            
-            // 检查折叠状态
             if (this.isTaskHidden(task)) return '';
-            
-            // 检查隐藏已完成选项
             if (this.options.hideCompleted && task.progress >= 100) return '';
 
-            // 判断任务就绪状态 (无依赖或依赖已完成)
+            // 就绪检查逻辑
             let isReady = false;
             if (task.progress < 100 && !task.isSummary && !task.isMilestone) {
                 if (!task.dependencies || task.dependencies.length === 0) {
-                    isReady = true; 
+                    isReady = true;
                 } else {
                     const allDepsCompleted = task.dependencies.every(dep => {
                         const depId = typeof dep === 'string' ? dep : dep.taskId;
@@ -236,7 +189,7 @@
                 }
             }
 
-            // 样式类构建
+            // 类名构建
             const classes = ['gantt-task-name'];
             if (this.selectedTask === task.id) classes.push('selected');
             if (task.isSummary) classes.push('summary-task');
@@ -248,7 +201,6 @@
             const icon = task.isMilestone ? '🎯' : (task.isSummary ? '📁' : '📋');
             const wbsPrefix = task.wbs ? `<span class="wbs-badge">[${task.wbs}]</span> ` : '';
             
-            // 折叠按钮
             const collapseBtn = (task.isSummary && task.children && task.children.length > 0) ? 
                 `<span class="task-collapse-btn" data-task-id="${task.id}" title="${task.isCollapsed ? '展开' : '折叠'}子任务">
                     ${task.isCollapsed ? '▶' : '▼'}
@@ -258,8 +210,7 @@
                 <div class="${classes.join(' ')}" 
                      data-task-id="${task.id}"
                      data-outline-level="${outlineLevel}"
-                     role="button"
-                     tabindex="0"
+                     role="button" tabindex="0"
                      aria-label="任务: ${this.escapeHtml(task.name)}">
                     ${collapseBtn}
                     <span class="task-name-content" title="${isReady ? '✅ 前置就绪，可以开始' : ''}">
@@ -271,7 +222,7 @@
     };
 
     /**
-     * 渲染时间轴表头
+     * 渲染日期表头
      */
     GanttChart.prototype.renderDateHeaders = function(dates, weekdays) {
         const scale = this.options.timeScale || 'day';
@@ -286,8 +237,8 @@
             if (isTodayDay) classes.push('today');
             
             const cellWidth = this.options.cellWidth * dateObj.span;
-            
             let content = '';
+            
             switch (scale) {
                 case 'day':
                     content = `
@@ -330,7 +281,7 @@
     };
 
     /**
-     * 渲染单个任务行 (包含任务条、里程碑、标签)
+     * 渲染单个任务行 (完整逻辑还原)
      */
     GanttChart.prototype.renderRow = function(task, dates) {
         if (!task || !task.id) return '';
@@ -352,34 +303,33 @@
         const left = startDays * this.options.cellWidth;
         const width = Math.max(durationDays * this.options.cellWidth, task.isMilestone ? 20 : 30);
 
-        // 标签文本
         const startTimeLabel = typeof formatDate === 'function' ? formatDate(start) : '';
         const endTimeLabel = typeof formatDate === 'function' ? formatDate(end) : '';
 
-        // 显示名称构建
         const outlineLevel = task.outlineLevel || 1;
         const indent = '　'.repeat(outlineLevel - 1);
         const icon = task.isMilestone ? '🎯' : (task.isSummary ? '📁' : '📋');
         const wbsPrefix = task.wbs ? `[${task.wbs}] ` : '';
         const displayName = `${indent}${icon} ${wbsPrefix}${task.name}`;
 
-        // 属性准备
         const priorityAttr = task.priority ? `data-priority="${task.priority}"` : '';
         const durationType = task.durationType || 'days';
         const durationTypeAttr = `data-duration-type="${durationType}"`;
         const durationTypeIcon = durationType === 'workdays' ? '💼' : '📅';
 
-        // 折叠按钮 (右侧)
         const collapseToggle = (task.isSummary && task.children && task.children.length > 0) ? 
             `<span class="collapse-toggle" data-task-id="${task.id}" title="${task.isCollapsed ? '展开' : '折叠'}子任务">
                 ${task.isCollapsed ? '▶' : '▼'}
             </span>` : '';
 
-        // 类名构建
+        // 类名构建 (恢复详细逻辑)
         let barClasses = ['gantt-bar'];
         if (task.isSummary) barClasses.push('gantt-bar-summary');
         if (isSelected) barClasses.push('selected');
         if (isCompleted) barClasses.push('locked');
+        
+        // 冲突检测类 (如果有冲突检测逻辑运行)
+        if (task.hasConflict) barClasses.push('conflict');
 
         let labelStartClasses = ['gantt-bar-label-start'];
         if (isSelected) labelStartClasses.push('selected');
@@ -392,7 +342,6 @@
             <div class="gantt-row ${task.isSummary ? 'gantt-row-summary' : ''}" role="row">
                 ${this.renderCells(dates)}
                 
-                <!-- 左侧双层时间标签 -->
                 <div class="${labelStartClasses.join(' ')}" 
                      data-task-id="${task.id}"
                      style="right: calc(100% - ${left}px + 8px);">
@@ -403,7 +352,6 @@
                     </div>
                 </div>
                 
-                <!-- 任务条 / 里程碑 -->
                 ${task.isMilestone ? `
                     <div class="gantt-milestone ${isSelected ? 'selected' : ''} ${isCompleted ? 'locked' : ''}" 
                          data-task-id="${task.id}" style="left: ${left}px;">
@@ -415,8 +363,6 @@
                          style="left: ${left}px; width: ${width}px;"
                          ${isCompleted ? 'title="已完成 (100%) - 锁定"' : ''}>
                         <div class="gantt-bar-progress" style="width: ${progress}%"></div>
-                        
-                        <!-- 拖拽手柄 (未完成且非汇总任务) -->
                         ${this.options.enableResize && !task.isSummary && !isCompleted ? `
                             <div class="gantt-bar-handle left"></div>
                             <div class="gantt-bar-handle right"></div>
@@ -424,7 +370,6 @@
                     </div>
                 `}
                 
-                <!-- 右侧标签 -->
                 <div class="${labelExtClasses.join(' ')}" 
                      data-task-id="${task.id}" style="left: ${left + width + 8}px;">
                     ${this.escapeHtml(displayName)} 
@@ -436,18 +381,16 @@
     };
 
     /**
-     * 渲染背景网格单元格
+     * 渲染单元格（背景网格）
      */
     GanttChart.prototype.renderCells = function(dates) {
         const scale = this.options.timeScale || 'day';
-        
         return dates.map(dateObj => {
             const date = dateObj.date;
             const isWeekendDay = typeof isWeekend === 'function' ? isWeekend(date) : false;
             const isTodayDay = typeof isToday === 'function' ? isToday(date) : false;
             
             const classes = ['gantt-cell'];
-            
             if (isWeekendDay && this.options.showWeekends) classes.push('weekend');
             if (isTodayDay) classes.push('today');
             
@@ -463,7 +406,7 @@
     };
 
     /**
-     * ⭐⭐⭐ 零延迟同步滚动 (硬核同步版) ⭐⭐⭐
+     * ⭐⭐⭐ 零延迟同步滚动 (核心修复) ⭐⭐⭐
      * 移除 requestAnimationFrame，消除缩放时的标尺错位
      */
     GanttChart.prototype.setupScrollSync = function() {
@@ -499,7 +442,7 @@
     };
 
     /**
-     * 绑定时间轴视图切换菜单
+     * 绑定时间轴视图菜单 (含标准日视图修正)
      */
     GanttChart.prototype.attachTimelineViewMenu = function() {
         const headerWrapper = document.getElementById('ganttTimelineHeaderWrapper');
@@ -545,12 +488,17 @@
                 } else {
                     this.options.isOverviewMode = false;
                     this.options.timeScale = scale;
-                    this.options.cellWidth = typeof getRecommendedCellWidth === 'function' ? getRecommendedCellWidth(scale) : 50;
+                    
+                    // ⭐⭐⭐ 强制 "日视图" 使用统一标准最大宽度 (60px) ⭐⭐⭐
+                    if (scale === 'day') {
+                        this.options.cellWidth = (typeof window.GANTT_STD_DAY_WIDTH !== 'undefined') ? window.GANTT_STD_DAY_WIDTH : 60;
+                    } else {
+                        this.options.cellWidth = typeof getRecommendedCellWidth === 'function' ? getRecommendedCellWidth(scale) : 50;
+                    }
+                    
                     this.calculateDateRange();
                     this.render();
-                    
-                    const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
-                    if (typeof addLog === 'function') addLog(`✅ 已切换到${scaleNames[scale]}视图`);
+                    if (typeof addLog === 'function') addLog(`✅ 已切换到${scale}视图`);
                 }
                 
                 viewMenu.classList.remove('show');
@@ -587,6 +535,6 @@
         console.log('GanttChart instance destroyed');
     };
 
-    console.log('✅ gantt-render.js loaded successfully (Epsilon35-Decompressed)');
+    console.log('✅ gantt-render.js loaded successfully (Epsilon37-Ultimate - 逻辑完全复原)');
 
 })();
