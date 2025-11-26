@@ -1,7 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图编辑表单模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-form.js                           ▓▓
-// ▓▓ 版本: Epsilon23 - 终极完整版 (工期修复 + 完工验证 + 全功能)      ▓▓
+// ▓▓ 版本: Epsilon38-FullRestored                                   ▓▓
+// ▓▓ 状态: 逻辑全量复原 + 历史记录集成                               ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -33,7 +34,6 @@
             !t.isMilestone
         );
         
-        // ⭐ 修复数据类型问题：强制转换为整数
         const rawDuration = parseInt(task.duration);
         const currentDuration = task.isMilestone ? 0 : (isNaN(rawDuration) || rawDuration < 0 ? 1 : rawDuration);
         const currentDurationType = task.durationType || 'days';
@@ -234,16 +234,13 @@
         rowsContainer.appendChild(form);
         this.updateFormPosition(form, bar, rowsContainer);
         
-        // ⭐ 关键：在元素插入DOM后，显式设置下拉菜单的值
         this.setFormValues(form, task, currentDuration);
         
         this.bindFormEvents(form, task, bar, rowsContainer);
-        
-        console.log(`✅ 表单已创建，显式设置工期为: ${currentDuration}`);
     };
 
     /**
-     * 显式设置表单值的辅助函数 (解决工期显示问题)
+     * 显式设置表单值
      */
     GanttChart.prototype.setFormValues = function(form, task, currentDuration) {
         const durationSelect = form.querySelector('#editDuration');
@@ -530,16 +527,12 @@
             }
         };
         setTimeout(() => document.addEventListener('click', clickOutside), 0);
-        
-        console.log('✅ 所有表单事件绑定完成');
     };
 
     /**
-     * 显示依赖任务选择器（修复版 - 保留原有依赖）
+     * 显示依赖任务选择器
      */
     GanttChart.prototype.showDependencySelector = function(task, parentForm) {
-        console.log('🔧 显示依赖任务选择器...');
-        
         const oldSelector = document.querySelector('.dependency-selector-modal');
         if (oldSelector) oldSelector.remove();
 
@@ -579,7 +572,6 @@
                             const indent = '　'.repeat((t.outlineLevel || 1) - 1);
                             const icon = t.isMilestone ? '🎯' : (t.children?.length > 0 ? '📁' : '📋');
                             
-                            // 已选依赖不验证（允许保留），其他进行验证
                             const validation = isChecked ? 
                                 { canAdd: true, reason: '' } : 
                                 this.canAddDependency(t.id, task.id);
@@ -623,16 +615,12 @@
         requestAnimationFrame(() => {
             modal.classList.add('show');
         });
-        
-        addLog(`📝 打开依赖任务选择器（当前已选 ${currentDeps.length} 个）`);
     };
 
     /**
      * 绑定依赖选择器事件
      */
     GanttChart.prototype.bindDependencySelectorEvents = function(modal, task, parentForm) {
-        console.log('🔧 开始绑定依赖选择器事件...');
-        
         const closeDepsSelector = () => {
             modal.classList.remove('show');
             setTimeout(() => {
@@ -689,8 +677,6 @@
         const confirmBtn = modal.querySelector('#confirmDeps');
         if (confirmBtn) {
             confirmBtn.onclick = () => {
-                console.log('🖱️ 保存依赖关系...');
-                
                 const selectedIds = Array.from(checkboxes)
                     .filter(cb => cb.checked && !cb.disabled)
                     .map(cb => cb.value);
@@ -711,8 +697,6 @@
                 closeDepsSelector();
             };
         }
-        
-        console.log('✅ 依赖选择器所有事件绑定完成');
     };
 
     /**
@@ -799,9 +783,15 @@
         addLog(`✅ 已移除依赖：${depName}`);
     };
 
-     GanttChart.prototype.saveTaskForm = function(form, task) {
+    /**
+     * ⭐ 核心修改：保存任务表单（包含完工验证 + 历史记录）
+     */
+    GanttChart.prototype.saveTaskForm = function(form, task) {
         const newName = form.querySelector('#editName').value.trim();
-        if (!newName) { alert('任务名称不能为空'); return; }
+        if (!newName) { 
+            alert('任务名称不能为空'); 
+            return; 
+        }
 
         const progress = parseInt(form.querySelector('#editProgress')?.value) || 0;
         const startStr = form.querySelector('#editStart').value;
@@ -810,37 +800,73 @@
         const isMilestone = form.querySelector('#editMilestone').checked;
         const hasChildren = task.children && task.children.length > 0;
 
-        // 完工验证
+        // ⭐⭐⭐ 完工验证逻辑 ⭐⭐⭐
         if (progress >= 100) {
-            if (task.dependencies?.some(d => {
-                const dt = this.tasks.find(t => t.id === (d.taskId||d));
-                return dt && dt.progress < 100;
-            })) {
-                alert('❌ 前置任务未完成，无法完成此任务。'); return;
+            // 1. 检查依赖任务是否已完成
+            if (task.dependencies && task.dependencies.length > 0) {
+                const incompleteDeps = [];
+                task.dependencies.forEach(dep => {
+                    const depId = typeof dep === 'string' ? dep : dep.taskId;
+                    const depTask = this.tasks.find(t => t.id === depId);
+                    if (depTask && depTask.progress < 100) {
+                        incompleteDeps.push(depTask.name);
+                    }
+                });
+
+                if (incompleteDeps.length > 0) {
+                    alert(`❌ 无法完成任务 "${task.name}"\n\n以下前置依赖尚未完成：\n• ${incompleteDeps.join('\n• ')}\n\n请先完成所有前置任务。`);
+                    if (typeof addLog === 'function') addLog(`❌ 拒绝完成 "${task.name}"：依赖未完成`);
+                    return; // ⛔ 阻止保存
+                }
+            }
+
+            // 2. 检查任务是否在未来（仅对非里程碑有效）
+            if (!isMilestone && !hasChildren && startStr) {
+                const startDate = new Date(startStr);
+                const endDate = calculateEndDate(startDate, duration, durationType);
+                
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const endCheck = new Date(endDate);
+                endCheck.setHours(0, 0, 0, 0);
+
+                if (endCheck > today) {
+                    alert(`❌ 无法完成任务 "${task.name}"\n\n任务计划结束日期 (${formatDate(endDate)}) 在未来。\n不能提前标记为 100% 完成。`);
+                    if (typeof addLog === 'function') addLog(`❌ 拒绝完成 "${task.name}"：任务结束日期在未来`);
+                    return; // ⛔ 阻止保存
+                }
             }
         }
+        // ⭐⭐⭐ 验证结束 ⭐⭐⭐
 
         // ⭐ 1. 记录历史：修改前快照
         const oldSnapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
 
         // 常规保存逻辑
         const newParentId = form.querySelector('#editParent').value || null;
+        const priority = form.querySelector('#editPriority').value;
+        const notes = form.querySelector('#editNotes').value.trim();
+
+        const oldDepsCount = task.dependencies ? task.dependencies.length : 0;
+
         task.name = newName;
-        task.priority = form.querySelector('#editPriority').value;
-        task.notes = form.querySelector('#editNotes').value.trim();
+        task.priority = priority;
+        task.notes = notes;
         task.isMilestone = isMilestone && !hasChildren;
         task.isSummary = hasChildren;
         task.durationType = durationType;
 
         if (!hasChildren) {
             task.start = startStr;
+            
             if (isMilestone) {
                 task.end = startStr;
                 task.duration = 0;
                 task.progress = 100;
                 task.durationType = 'days';
             } else {
-                const endDate = calculateEndDate(new Date(startStr), duration, durationType);
+                const startDate = new Date(startStr);
+                const endDate = calculateEndDate(startDate, duration, durationType);
                 task.end = formatDate(endDate);
                 task.duration = duration;
                 task.progress = progress;
@@ -852,16 +878,44 @@
         }
 
         task.wbs = this.generateWBS(task.id);
-        if (hasChildren) this.recalculateSummaryTask(task.id);
+
+        if (!Array.isArray(task.dependencies)) {
+            task.dependencies = [];
+        }
+
+        // 确保依赖格式正确
+        task.dependencies = task.dependencies.map(dep => {
+            if (typeof dep === 'string') {
+                return { taskId: dep, type: 'FS', lag: 0 };
+            } else if (typeof dep === 'object' && dep.taskId) {
+                return dep;
+            }
+            return null;
+        }).filter(dep => dep);
+
+        const newDepsCount = task.dependencies.length;
+
+        if (hasChildren) {
+            this.recalculateSummaryTask(task.id);
+        }
+
         this.updateParentTasks(task.id);
         this.sortTasksByWBS();
+        this.cleanupForm(form);
         this.calculateDateRange();
+        
         this.render();
-
-        // ⭐ 2. 记录历史：修改后快照
+        
+        setTimeout(() => {
+            const dates = this.generateDates();
+            const visibleTasks = getVisibleTasks(this.tasks);
+            this.renderDependencies(dates, visibleTasks);
+        }, 50);
+        
+        // ⭐ 2. 记录历史：修改后快照 (使用 window.historyManager)
         if (window.historyManager) {
             const newSnapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
-            historyManager.record(
+            window.historyManager.record(
                 'UPDATE',
                 { task: oldSnapshot },
                 { task: newSnapshot },
@@ -869,8 +923,16 @@
             );
         }
         
-        addLog(`✅ 任务已更新：${task.name}`);
-        this.cleanupForm(form);
+        const typeLabel = isMilestone ? '（里程碑）' : 
+                        hasChildren ? '（汇总任务）' : 
+                        `（${task.duration}${durationType === 'workdays' ? '工作日' : '自然日'}）`;
+        
+        addLog(`✅ 任务已更新：${task.wbs ? '[' + task.wbs + '] ' : ''}${task.name}${typeLabel}`);
+        
+        if (oldDepsCount !== newDepsCount) {
+            addLog(`   依赖关系：${oldDepsCount} → ${newDepsCount} 个`);
+        }
+        
         form.remove();
     };
 
@@ -932,7 +994,7 @@
     };
 
     /**
-     * 编辑任务名称
+     * 编辑任务名称 (内联编辑)
      */
     GanttChart.prototype.editTaskName = function(element) {
         if (element.classList.contains('editing')) return;
@@ -960,10 +1022,20 @@
         const saveEdit = () => {
             const newName = input.value.trim();
             if (newName && newName !== originalName) {
-                task.name = newName;
+                // ⭐ 记录历史 (重命名)
+                if (window.historyManager) {
+                    const oldSnapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
+                    task.name = newName;
+                    const newSnapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
+                    window.historyManager.record('UPDATE', { task: oldSnapshot }, { task: newSnapshot }, `重命名任务为 "${newName}"`);
+                } else {
+                    task.name = newName;
+                }
+                
                 addLog(`✏️ 任务名称从 "${originalName}" 改为 "${newName}"`);
             }
             
+            // 恢复显示结构 (保持缩进和图标)
             const indent = '　'.repeat((task.outlineLevel || 1) - 1);
             const icon = task.isMilestone ? '🎯' : (task.isSummary ? '📁' : '📋');
             const wbsPrefix = task.wbs ? `<span class="wbs-badge">[${task.wbs}]</span> ` : '';
@@ -974,6 +1046,7 @@
             element.innerHTML = `${collapseBtn}<span class="task-name-content">${indent}${icon} ${wbsPrefix}${task.name}</span>`;
             element.classList.remove('editing');
             
+            // 重新绑定折叠按钮
             const newCollapseBtn = element.querySelector('.task-collapse-btn');
             if (newCollapseBtn) {
                 newCollapseBtn.onclick = (e) => {
@@ -983,6 +1056,7 @@
                 };
             }
             
+            // 同步更新右侧标签
             const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${taskId}"]`);
             if (externalLabel) {
                 const displayName = `${indent}${icon} ${task.wbs ? '[' + task.wbs + '] ' : ''}${task.name}`;
@@ -1031,6 +1105,6 @@
         }
     };
 
-    console.log('✅ gantt-events-form.js loaded successfully (Epsilon23 - 完整无省略版)');
+    console.log('✅ gantt-events-form.js loaded successfully (Epsilon38-FullRestored)');
 
 })();

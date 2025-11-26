@@ -1,8 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图任务操作模块                                              ▓▓
 // ▓▓ 路径: js/gantt/gantt-operations.js                             ▓▓
-// ▓▓ 版本: Epsilon17 - 修复折叠时依赖箭头重渲染                     ▓▓
-// ▓▓ 职责: 任务增删改查、层级管理、汇总任务计算                     ▓▓
+// ▓▓ 版本: Epsilon38-FullRestored                                   ▓▓
+// ▓▓ 状态: 逻辑全量复原 + 历史记录集成                               ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -78,7 +78,9 @@
             this.scrollTaskToCenter(taskId);
         }, 150);
         
-        addLog(`📌 已选择任务 "${task.name}"${deps.size > 0 ? ` (依赖${deps.size}个任务)` : ''}`);
+        if (typeof addLog === 'function') {
+            addLog(`📌 已选择任务 "${task.name}"${deps.size > 0 ? ` (依赖${deps.size}个任务)` : ''}`);
+        }
     };
 
     /**
@@ -100,7 +102,7 @@
         const form = this.container.querySelector('.inline-task-form');
         if (form) form.remove();
         
-        addLog('✅ 已取消选择');
+        if (typeof addLog === 'function') addLog('✅ 已取消选择');
     };
 
     /**
@@ -174,8 +176,11 @@
             ganttWrapper.style.height = finalHeight + 'px';
             ganttWrapper.style.maxHeight = finalHeight + 'px';
             
-            // ⭐ 使用可见任务数量计算高度
-            const visibleTasks = getVisibleTasks(this.tasks);
+            // 使用可见任务数量计算高度
+            const visibleTasks = typeof getVisibleTasks === 'function' ? getVisibleTasks(this.tasks) : this.tasks;
+            // 默认行高 40 (需与 CSS 保持一致)
+            const ROW_HEIGHT = 40; 
+            const HEADER_HEIGHT = 50;
             const contentHeight = visibleTasks.length * ROW_HEIGHT;
             
             if (contentHeight > finalHeight - HEADER_HEIGHT) {
@@ -196,20 +201,29 @@
      * 添加任务
      */
     GanttChart.prototype.addTask = function(task) {
-        if (!task || typeof task !== 'object') return;
+        if (!task || typeof task !== 'object') {
+            console.error('Invalid task object');
+            return;
+        }
 
-        // 自动补全字段
+        // 自动补全所有必需字段
         if (!task.id) task.id = generateId();
         if (!task.uid) task.uid = this.getNextUID();
         if (!task.name) task.name = '新任务';
         if (!task.start) task.start = formatDate(new Date());
+        
         if (typeof task.duration !== 'number') task.duration = 1;
         if (!task.durationType) task.durationType = 'days';
+        
         if (!task.end) {
-            task.end = formatDate(calculateEndDate(new Date(task.start), task.duration, task.durationType));
+            const startDate = new Date(task.start);
+            const endDate = calculateEndDate(startDate, task.duration, task.durationType);
+            task.end = formatDate(endDate);
         }
+        
         if (typeof task.progress !== 'number') task.progress = 0;
         if (!Array.isArray(task.dependencies)) task.dependencies = [];
+        
         if (typeof task.isMilestone !== 'boolean') task.isMilestone = false;
         if (typeof task.isSummary !== 'boolean') task.isSummary = false;
         if (task.parentId === undefined) task.parentId = null;
@@ -222,23 +236,23 @@
         this.tasks.push(task);
         
         task.wbs = this.generateWBS(task.id);
+        
         this.sortTasksByWBS();
         this.calculateDateRange();
         this.render();
         
-        // ⭐ 记录历史
+        // ⭐ 记录历史 (集成 HistoryManager)
         if (window.historyManager) {
-            // 深拷贝一份以存入历史
             const snapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
-            historyManager.record(
+            window.historyManager.record(
                 'ADD',
-                { addedTask: snapshot }, // Undo: 删掉它
-                { addedTask: snapshot }, // Redo: 加回它
+                { addedTask: snapshot }, // Undo
+                { addedTask: snapshot }, // Redo
                 `创建任务 "${task.name}"`
             );
         }
         
-        addLog(`✅ 已添加任务 "${task.name}"`);
+        if (typeof addLog === 'function') addLog(`✅ 已添加任务 "${task.name}"`);
     };
 
     /**
@@ -253,13 +267,17 @@
      */
     GanttChart.prototype.deleteTaskWithChildren = function(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
-        if (!task) return;
+        if (!task) {
+            console.warn('Task not found:', taskId);
+            return;
+        }
 
         if (task.children && task.children.length > 0) {
             console.warn(`Cannot delete task with children: ${task.name}`);
             return;
         }
 
+        // ⭐ 准备历史数据：备份将被删除的任务
         const deletedTaskSnapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
 
         // 从父任务移除
@@ -267,8 +285,10 @@
             const parent = this.tasks.find(t => t.id === task.parentId);
             if (parent && parent.children) {
                 parent.children = parent.children.filter(cid => cid !== taskId);
+                
                 if (parent.children.length === 0) {
                     parent.isSummary = false;
+                    if (typeof addLog === 'function') addLog(`   "${parent.name}" 已自动取消汇总任务状态`);
                 } else {
                     this.recalculateSummaryTask(parent.id);
                 }
@@ -283,35 +303,50 @@
         this.tasks.forEach(t => {
             if (t.dependencies && t.dependencies.length > 0) {
                 const originalCount = t.dependencies.length;
+                
                 t.dependencies = t.dependencies.filter(dep => {
                     const depId = typeof dep === 'string' ? dep : dep.taskId;
                     return depId !== taskId;
                 });
-                removedDepsCount += (originalCount - t.dependencies.length);
+                
+                const removed = originalCount - t.dependencies.length;
+                if (removed > 0) {
+                    removedDepsCount += removed;
+                }
             }
         });
 
-        if (this.selectedTask === taskId) this.selectedTask = null;
+        // 取消选择
+        if (this.selectedTask === taskId) {
+            this.selectedTask = null;
+        }
 
-        this.tasks.forEach(t => t.wbs = this.generateWBS(t.id));
+        // 重新生成所有 WBS
+        this.tasks.forEach(t => {
+            t.wbs = this.generateWBS(t.id);
+        });
+
         this.calculateDateRange();
         this.render();
 
-        // ⭐ 记录历史
+        // ⭐ 记录历史 (集成 HistoryManager)
         if (window.historyManager) {
-            historyManager.record(
+            window.historyManager.record(
                 'DELETE',
-                { deletedTask: deletedTaskSnapshot }, // Undo: 恢复它
-                { deletedTask: deletedTaskSnapshot }, // Redo: 再次删除
+                { deletedTask: deletedTaskSnapshot }, // Undo
+                { deletedTask: deletedTaskSnapshot }, // Redo
                 `删除任务 "${task.name}"`
             );
         }
 
-        addLog(`✅ 已删除任务 "${task.name}"`);
+        if (typeof addLog === 'function') addLog(`✅ 已删除任务 "${task.name}"${removedDepsCount > 0 ? `（清理了 ${removedDepsCount} 个依赖关系）` : ''}`);
     };
 
     // ==================== 子任务管理 ====================
 
+    /**
+     * 添加子任务
+     */
     GanttChart.prototype.addChildTask = function(parentId) {
         const parent = this.tasks.find(t => t.id === parentId);
         if (!parent) return;
@@ -336,7 +371,9 @@
             dependencies: []
         };
         
-        newTask.end = formatDate(calculateEndDate(new Date(newTask.start), newTask.duration, newTask.durationType));
+        const startDate = new Date(newTask.start);
+        const endDate = calculateEndDate(startDate, newTask.duration, newTask.durationType);
+        newTask.end = formatDate(endDate);
 
         if (!parent.children) parent.children = [];
         parent.children.push(newTask.id);
@@ -350,10 +387,10 @@
         this.calculateDateRange();
         this.render();
 
-        // ⭐ 记录历史
+        // ⭐ 记录历史 (集成 HistoryManager)
         if (window.historyManager) {
             const snapshot = typeof deepClone === 'function' ? deepClone(newTask) : JSON.parse(JSON.stringify(newTask));
-            historyManager.record(
+            window.historyManager.record(
                 'ADD',
                 { addedTask: snapshot },
                 { addedTask: snapshot },
@@ -364,7 +401,7 @@
         setTimeout(() => {
             this.selectTask(newTask.id);
             this.showInlineTaskForm(newTask);
-            addLog(`✅ 已为 "${parent.name}" 添加子任务`);
+            if (typeof addLog === 'function') addLog(`✅ 已为 "${parent.name}" 添加子任务 [${newTask.wbs}]`);
         }, 100);
     };
 
@@ -546,7 +583,7 @@
         });
     };
 
-    // ==================== ⭐ 折叠/展开（修复版） ====================
+    // ==================== 折叠/展开 ====================
 
     /**
      * 切换任务折叠状态
@@ -559,7 +596,7 @@
     };
 
     /**
-     * ⭐ 新增：全部展开
+     * 全部展开
      */
     GanttChart.prototype.expandAllTasks = function() {
         this.tasks.forEach(task => {
@@ -567,12 +604,12 @@
                 task.isCollapsed = false;
             }
         });
-        addLog('📂 已全部展开任务');
+        if (typeof addLog === 'function') addLog('📂 已全部展开任务');
         this.render();
     };
 
     /**
-     * ⭐ 新增：全部折叠
+     * 全部折叠
      */
     GanttChart.prototype.collapseAllTasks = function() {
         this.tasks.forEach(task => {
@@ -580,9 +617,10 @@
                 task.isCollapsed = true;
             }
         });
-        addLog('📁 已全部折叠任务');
+        if (typeof addLog === 'function') addLog('📁 已全部折叠任务');
         this.render();
     };
+
     // ==================== 工具函数 ====================
 
     /**
@@ -630,17 +668,15 @@
             if (show) {
                 sidebar.classList.remove('collapsed');
                 this.options.showTaskNames = true;
-                addLog('✅ 任务名称栏已展开');
             } else {
                 sidebar.classList.add('collapsed');
                 this.options.showTaskNames = false;
-                addLog('✅ 任务名称栏已折叠');
             }
         } catch (error) {
             console.error('toggleSidebar error:', error);
         }
     };
 
-    console.log('✅ gantt-operations.js loaded successfully (Epsilon17 - 修复折叠渲染)');
+    console.log('✅ gantt-operations.js loaded successfully (Epsilon38-FullRestored)');
 
 })();

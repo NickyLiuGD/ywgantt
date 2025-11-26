@@ -1,8 +1,7 @@
-
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图拖拽操作模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-drag.js                           ▓▓
-// ▓▓ 版本: Epsilon5 - 集成 HistoryManager 自动记录增量               ▓▓
+// ▓▓ 版本: Epsilon6-Fix - 修复 historyManager 引用错误               ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -71,7 +70,7 @@
     };
 
     /**
-     * 鼠标移动处理 (保持原逻辑)
+     * 鼠标移动处理 (UI 实时更新逻辑保持不变)
      */
     GanttChart.prototype.onMouseMove = function(e) {
         if (!this.dragState) return;
@@ -87,12 +86,14 @@
             const offset = daysBetween(this.startDate, newStart);
             this.dragState.bar.style.left = offset * this.options.cellWidth + 'px';
             
+            // 更新右侧任务名称标签
             const externalLabel = this.container.querySelector(`.gantt-bar-label-external[data-task-id="${this.dragState.task.id}"]`);
             if (externalLabel) {
                 const barWidth = parseFloat(this.dragState.bar.style.width) || this.dragState.bar.offsetWidth;
                 externalLabel.style.left = (offset * this.options.cellWidth + barWidth + 8) + 'px';
             }
             
+            // 更新左侧双层时间标签
             const startLabel = this.container.querySelector(`.gantt-bar-label-start[data-task-id="${this.dragState.task.id}"]`);
             if (startLabel) {
                 startLabel.style.right = `calc(100% - ${offset * this.options.cellWidth}px + 8px)`;
@@ -100,6 +101,7 @@
                 startLabel.querySelector('.time-end').textContent = formatDate(newEnd);
             }
             
+            // 如果表单打开，更新表单位置
             const form = this.container.querySelector('.inline-task-form');
             const rowsContainer = this.container.querySelector('.gantt-rows-container');
             if (form && form.dataset.taskId === this.dragState.task.id && rowsContainer) {
@@ -157,7 +159,7 @@
     };
 
     /**
-     * 鼠标释放处理
+     * 鼠标释放处理 (提交历史记录)
      */
     GanttChart.prototype.onMouseUp = function(e) {
         if (!this.dragState) return;
@@ -165,7 +167,7 @@
         const task = this.dragState.task;
         const oldSnapshot = this.dragState.snapshot;
         
-        // 根据工期类型重新计算 duration
+        // 根据工期类型重新计算 duration (业务逻辑)
         if (task.durationType === 'workdays') {
             task.duration = workdaysBetween(task.start, task.end);
         } else {
@@ -176,7 +178,7 @@
         
         const durationLabel = task.durationType === 'workdays' ? '工作日' : '自然日';
         
-        // ⭐ 2. 记录历史 (仅当日期确实发生变化时)
+        // ⭐⭐⭐ 核心修复：使用 window.historyManager 避免引用错误 ⭐⭐⭐
         if (window.historyManager && (oldSnapshot.start !== task.start || oldSnapshot.end !== task.end)) {
             const newSnapshot = typeof deepClone === 'function' ? deepClone(task) : JSON.parse(JSON.stringify(task));
             
@@ -185,10 +187,10 @@
                 ? `调整任务 "${task.name}" 工期为 ${task.duration} 天`
                 : `移动任务 "${task.name}" 到 ${task.start}`;
 
-            historyManager.record(
+            window.historyManager.record(
                 actionType,
-                { task: oldSnapshot }, // Undo
-                { task: newSnapshot }, // Redo
+                { task: oldSnapshot }, // Undo: 恢复旧状态
+                { task: newSnapshot }, // Redo: 应用新状态
                 desc
             );
         }
@@ -197,7 +199,7 @@
         
         this.dragState = null;
         
-        // 更新父任务
+        // 更新父任务聚合时间
         if (typeof this.updateParentTasks === 'function') {
             this.updateParentTasks(task.id);
         }
@@ -206,6 +208,5 @@
         this.render();
     };
 
-    console.log('✅ gantt-events-drag.js loaded successfully (Epsilon5 - History Integrated)');
-
+    console.log('✅ gantt-events-drag.js loaded (Epsilon6-Fix)');
 })();
