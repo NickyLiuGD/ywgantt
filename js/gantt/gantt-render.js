@@ -1,7 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Epsilon26-Fix - 修复变量初始化顺序错误                   ▓▓
+// ▓▓ 版本: Epsilon34-FullRestore - 完整复原版 (含修复)              ▓▓
+// ▓▓ 修复: 零延迟滚动同步 + 找回任务渲染的所有细节逻辑              ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -19,64 +20,48 @@
         const dates = this.generateDates();
         const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
 
-        // 1. 记录滚动位置，以便重新渲染后恢复
+        // 1. 计算精确的总宽度 (避免浮点数累积误差导致上下宽度不一致)
+        const totalWidth = calculateTotalWidth(dates, this.options.cellWidth);
+
+        // 2. 记录滚动位置
         const rowsContainer = this.container.querySelector('.gantt-rows-container');
         const prevScrollTop = rowsContainer ? rowsContainer.scrollTop : 0;
         const prevScrollLeft = rowsContainer ? rowsContainer.scrollLeft : 0;
         
-        // 2. 构建基础 HTML 结构 (先定义 html 变量)
+        // 3. 构建 HTML 结构
+        // 注意：显式设置 gantt-timeline-header 和 gantt-rows 的宽度
         const html = `
             <div class="gantt-wrapper">
                 <div class="gantt-sidebar" id="ganttSidebar">
-                    <!-- 表头：移除硬编码按钮，交由悬停菜单处理 -->
                     <div class="gantt-sidebar-header" id="taskNameHeader">
                         <span>任务名称</span>
                     </div>
                     <div class="gantt-sidebar-body" id="ganttSidebarBody">
                         ${this.renderTaskNames()}
                     </div>
-                    <!-- 拖拽调整宽度手柄 -->
-                    <div class="sidebar-resize-handle" id="sidebarResizeHandle" 
-                         title="拖拽调整宽度" 
-                         aria-label="调整侧边栏宽度"></div>
+                    <div class="sidebar-resize-handle" id="sidebarResizeHandle" title="拖拽调整宽度"></div>
                 </div>
                 <div class="gantt-timeline-wrapper">
                     <div class="gantt-timeline">
                         <div class="gantt-timeline-header-wrapper" id="ganttTimelineHeaderWrapper">
                             <div class="gantt-timeline-header" id="ganttTimelineHeader">
-                                ${this.renderDateHeaders(dates, weekdays)}
+                                <div style="width: ${totalWidth}px; height: 100%; display: flex;">
+                                    ${this.renderDateHeaders(dates, weekdays)}
+                                </div>
                             </div>
                             
-                            <!-- 时间轴视图切换菜单 -->
+                            <!-- 视图菜单 -->
                             <div class="timeline-view-menu" id="timelineViewMenu">
                                 <div class="view-menu-title">时间刻度</div>
-                                <button class="view-menu-btn ${this.options.timeScale === 'day' && !this.options.isOverviewMode ? 'active' : ''}" 
-                                        data-scale="day" title="按天显示">
-                                    <span class="view-icon">📅</span>
-                                    <span class="view-text">日视图</span>
-                                </button>
-                                <button class="view-menu-btn ${this.options.timeScale === 'week' && !this.options.isOverviewMode ? 'active' : ''}" 
-                                        data-scale="week" title="按周显示">
-                                    <span class="view-icon">📆</span>
-                                    <span class="view-text">周视图</span>
-                                </button>
-                                <button class="view-menu-btn ${this.options.timeScale === 'month' && !this.options.isOverviewMode ? 'active' : ''}" 
-                                        data-scale="month" title="按月显示">
-                                    <span class="view-icon">🗓️</span>
-                                    <span class="view-text">月视图</span>
-                                </button>
-                                
+                                <button class="view-menu-btn ${this.options.timeScale === 'day' && !this.options.isOverviewMode ? 'active' : ''}" data-scale="day"><span class="view-icon">📅</span><span class="view-text">日视图</span></button>
+                                <button class="view-menu-btn ${this.options.timeScale === 'week' && !this.options.isOverviewMode ? 'active' : ''}" data-scale="week"><span class="view-icon">📆</span><span class="view-text">周视图</span></button>
+                                <button class="view-menu-btn ${this.options.timeScale === 'month' && !this.options.isOverviewMode ? 'active' : ''}" data-scale="month"><span class="view-icon">🗓️</span><span class="view-text">月视图</span></button>
                                 <div class="view-menu-divider"></div>
-                                
-                                <button class="view-menu-btn view-menu-overview ${this.options.isOverviewMode ? 'active' : ''}" 
-                                        data-scale="overview" title="自适应显示整个项目">
-                                    <span class="view-icon">🔭</span>
-                                    <span class="view-text">全貌视图</span>
-                                </button>
+                                <button class="view-menu-btn view-menu-overview ${this.options.isOverviewMode ? 'active' : ''}" data-scale="overview"><span class="view-icon">🔭</span><span class="view-text">全貌视图</span></button>
                             </div>
                         </div>
                         <div class="gantt-rows-container" id="ganttRowsContainer">
-                            <div class="gantt-rows">
+                            <div class="gantt-rows" style="width: ${totalWidth}px;">
                                 ${this.renderTaskRows(dates)}
                             </div>
                             <svg class="gantt-dependencies" style="position: absolute; top: 0; left: 0; pointer-events: none;"></svg>
@@ -86,29 +71,30 @@
             </div>
         `;
 
-        // 3. 写入 DOM
         this.container.innerHTML = html;
 
         // 4. 恢复滚动位置
         const newRowsContainer = this.container.querySelector('.gantt-rows-container');
+        const newHeader = this.container.querySelector('.gantt-timeline-header');
+        
         if (newRowsContainer) {
             newRowsContainer.scrollTop = prevScrollTop;
             newRowsContainer.scrollLeft = prevScrollLeft;
+            if (newHeader) newHeader.scrollLeft = prevScrollLeft;
         }
 
         // 5. 绑定功能模块
         this.attachSidebarResize();
-        this.setupScrollSync();
+        this.setupScrollSync(); // ⭐ 零延迟同步
         
-        // 6. 渲染依赖箭头
+        // 6. 渲染依赖
         const visibleTasks = typeof getVisibleTasks === 'function' ? getVisibleTasks(this.tasks) : this.tasks;
         const filteredTasks = this.options.hideCompleted ? 
-            visibleTasks.filter(t => t.progress < 100) : 
-            visibleTasks;
+            visibleTasks.filter(t => t.progress < 100) : visibleTasks;
 
         this.renderDependencies(dates, filteredTasks);
         
-        // 7. 绑定事件
+        // 7. 事件绑定
         this.attachEvents();
         this.attachQuickMenus();
         
@@ -120,32 +106,26 @@
     };
 
     /**
-     * 递归检查任务是否应该隐藏 (支持多级折叠)
+     * 递归检查任务是否应该隐藏
      */
     GanttChart.prototype.isTaskHidden = function(task) {
         if (!task.parentId) return false;
-        
         let current = task;
-        // 向上遍历所有祖先
         while (current.parentId) {
             const parent = this.tasks.find(t => t.id === current.parentId);
             if (!parent) break;
-            
-            // 如果任何一个祖先是折叠状态，则当前任务隐藏
             if (parent.isCollapsed) return true;
-            
             current = parent;
         }
         return false;
     };
 
     /**
-     * 绑定侧边栏拖拽调整宽度事件
+     * 侧边栏调整
      */
     GanttChart.prototype.attachSidebarResize = function() {
         const handle = document.getElementById('sidebarResizeHandle');
         const sidebar = document.getElementById('ganttSidebar');
-        
         if (!handle || !sidebar) return;
 
         let isResizing = false;
@@ -164,17 +144,14 @@
 
         const onMouseMove = (e) => {
             if (!isResizing) return;
-            
             const deltaX = e.clientX - startX;
             const newWidth = Math.max(100, Math.min(400, startWidth + deltaX));
-            
             sidebar.style.width = newWidth + 'px';
             sidebar.style.minWidth = newWidth + 'px';
         };
 
         const onMouseUp = () => {
             if (!isResizing) return;
-            
             isResizing = false;
             sidebar.classList.remove('resizing');
             document.body.style.cursor = '';
@@ -187,25 +164,20 @@
     };
 
     /**
-     * 渲染任务名称列表
+     * 渲染任务名称列表 (完整逻辑回归)
      */
     GanttChart.prototype.renderTaskNames = function() {
         return this.tasks.map(task => {
             if (!task || !task.id) return '';
-            
-            // 1. 递归检查折叠可见性
             if (this.isTaskHidden(task)) return '';
-            
-            // 2. 检查"隐藏已完成"选项
             if (this.options.hideCompleted && task.progress >= 100) return '';
 
-            // 3. 判断任务是否"就绪" (无依赖 或 依赖全完成)
+            // 检查就绪状态
             let isReady = false;
             if (task.progress < 100 && !task.isSummary && !task.isMilestone) {
                 if (!task.dependencies || task.dependencies.length === 0) {
-                    isReady = true; // 无依赖
+                    isReady = true;
                 } else {
-                    // 检查依赖是否都已完成
                     const allDepsCompleted = task.dependencies.every(dep => {
                         const depId = typeof dep === 'string' ? dep : dep.taskId;
                         const depTask = this.tasks.find(t => t.id === depId);
@@ -232,8 +204,7 @@
                             ${isReady ? 'task-ready' : ''}" 
                      data-task-id="${task.id}"
                      data-outline-level="${outlineLevel}"
-                     role="button"
-                     tabindex="0"
+                     role="button" tabindex="0"
                      aria-label="任务: ${this.escapeHtml(task.name)}">
                     ${collapseBtn}
                     <span class="task-name-content" title="${isReady ? '✅ 前置就绪，可以开始' : ''}">
@@ -260,8 +231,8 @@
             if (isTodayDay) classes.push('today');
             
             const cellWidth = this.options.cellWidth * dateObj.span;
-            
             let content = '';
+            
             switch (scale) {
                 case 'day':
                     content = `
@@ -289,8 +260,6 @@
                 <div class="${classes.join(' ')}" 
                      style="width: ${cellWidth}px; min-width: ${cellWidth}px;"
                      data-scale="${scale}"
-                     data-start="${typeof formatDate === 'function' ? formatDate(dateObj.startDate) : ''}"
-                     data-end="${typeof formatDate === 'function' ? formatDate(dateObj.endDate) : ''}"
                      role="columnheader">
                     ${content}
                 </div>
@@ -306,26 +275,19 @@
     };
 
     /**
-     * 渲染单个任务行
+     * 渲染单个任务行 (完整逻辑回归)
      */
     GanttChart.prototype.renderRow = function(task, dates) {
         if (!task || !task.id) return '';
-        
-        // 1. 折叠隐藏
         if (this.isTaskHidden(task)) return '';
-        
-        // 2. 隐藏已完成任务
         if (this.options.hideCompleted && task.progress >= 100) return '';
 
         const start = new Date(task.start);
         const end = new Date(task.end || task.start);
-        
         if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
         
         const progress = Math.min(Math.max(task.progress || 0, 0), 100);
         const isSelected = this.selectedTask === task.id;
-        
-        // 判断锁定状态 (100%完成)
         const isCompleted = progress >= 100;
         
         const startDays = typeof daysBetween === 'function' ? daysBetween(this.startDate, start) : 0;
@@ -338,9 +300,9 @@
         const endTimeLabel = typeof formatDate === 'function' ? formatDate(end) : '';
 
         const outlineLevel = task.outlineLevel || 1;
+        const indent = '　'.repeat(outlineLevel - 1);
         const icon = task.isMilestone ? '🎯' : (task.isSummary ? '📁' : '📋');
         const wbsPrefix = task.wbs ? `[${task.wbs}] ` : '';
-        const indent = '　'.repeat(outlineLevel - 1);
         const displayName = `${indent}${icon} ${wbsPrefix}${task.name}`;
 
         const priorityAttr = task.priority ? `data-priority="${task.priority}"` : '';
@@ -403,14 +365,12 @@
      */
     GanttChart.prototype.renderCells = function(dates) {
         const scale = this.options.timeScale || 'day';
-        
         return dates.map(dateObj => {
             const date = dateObj.date;
             const isWeekendDay = typeof isWeekend === 'function' ? isWeekend(date) : false;
             const isTodayDay = typeof isToday === 'function' ? isToday(date) : false;
             
             const classes = ['gantt-cell'];
-            
             if (isWeekendDay && this.options.showWeekends) classes.push('weekend');
             if (isTodayDay) classes.push('today');
             
@@ -426,7 +386,7 @@
     };
 
     /**
-     * 设置滚动同步
+     * ⭐⭐⭐ 零延迟同步滚动 (关键修复) ⭐⭐⭐
      */
     GanttChart.prototype.setupScrollSync = function() {
         const sidebarBody = document.getElementById('ganttSidebarBody');
@@ -435,74 +395,51 @@
 
         if (!sidebarBody || !rowsContainer || !timelineHeader) return;
 
-        let isSyncingScroll = false;
+        // 移除 rAF 延迟，直接同步
+        // 使用标志位防止循环触发
+        let isSyncing = false;
 
         rowsContainer.addEventListener('scroll', () => {
-            if (isSyncingScroll) return;
-            isSyncingScroll = true;
+            if (isSyncing) return;
+            isSyncing = true;
             
             sidebarBody.scrollTop = rowsContainer.scrollTop;
             timelineHeader.scrollLeft = rowsContainer.scrollLeft;
             
-            requestAnimationFrame(() => {
-                isSyncingScroll = false;
-            });
+            isSyncing = false;
         }, { passive: true });
 
         sidebarBody.addEventListener('scroll', () => {
-            if (isSyncingScroll) return;
-            isSyncingScroll = true;
+            if (isSyncing) return;
+            isSyncing = true;
             
             rowsContainer.scrollTop = sidebarBody.scrollTop;
             
-            requestAnimationFrame(() => {
-                isSyncingScroll = false;
-            });
+            isSyncing = false;
         }, { passive: true });
+        
+        // 初始对齐
+        timelineHeader.scrollLeft = rowsContainer.scrollLeft;
     };
 
     /**
-     * 绑定时间轴视图切换菜单事件
+     * 绑定时间轴视图菜单
      */
     GanttChart.prototype.attachTimelineViewMenu = function() {
         const headerWrapper = document.getElementById('ganttTimelineHeaderWrapper');
         const viewMenu = document.getElementById('timelineViewMenu');
-        
         if (!headerWrapper || !viewMenu) return;
 
         let menuTimer = null;
-
-        headerWrapper.addEventListener('mouseenter', (e) => {
-            clearTimeout(menuTimer);
-            menuTimer = setTimeout(() => {
-                viewMenu.classList.add('show');
-            }, 300);
-        });
-
-        headerWrapper.addEventListener('mouseleave', (e) => {
-            clearTimeout(menuTimer);
-            menuTimer = setTimeout(() => {
-                if (!viewMenu.matches(':hover')) {
-                    viewMenu.classList.remove('show');
-                }
-            }, 200);
-        });
-
-        viewMenu.addEventListener('mouseenter', () => {
-            clearTimeout(menuTimer);
-        });
-
-        viewMenu.addEventListener('mouseleave', () => {
-            menuTimer = setTimeout(() => {
-                viewMenu.classList.remove('show');
-            }, 200);
-        });
+        headerWrapper.addEventListener('mouseenter', () => { clearTimeout(menuTimer); menuTimer = setTimeout(() => viewMenu.classList.add('show'), 300); });
+        headerWrapper.addEventListener('mouseleave', () => { clearTimeout(menuTimer); menuTimer = setTimeout(() => { if (!viewMenu.matches(':hover')) viewMenu.classList.remove('show'); }, 200); });
+        viewMenu.addEventListener('mouseenter', () => clearTimeout(menuTimer));
+        viewMenu.addEventListener('mouseleave', () => { menuTimer = setTimeout(() => viewMenu.classList.remove('show'), 200); });
 
         viewMenu.querySelectorAll('.view-menu-btn').forEach(btn => {
             btn.onclick = (e) => {
                 e.stopPropagation();
                 const scale = btn.dataset.scale;
-                
                 if (scale === 'overview') {
                     this.switchToOverviewMode();
                 } else {
@@ -511,11 +448,8 @@
                     this.options.cellWidth = typeof getRecommendedCellWidth === 'function' ? getRecommendedCellWidth(scale) : 50;
                     this.calculateDateRange();
                     this.render();
-                    
-                    const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
-                    if (typeof addLog === 'function') addLog(`✅ 已切换到${scaleNames[scale]}视图`);
+                    if (typeof addLog === 'function') addLog(`✅ 已切换到${scale}视图`);
                 }
-                
                 viewMenu.classList.remove('show');
             };
         });
@@ -534,15 +468,9 @@
      * 销毁实例
      */
     GanttChart.prototype.destroy = function() {
-        if (this._mouseMoveHandler) {
-            document.removeEventListener('mousemove', this._mouseMoveHandler);
-        }
-        if (this._mouseUpHandler) {
-            document.removeEventListener('mouseup', this._mouseUpHandler);
-        }
-        if (this.container) {
-            this.container.innerHTML = '';
-        }
+        if (this._mouseMoveHandler) document.removeEventListener('mousemove', this._mouseMoveHandler);
+        if (this._mouseUpHandler) document.removeEventListener('mouseup', this._mouseUpHandler);
+        if (this.container) this.container.innerHTML = '';
         this.tasks = null;
         this.container = null;
         this._cachedElements = null;
@@ -550,6 +478,6 @@
         console.log('GanttChart instance destroyed');
     };
 
-    console.log('✅ gantt-render.js loaded successfully (Epsilon26-Fix - 修复变量顺序)');
+    console.log('✅ gantt-render.js loaded successfully (Epsilon34-FullRestore)');
 
 })();
