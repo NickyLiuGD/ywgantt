@@ -211,3 +211,82 @@ h1 {
         border: 1px solid currentColor;
     }
 }
+/* ======================
+   ⭐ 新增：顶部导航栏样式
+   ====================== */
+.app-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 2000; /* 保证在最上层 */
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.header-left, .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1; /* 左右等宽，保证中间居中 */
+}
+
+.header-right {
+    justify-content: flex-end;
+}
+
+.header-center {
+    flex: 2;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.project-title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    cursor: pointer;
+    transition: opacity 0.2s;
+    background: none;
+    -webkit-text-fill-color: initial; /* 移除之前的渐变，改用纯色更像标题 */
+}
+
+.project-title:hover {
+    opacity: 0.7;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 4px;
+}
+
+.header-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--gray-300);
+    margin: 0 8px;
+}
+
+/* 修正主容器布局，因为 Header 固定了 */
+.container-fluid {
+    padding-top: 0; /* 由 header 遮挡处理 */
+    height: 100vh;
+}
+
+/* 浮动工具栏调整 */
+.floating-toolbar-expanded {
+    position: fixed !important; /* 改为固定定位 */
+    top: 70px !important; /* 在 Header 下方 */
+    transform: translateX(-50%) !important;
+    left: 50% !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
+    border: 1px solid rgba(0,0,0,0.05) !important;
+}

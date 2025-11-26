@@ -177,9 +177,18 @@
         
         global.gantt.updateHeight();
 
-        if (projectInfo && projectInfo.name) {
-            document.title = `${projectInfo.name} - 云端甘特图`;
-        }
+        const projName = (projectInfo && projectInfo.name) ? projectInfo.name : '未命名项目';
+        const projVersion = (projectInfo && projectInfo.version) ? `v${projectInfo.version}` : 'v1.0';
+
+        // 1. 更新浏览器标签页标题
+        document.title = `${projName} - 云端甘特图`;
+
+        // 2. 更新界面 Header 标题
+        const titleEl = document.getElementById('projectTitle');
+        const versionEl = document.getElementById('versionBadge');
+        
+        if (titleEl) titleEl.textContent = projName;
+        if (versionEl) versionEl.textContent = projVersion;
     }
 
     // ==================== 复原的业务逻辑 (关键) ====================

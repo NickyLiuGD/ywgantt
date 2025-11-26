@@ -99,5 +99,110 @@
         });
     }
 
-    console.log('✅ app-controls.js loaded (Epsilon25)');
+    // ==================== ⭐ 新增：顶部导航栏事件 ====================
+
+    // 1. 新建项目
+    const btnNewProject = document.getElementById('btnNewProject');
+    if (btnNewProject) {
+        btnNewProject.onclick = () => {
+            if (confirm('确定要新建项目吗？当前未保存的内容将会丢失。')) {
+                // 清空数据
+                const emptyProject = {
+                    project: { name: "新项目", version: "1.0" },
+                    tasks: []
+                };
+                // 重新初始化（假设 app-init.js 里有暴露，或者直接刷新页面）
+                // 这里简单处理：重置 gantt 实例
+                gantt.tasks = [];
+                gantt.calculateDateRange();
+                gantt.render();
+                
+                // 更新标题
+                document.getElementById('projectTitle').textContent = "新项目";
+                document.getElementById('versionBadge').textContent = "v1.0";
+                
+                addLog('✨ 已新建空白项目');
+            }
+        };
+    }
+
+    // 2. 切换项目 (复用 app-file-manager.js 的逻辑)
+    const btnSwitchProject = document.getElementById('btnSwitchProject');
+    // 获取原有的隐藏的文件管理按钮 (如果 html 里还保留的话)，或者直接触发逻辑
+    // 这里假设 app-file-manager.js 绑定的是 id="manageFiles"
+    // 我们让这个新按钮去模拟点击那个逻辑，或者你也可以在 file-manager 里绑定这个 ID
+    if (btnSwitchProject) {
+        btnSwitchProject.onclick = () => {
+            // 触发原本的文件管理逻辑
+            const originalBtn = document.getElementById('manageFiles');
+            if (originalBtn) {
+                originalBtn.click();
+            } else {
+                // 如果原按钮被删了，需要在 app-file-manager.js 里把绑定 ID 改为 btnSwitchProject
+                // 临时兼容方案：
+                alert('请确保 app-file-manager.js 已加载');
+            }
+        };
+    }
+
+    // 3. PERT 视图切换 (顶部)
+    const btnTopTogglePert = document.getElementById('btnTopTogglePert');
+    if (btnTopTogglePert) {
+        btnTopTogglePert.onclick = () => {
+            // 调用全局切换函数 (来自 app-view-switcher.js)
+            if (typeof window.switchToView === 'function' && typeof window.getCurrentView === 'function') {
+                const current = window.getCurrentView();
+                window.switchToView(current === 'gantt' ? 'pert' : 'gantt');
+                
+                // 更新按钮状态
+                const isPert = (current === 'gantt'); // 切换后
+                btnTopTogglePert.classList.toggle('active', isPert);
+                if(isPert) {
+                    btnTopTogglePert.classList.replace('btn-outline-primary', 'btn-primary');
+                } else {
+                    btnTopTogglePert.classList.replace('btn-primary', 'btn-outline-primary');
+                }
+            }
+        };
+    }
+
+    // 4. 用户登录 (模拟)
+    const btnLogin = document.getElementById('btnLogin');
+    if (btnLogin) {
+        btnLogin.onclick = () => {
+            const isLogin = btnLogin.classList.contains('btn-success');
+            if (!isLogin) {
+                // 模拟登录
+                const username = prompt("请输入用户名 (模拟登录):", "Admin");
+                if (username) {
+                    btnLogin.innerHTML = `<span class="icon">👤</span> ${username}`;
+                    btnLogin.classList.replace('btn-dark', 'btn-success');
+                    addLog(`👋 欢迎回来，${username}`);
+                }
+            } else {
+                // 模拟登出
+                if(confirm("确定要退出登录吗？")) {
+                    btnLogin.innerHTML = `<span class="icon">👤</span> 用户登录`;
+                    btnLogin.classList.replace('btn-success', 'btn-dark');
+                    addLog(`👋 已退出登录`);
+                }
+            }
+        };
+    }
+    
+    // 5. 标题重命名
+    const projectTitle = document.getElementById('projectTitle');
+    if (projectTitle) {
+        projectTitle.onclick = () => {
+            const oldName = projectTitle.textContent;
+            const newName = prompt("重命名项目:", oldName);
+            if (newName && newName.trim() !== "") {
+                projectTitle.textContent = newName;
+                document.title = `${newName} - 云端甘特图`;
+                addLog(`✏️ 项目重命名为: ${newName}`);
+            }
+        };
+    }
+
+    console.log('✅ app-controls.js updated (Header events bound)');
 })();

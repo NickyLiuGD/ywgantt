@@ -10,8 +10,9 @@
     let _fileListCache = null;
     let _lastFetchTime = 0;
     const CACHE_DURATION = 30 * 1000;
-
-    const manageFilesBtn = document.getElementById('manageFiles');
+    // 同时支持新旧按钮 ID
+    const manageFilesBtn = document.getElementById('btnSwitchProject') || document.getElementById('manageFiles');
+    
     if (!manageFilesBtn) return;
 
     manageFilesBtn.onclick = () => {
