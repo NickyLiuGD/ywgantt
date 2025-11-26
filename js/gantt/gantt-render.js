@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图渲染模块                                                  ▓▓
 // ▓▓ 路径: js/gantt/gantt-render.js                                 ▓▓
-// ▓▓ 版本: Epsilon25 - 完整版 (含就绪高亮、锁定、隐藏完成)          ▓▓
+// ▓▓ 版本: Epsilon26-Fix - 修复变量初始化顺序错误                   ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -19,17 +19,12 @@
         const dates = this.generateDates();
         const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
 
+        // 1. 记录滚动位置，以便重新渲染后恢复
         const rowsContainer = this.container.querySelector('.gantt-rows-container');
         const prevScrollTop = rowsContainer ? rowsContainer.scrollTop : 0;
-        // ... (生成 HTML) ...
-        this.container.innerHTML = html;
-        // ...
-        const newRowsContainer = this.container.querySelector('.gantt-rows-container');
-        if (newRowsContainer) {
-            newRowsContainer.scrollTop = prevScrollTop;
-        }
+        const prevScrollLeft = rowsContainer ? rowsContainer.scrollLeft : 0;
         
-        // 构建基础 HTML 结构
+        // 2. 构建基础 HTML 结构 (先定义 html 变量)
         const html = `
             <div class="gantt-wrapper">
                 <div class="gantt-sidebar" id="ganttSidebar">
@@ -91,25 +86,29 @@
             </div>
         `;
 
+        // 3. 写入 DOM
         this.container.innerHTML = html;
 
-        // 绑定功能模块
+        // 4. 恢复滚动位置
+        const newRowsContainer = this.container.querySelector('.gantt-rows-container');
+        if (newRowsContainer) {
+            newRowsContainer.scrollTop = prevScrollTop;
+            newRowsContainer.scrollLeft = prevScrollLeft;
+        }
+
+        // 5. 绑定功能模块
         this.attachSidebarResize();
         this.setupScrollSync();
         
-        console.log('🔄 开始渲染依赖箭头...');
-        
-        // ⭐ 获取可见任务列表，并应用"隐藏已完成"过滤
-        // getVisibleTasks 来自 gantt-dependencies.js，只处理折叠
+        // 6. 渲染依赖箭头
         const visibleTasks = typeof getVisibleTasks === 'function' ? getVisibleTasks(this.tasks) : this.tasks;
-        
         const filteredTasks = this.options.hideCompleted ? 
             visibleTasks.filter(t => t.progress < 100) : 
             visibleTasks;
 
         this.renderDependencies(dates, filteredTasks);
         
-        // 绑定事件
+        // 7. 绑定事件
         this.attachEvents();
         this.attachQuickMenus();
         
@@ -180,11 +179,6 @@
             sidebar.classList.remove('resizing');
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
-            
-            const finalWidth = sidebar.offsetWidth;
-            if (typeof addLog === 'function') {
-                // addLog(`✅ 任务名称栏宽度已调整为 ${finalWidth}px`);
-            }
         };
 
         handle.addEventListener('mousedown', onMouseDown);
@@ -202,10 +196,10 @@
             // 1. 递归检查折叠可见性
             if (this.isTaskHidden(task)) return '';
             
-            // 2. ⭐ 检查"隐藏已完成"选项
+            // 2. 检查"隐藏已完成"选项
             if (this.options.hideCompleted && task.progress >= 100) return '';
 
-            // 3. ⭐ 判断任务是否"就绪" (无依赖 或 依赖全完成)
+            // 3. 判断任务是否"就绪" (无依赖 或 依赖全完成)
             let isReady = false;
             if (task.progress < 100 && !task.isSummary && !task.isMilestone) {
                 if (!task.dependencies || task.dependencies.length === 0) {
@@ -320,7 +314,7 @@
         // 1. 折叠隐藏
         if (this.isTaskHidden(task)) return '';
         
-        // 2. ⭐ 隐藏已完成任务
+        // 2. 隐藏已完成任务
         if (this.options.hideCompleted && task.progress >= 100) return '';
 
         const start = new Date(task.start);
@@ -331,7 +325,7 @@
         const progress = Math.min(Math.max(task.progress || 0, 0), 100);
         const isSelected = this.selectedTask === task.id;
         
-        // ⭐ 判断锁定状态 (100%完成)
+        // 判断锁定状态 (100%完成)
         const isCompleted = progress >= 100;
         
         const startDays = typeof daysBetween === 'function' ? daysBetween(this.startDate, start) : 0;
@@ -353,7 +347,6 @@
         const durationType = task.durationType || 'days';
         const durationTypeAttr = `data-duration-type="${durationType}"`;
         const durationTypeIcon = durationType === 'workdays' ? '💼' : '📅';
-        const durationTypeTitle = durationType === 'workdays' ? '工作日' : '自然日';
 
         const collapseToggle = (task.isSummary && task.children && task.children.length > 0) ? 
             `<span class="collapse-toggle" data-task-id="${task.id}" title="${task.isCollapsed ? '展开' : '折叠'}子任务">
@@ -388,7 +381,6 @@
                          ${isCompleted ? 'title="已完成 (100%) - 锁定"' : ''}>
                         <div class="gantt-bar-progress" style="width: ${progress}%"></div>
                         
-                        <!-- ⭐ 如果任务已完成，不渲染拖拽手柄 -->
                         ${this.options.enableResize && !task.isSummary && !isCompleted ? `
                             <div class="gantt-bar-handle left"></div>
                             <div class="gantt-bar-handle right"></div>
@@ -558,6 +550,6 @@
         console.log('GanttChart instance destroyed');
     };
 
-    console.log('✅ gantt-render.js loaded successfully (Epsilon25 - 完整渲染逻辑)');
+    console.log('✅ gantt-render.js loaded successfully (Epsilon26-Fix - 修复变量顺序)');
 
 })();
