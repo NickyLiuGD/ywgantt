@@ -103,43 +103,41 @@
             </button>
         </div>
     </header>
+    <!-- 3. 浮动工具栏 (恢复原有左上角交互逻辑) -->
+    <!-- 收起状态 (呼吸灯按钮) -->
+    <div class="toolbar-collapsed" id="toolbarCollapsed" title="工具菜单">
+        <span class="toolbar-icon">🛠️</span>
+    </div>
+    
+    <!-- 展开状态 (左上角浮出) -->
+    <div class="floating-toolbar-expanded" id="floatingToolbarExpanded">
+        <!-- 任务编辑组 -->
+        <div class="toolbar-section">
+            <button class="toolbar-btn" id="addTask" title="添加新任务">
+                <span class="btn-icon icon">➕</span><span class="btn-text">添加任务</span>
+            </button>
+            <button class="toolbar-btn" id="quickCloudSave" title="保存当前进度">
+                <span class="btn-icon icon">☁️</span><span class="btn-text">云保存</span>
+            </button>
+        </div>
+        
+        <div class="toolbar-divider"></div>
+        
+        <!-- 智能组 -->
+        <div class="toolbar-section">
+            <button class="toolbar-btn" id="checkConflicts" title="检测冲突">
+                <span class="btn-icon icon">🔍</span><span class="btn-text">检测冲突</span>
+            </button>
+            <button class="toolbar-btn" id="autoFixConflicts" title="自动修复">
+                <span class="btn-icon icon">🔧</span><span class="btn-text">自动修复</span>
+            </button>
+            <button class="toolbar-btn" id="clearHighlights" title="清除高亮">
+                <span class="btn-icon icon">🧹</span><span class="btn-text">清除高亮</span>
+            </button>
+        </div>
+    </div>
 
-    <div class="container-fluid main-layout">
-        
-        <!-- 3. 浮动工具栏 (恢复原有左上角交互逻辑) -->
-        <!-- 收起状态 (呼吸灯按钮) -->
-        <div class="toolbar-collapsed" id="toolbarCollapsed" title="工具菜单">
-            <span class="toolbar-icon">🛠️</span>
-        </div>
-        
-        <!-- 展开状态 (左上角浮出) -->
-        <div class="floating-toolbar-expanded" id="floatingToolbarExpanded">
-            <!-- 任务编辑组 -->
-            <div class="toolbar-section">
-                <button class="toolbar-btn" id="addTask" title="添加新任务">
-                    <span class="btn-icon icon">➕</span><span class="btn-text">添加任务</span>
-                </button>
-                <button class="toolbar-btn" id="quickCloudSave" title="保存当前进度">
-                    <span class="btn-icon icon">☁️</span><span class="btn-text">云保存</span>
-                </button>
-            </div>
-            
-            <div class="toolbar-divider"></div>
-            
-            <!-- 智能组 -->
-            <div class="toolbar-section">
-                <button class="toolbar-btn" id="checkConflicts" title="检测冲突">
-                    <span class="btn-icon icon">🔍</span><span class="btn-text">检测冲突</span>
-                </button>
-                <button class="toolbar-btn" id="autoFixConflicts" title="自动修复">
-                    <span class="btn-icon icon">🔧</span><span class="btn-text">自动修复</span>
-                </button>
-                <button class="toolbar-btn" id="clearHighlights" title="清除高亮">
-                    <span class="btn-icon icon">🧹</span><span class="btn-text">清除高亮</span>
-                </button>
-            </div>
-        </div>
-        
+    <div class="container-fluid main-layout">   
         <!-- 4. 设置面板 (保持不变) -->
         <aside class="settings-panel" id="settingsPanel" role="complementary">
             <div class="settings-header">
