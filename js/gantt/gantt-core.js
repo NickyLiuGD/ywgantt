@@ -1,7 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图核心类定义                                                ▓▓
 // ▓▓ 路径: js/gantt/gantt-core.js                                   ▓▓
-// ▓▓ 版本: Epsilon28-FullRestore - 完整复原版 (含修复)              ▓▓
+// ▓▓ 版本: Epsilon30-ZoomPerfect - 完美缩放版                       ▓▓
+// ▓▓ 修复: 动态缩放边界 + 标尺严格同步 + 移除跳变                   ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -102,7 +103,7 @@
     };
 
     /**
-     * 切换到项目全貌视图 (Delta8 完整逻辑回归)
+     * 切换到项目全貌视图
      */
     GanttChart.prototype.switchToOverviewMode = function() {
         if (this.tasks.length === 0) {
@@ -121,10 +122,9 @@
             if (end > maxDate) maxDate = end;
         });
         
-        // 2. 计算项目总天数
         const projectDays = daysBetween(minDate, maxDate) + 1;
         
-        // 3. 获取容器宽度
+        // 2. 获取容器宽度
         const container = this.container.querySelector('.gantt-rows-container');
         if (!container) {
             addLog('❌ 无法获取容器宽度');
@@ -133,7 +133,7 @@
         
         const containerWidth = container.clientWidth;
         
-        // 4. 预留空间（包括左侧时间标签）
+        // 3. 预留空间（包括左侧时间标签）
         const leftTimeLabelWidth = 100;
         const leftLabelMargin = 20;
         const rightLabelSpace = 150;
@@ -142,129 +142,112 @@
         const totalReservedSpace = leftTimeLabelWidth + leftLabelMargin + rightLabelSpace + scrollbarSpace;
         const availableWidth = containerWidth - totalReservedSpace;
         
-        // 5. 计算最优 cellWidth
+        // 4. 计算最优 cellWidth
         let optimalCellWidth = Math.floor(availableWidth / projectDays);
         
-        // 6. 限制范围
-        const minCellWidth = 2;
-        const maxCellWidth = 50;
+        // 限制范围
+        const minCellWidth = 0.5; // 允许更小，适应超长项目
+        const maxCellWidth = 60;
         optimalCellWidth = Math.max(minCellWidth, Math.min(optimalCellWidth, maxCellWidth));
         
-        // 7. 选择时间刻度
+        // 5. 选择时间刻度
         let scale = 'week';
         if (optimalCellWidth >= 30) {
             scale = 'day';
-        } else if (optimalCellWidth <= 3) {
+        } else if (optimalCellWidth <= 5) {
             scale = 'month';
         }
         
-        // 8. 应用设置
+        // 6. 应用设置
         this.options.timeScale = scale;
         this.options.cellWidth = optimalCellWidth;
         this.options.isOverviewMode = true;
         
-        // 9. 向左扩展日期范围（包容左侧标签）
+        // 7. 向左扩展日期范围（包容左侧标签）
         const leftLabelDays = Math.ceil((leftTimeLabelWidth + leftLabelMargin) / optimalCellWidth);
         this.startDate = addDays(minDate, -leftLabelDays);
         this.endDate = new Date(maxDate);
         
-        // 10. 重新渲染
+        // 8. 重新渲染
         this.render();
         
-        // 11. 滚动到最左侧
-        setTimeout(() => {
+        // 9. 滚动到最左侧
+        requestAnimationFrame(() => {
             const rowsContainer = this.container.querySelector('.gantt-rows-container');
             if (rowsContainer) {
                 rowsContainer.scrollLeft = 0;
             }
-        }, 100);
+        });
         
-        // 12. 详细日志 (恢复)
         const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
-        addLog(`╔═══════════════════════════════════════════════════════════╗`);
-        addLog(`║  🔭 已切换到项目全貌视图                                  ║`);
-        addLog(`╠═══════════════════════════════════════════════════════════╣`);
-        addLog(`  📊 项目周期: ${projectDays} 天`);
-        addLog(`  📅 任务范围: ${formatDate(minDate)} - ${formatDate(maxDate)}`);
-        addLog(`  🔄 视图范围: ${formatDate(this.startDate)} - ${formatDate(this.endDate)}`);
-        addLog(`  📏 时间刻度: ${scaleNames[scale]}视图 (${optimalCellWidth}px/天)`);
-        addLog(`  📐 可用宽度: ${availableWidth}px`);
-        addLog(`  🖥️ 容器宽度: ${containerWidth}px`);
-        addLog(`  ◀️ 左侧预留: ${leftTimeLabelWidth + leftLabelMargin}px`);
-        addLog(`  ▶️ 右侧预留: ${rightLabelSpace}px`);
-        addLog(`  📍 左扩展: ${leftLabelDays} 天`);
-        addLog(`╚═══════════════════════════════════════════════════════════╝`);
+        addLog(`🔭 全貌视图 (${scaleNames[scale]}模式, ${optimalCellWidth.toFixed(2)}px/天)`);
     };
 
     /**
-     * 退出全貌视图 (恢复)
+     * 退出全貌视图
      */
     GanttChart.prototype.exitOverviewMode = function() {
         this.options.isOverviewMode = false;
         this.calculateDateRange();
         this.options.timeScale = 'day';
-        this.options.cellWidth = 50; // 恢复默认
+        this.options.cellWidth = 50;
         this.render();
         addLog('✅ 已退出全貌视图');
     };
 
     /**
-     * 处理滚轮缩放逻辑 (修复版)
+     * ⭐⭐⭐ 处理滚轮缩放逻辑 (完美修复版) ⭐⭐⭐
      */
     GanttChart.prototype.handleWheelZoom = function(delta, mouseX, containerWidth) {
+        // 1. 动态计算缩放边界 (Critical Fix)
+        // 下限：基于当前项目总工期，计算出能铺满屏幕的最小宽度 (即全貌视图宽度)
+        const daysCount = daysBetween(this.startDate, this.endDate) || 30;
+        // 预留一些边距，防止完全贴边
+        const dynamicMinWidth = (containerWidth - 100) / daysCount; 
+        
+        // 绝对限制
+        const LIMIT_MIN_WIDTH = Math.max(0.1, dynamicMinWidth); // 绝不小于全貌
+        const LIMIT_MAX_WIDTH = 60; // 绝不大于舒适的日视图 (60px)
+
         const oldScale = this.options.timeScale;
         const oldCellWidth = this.options.cellWidth;
         
-        // 1. 锁定锚点 (鼠标指向的时间点)
-        const scrollLeft = this.container.querySelector('.gantt-rows-container').scrollLeft;
-        // 计算鼠标下的“绝对日期偏移量” (天)
+        // 2. 锁定锚点
+        const rowsContainer = this.container.querySelector('.gantt-rows-container');
+        const header = this.container.querySelector('.gantt-timeline-header');
+        if (!rowsContainer) return;
+
+        const scrollLeft = rowsContainer.scrollLeft;
         const mouseDateOffset = (scrollLeft + mouseX) / oldCellWidth;
 
-        // 2. 缩放系数
-        const ZOOM_FACTOR = 1.1; // 每次 10%
-        
-        // 3. 定义层级切换阈值
-        const THRESHOLD_DAY_TO_WEEK = 24; 
-        const THRESHOLD_WEEK_TO_MONTH = 6;
-        const MAX_CELL_WIDTH = 100; // 日视图最大宽度
-        const MIN_CELL_WIDTH = 1;   // 绝对最小宽度
+        // 3. 计算新宽度 (更平滑的系数)
+        const ZOOM_FACTOR = 1.05; // 5% 的变化率，更平滑
+        let newCellWidth = delta < 0 ? oldCellWidth / ZOOM_FACTOR : oldCellWidth * ZOOM_FACTOR;
 
-        // 4. 计算新宽度
-        let newCellWidth = oldCellWidth;
+        // 4. 应用边界限制 (Fix Issue 2)
+        if (newCellWidth < LIMIT_MIN_WIDTH) newCellWidth = LIMIT_MIN_WIDTH;
+        if (newCellWidth > LIMIT_MAX_WIDTH) newCellWidth = LIMIT_MAX_WIDTH;
+
+        // 如果宽度没变（到了边界），直接返回，节省性能
+        if (Math.abs(newCellWidth - oldCellWidth) < 0.01) return;
+
+        // 5. 判断视图层级切换
+        // 调整了阈值，避免频繁跳动
         let newScale = oldScale;
-
-        if (delta < 0) {
-            // 缩小 (Zoom Out)
-            newCellWidth = oldCellWidth / ZOOM_FACTOR;
+        
+        // 逻辑：
+        // Day: > 25px
+        // Week: 5px - 25px
+        // Month: < 5px
+        if (newCellWidth > 25) {
+            newScale = 'day';
+        } else if (newCellWidth > 5) {
+            newScale = 'week';
         } else {
-            // 放大 (Zoom In)
-            newCellWidth = oldCellWidth * ZOOM_FACTOR;
+            newScale = 'month';
         }
 
-        // 5. 判断是否需要切换视图层级
-        if (oldScale === 'day') {
-            if (newCellWidth < THRESHOLD_DAY_TO_WEEK) {
-                newScale = 'week';
-            } else if (newCellWidth > MAX_CELL_WIDTH) {
-                newCellWidth = MAX_CELL_WIDTH;
-            }
-        } else if (oldScale === 'week') {
-            if (newCellWidth > THRESHOLD_DAY_TO_WEEK) {
-                newScale = 'day';
-            } else if (newCellWidth < THRESHOLD_WEEK_TO_MONTH) {
-                newScale = 'month';
-            }
-        } else if (oldScale === 'month') {
-            if (newCellWidth > THRESHOLD_WEEK_TO_MONTH) {
-                newScale = 'week';
-            } else if (newCellWidth < MIN_CELL_WIDTH) {
-                // ⭐ 关键修复：不再跳转 Overview，而是停留在最小值
-                // 防止短项目突然变大
-                newCellWidth = MIN_CELL_WIDTH;
-            }
-        }
-
-        // 如果从全貌模式手动缩放，退出全貌标记
+        // 退出全貌标记
         if (this.options.isOverviewMode) {
             this.options.isOverviewMode = false;
         }
@@ -273,22 +256,35 @@
         this.options.timeScale = newScale;
         this.options.cellWidth = newCellWidth;
         
-        this.render(); // 重新渲染 DOM
+        // 7. 渲染
+        this.render();
 
-        // 7. ⭐ 关键修复：强制同步滚动位置 (包括表头)
-        // 新 ScrollLeft = (锚点天数 * 新宽度) - 鼠标偏移
-        const newScrollLeft = (mouseDateOffset * newCellWidth) - mouseX;
-        
-        const rowsContainer = this.container.querySelector('.gantt-rows-container');
-        const header = this.container.querySelector('.gantt-timeline-header');
+        // 8. ⭐ 强制同步滚动位置 (Fix Issue 1)
+        // 使用 requestAnimationFrame 确保 DOM 重绘完成后再设置 scrollLeft
+        // 这解决了标尺和内容短暂不同步的问题
+        requestAnimationFrame(() => {
+            // 重新获取容器（防止引用丢失）
+            const newRowsContainer = this.container.querySelector('.gantt-rows-container');
+            const newHeader = this.container.querySelector('.gantt-timeline-header');
+            
+            if (newRowsContainer) {
+                const newScrollLeft = (mouseDateOffset * newCellWidth) - mouseX;
+                
+                // 强制去除平滑滚动，实现瞬时同步
+                newRowsContainer.style.scrollBehavior = 'auto'; 
+                if (newHeader) newHeader.style.scrollBehavior = 'auto';
 
-        if (rowsContainer) {
-            rowsContainer.scrollLeft = newScrollLeft;
-            // 显式同步表头，消除错位
-            if (header) {
-                header.scrollLeft = newScrollLeft;
+                newRowsContainer.scrollLeft = newScrollLeft;
+                if (newHeader) {
+                    newHeader.scrollLeft = newScrollLeft;
+                }
+                
+                // 恢复平滑滚动（可选，如果不想要平滑滚动可去掉）
+                // requestAnimationFrame(() => {
+                //    newRowsContainer.style.scrollBehavior = 'smooth';
+                // });
             }
-        }
+        });
     };
 
     /**
@@ -319,6 +315,6 @@
     global.ROW_HEIGHT = ROW_HEIGHT;
     global.HEADER_HEIGHT = HEADER_HEIGHT;
 
-    console.log('✅ gantt-core.js loaded successfully (Epsilon28 - 完整复原 + 修复缩放)');
+    console.log('✅ gantt-core.js loaded successfully (Epsilon30-ZoomPerfect)');
 
 })(typeof window !== 'undefined' ? window : this);
