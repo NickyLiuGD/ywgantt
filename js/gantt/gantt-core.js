@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图核心类定义                                                ▓▓
 // ▓▓ 路径: js/gantt/gantt-core.js                                   ▓▓
-// ▓▓ 版本: Delta8 - 支持项目全貌视图（包容左侧标签）                ▓▓
+// ▓▓ 版本: Epsilon28-FullRestore - 完整复原版 (含修复)              ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function(global) {
@@ -30,7 +30,7 @@
             showTaskNames: true,
             timeScale: 'day',
             isOverviewMode: false,
-            hideCompleted: false // ⭐ 新增：默认不隐藏已完成任务            
+            hideCompleted: false            
         }, options || {});
 
         this.selectedTask = null;
@@ -102,7 +102,7 @@
     };
 
     /**
-     * ⭐ 切换到项目全貌视图（修复版 - 包容左侧时间标签）
+     * 切换到项目全貌视图 (Delta8 完整逻辑回归)
      */
     GanttChart.prototype.switchToOverviewMode = function() {
         if (this.tasks.length === 0) {
@@ -133,7 +133,7 @@
         
         const containerWidth = container.clientWidth;
         
-        // ⭐ 4. 预留空间（包括左侧时间标签）
+        // 4. 预留空间（包括左侧时间标签）
         const leftTimeLabelWidth = 100;
         const leftLabelMargin = 20;
         const rightLabelSpace = 150;
@@ -163,7 +163,7 @@
         this.options.cellWidth = optimalCellWidth;
         this.options.isOverviewMode = true;
         
-        // ⭐ 9. 向左扩展日期范围（包容左侧标签）
+        // 9. 向左扩展日期范围（包容左侧标签）
         const leftLabelDays = Math.ceil((leftTimeLabelWidth + leftLabelMargin) / optimalCellWidth);
         this.startDate = addDays(minDate, -leftLabelDays);
         this.endDate = new Date(maxDate);
@@ -179,7 +179,7 @@
             }
         }, 100);
         
-        // 12. 详细日志
+        // 12. 详细日志 (恢复)
         const scaleNames = { 'day': '日', 'week': '周', 'month': '月' };
         addLog(`╔═══════════════════════════════════════════════════════════╗`);
         addLog(`║  🔭 已切换到项目全貌视图                                  ║`);
@@ -197,66 +197,39 @@
     };
 
     /**
-     * 退出全貌视图
+     * 退出全貌视图 (恢复)
      */
     GanttChart.prototype.exitOverviewMode = function() {
         this.options.isOverviewMode = false;
         this.calculateDateRange();
         this.options.timeScale = 'day';
-        this.options.cellWidth = getRecommendedCellWidth('day');
+        this.options.cellWidth = 50; // 恢复默认
         this.render();
         addLog('✅ 已退出全貌视图');
     };
 
     /**
-     * HTML 转义
-     */
-    GanttChart.prototype.escapeHtml = function(text) {
-        if (typeof text !== 'string') return '';
-        
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        
-        return text.replace(/[&<>"']/g, m => map[m]);
-    };
-    /**
-     * 处理滚轮缩放逻辑
-     * @param {number} delta - 滚轮增量 (+1 或 -1)
-     * @param {number} mouseX - 鼠标相对于容器左侧的 X 坐标
-     * @param {number} containerWidth - 容器宽度
+     * 处理滚轮缩放逻辑 (修复版)
      */
     GanttChart.prototype.handleWheelZoom = function(delta, mouseX, containerWidth) {
         const oldScale = this.options.timeScale;
         const oldCellWidth = this.options.cellWidth;
         
-        // 1. 计算鼠标当前指向的时间点 (锚点)
-        // 当前滚动位置 + 鼠标偏移 = 绝对像素位置
-        // 绝对像素位置 / 旧单元格宽度 = 距离开始日期的天数
+        // 1. 锁定锚点 (鼠标指向的时间点)
         const scrollLeft = this.container.querySelector('.gantt-rows-container').scrollLeft;
+        // 计算鼠标下的“绝对日期偏移量” (天)
         const mouseDateOffset = (scrollLeft + mouseX) / oldCellWidth;
 
-        // 2. 定义缩放系数和阈值
-        const ZOOM_FACTOR = 1.1; // 每次缩放 10%
+        // 2. 缩放系数
+        const ZOOM_FACTOR = 1.1; // 每次 10%
         
-        // 阈值定义 (像素/天)
-        // 日视图标准: 50px
-        // 周视图标准: ~12px (84px/周) -> 2倍即 24px
-        // 月视图标准: ~4px
+        // 3. 定义层级切换阈值
         const THRESHOLD_DAY_TO_WEEK = 24; 
         const THRESHOLD_WEEK_TO_MONTH = 6;
         const MAX_CELL_WIDTH = 100; // 日视图最大宽度
+        const MIN_CELL_WIDTH = 1;   // 绝对最小宽度
 
-        // 计算全貌视图的最小宽度作为底线
-        const overviewParams = typeof calculateOverviewParams === 'function' ? 
-            calculateOverviewParams(this.tasks, containerWidth) : { cellWidth: 2 };
-        const MIN_CELL_WIDTH = overviewParams ? overviewParams.cellWidth : 1;
-
-        // 3. 计算新的 CellWidth
+        // 4. 计算新宽度
         let newCellWidth = oldCellWidth;
         let newScale = oldScale;
 
@@ -268,11 +241,10 @@
             newCellWidth = oldCellWidth * ZOOM_FACTOR;
         }
 
-        // 4. 判断是否需要切换视图层级
+        // 5. 判断是否需要切换视图层级
         if (oldScale === 'day') {
             if (newCellWidth < THRESHOLD_DAY_TO_WEEK) {
                 newScale = 'week';
-                // 保持视觉连续性，切换瞬间宽度不要跳变太大
             } else if (newCellWidth > MAX_CELL_WIDTH) {
                 newCellWidth = MAX_CELL_WIDTH;
             }
@@ -286,67 +258,67 @@
             if (newCellWidth > THRESHOLD_WEEK_TO_MONTH) {
                 newScale = 'week';
             } else if (newCellWidth < MIN_CELL_WIDTH) {
-                // 限制最小缩放为全貌视图尺寸
+                // ⭐ 关键修复：不再跳转 Overview，而是停留在最小值
+                // 防止短项目突然变大
                 newCellWidth = MIN_CELL_WIDTH;
-                // 如果已经很小，可能触发全貌模式
-                if (!this.options.isOverviewMode) {
-                    this.switchToOverviewMode();
-                    return; // 全貌模式处理接管
-                }
             }
         }
 
-        // 如果从全貌模式放大，退出全貌模式
-        if (this.options.isOverviewMode && delta > 0) {
+        // 如果从全貌模式手动缩放，退出全貌标记
+        if (this.options.isOverviewMode) {
             this.options.isOverviewMode = false;
-            newScale = 'month';
-            newCellWidth = MIN_CELL_WIDTH * 1.2;
         }
 
-        // 5. 应用变更并重新渲染
+        // 6. 应用变更
         this.options.timeScale = newScale;
         this.options.cellWidth = newCellWidth;
         
         this.render(); // 重新渲染 DOM
 
-        // 6. 恢复滚动位置 (保持锚点不动)
-        // 新的绝对像素位置 = 天数 * 新单元格宽度
-        // 新 ScrollLeft = 新绝对位置 - 鼠标偏移
+        // 7. ⭐ 关键修复：强制同步滚动位置 (包括表头)
+        // 新 ScrollLeft = (锚点天数 * 新宽度) - 鼠标偏移
         const newScrollLeft = (mouseDateOffset * newCellWidth) - mouseX;
         
         const rowsContainer = this.container.querySelector('.gantt-rows-container');
+        const header = this.container.querySelector('.gantt-timeline-header');
+
         if (rowsContainer) {
             rowsContainer.scrollLeft = newScrollLeft;
+            // 显式同步表头，消除错位
+            if (header) {
+                header.scrollLeft = newScrollLeft;
+            }
         }
     };
+
+    /**
+     * HTML 转义
+     */
+    GanttChart.prototype.escapeHtml = function(text) {
+        if (typeof text !== 'string') return '';
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    };
+
     /**
      * 销毁实例
      */
     GanttChart.prototype.destroy = function() {
-        if (this._mouseMoveHandler) {
-            document.removeEventListener('mousemove', this._mouseMoveHandler);
-        }
-        if (this._mouseUpHandler) {
-            document.removeEventListener('mouseup', this._mouseUpHandler);
-        }
-        
-        if (this.container) {
-            this.container.innerHTML = '';
-        }
-        
+        if (this._mouseMoveHandler) document.removeEventListener('mousemove', this._mouseMoveHandler);
+        if (this._mouseUpHandler) document.removeEventListener('mouseup', this._mouseUpHandler);
+        if (this.container) this.container.innerHTML = '';
         this.tasks = null;
         this.container = null;
         this._cachedElements = null;
         this._dateCache = null;
-        
         console.log('GanttChart instance destroyed');
     };
 
+    // 导出到全局
     global.GanttChart = GanttChart;
     global.ROW_HEIGHT = ROW_HEIGHT;
     global.HEADER_HEIGHT = HEADER_HEIGHT;
 
-    console.log('✅ gantt-core.js loaded successfully (Delta8 - 全貌视图修复版)');
+    console.log('✅ gantt-core.js loaded successfully (Epsilon28 - 完整复原 + 修复缩放)');
 
 })(typeof window !== 'undefined' ? window : this);
-
