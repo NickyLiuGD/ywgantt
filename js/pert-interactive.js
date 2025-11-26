@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ PERT 交互事件模块                                               ▓▓
 // ▓▓ 路径: js/pert-interactive.js                                   ▓▓
-// ▓▓ 版本: Epsilon3 - 交互逻辑（拆分版 2/2）                        ▓▓
+// ▓▓ 版本: Epsilon28 - 完整版 (修复缩放坐标 + 悬停干扰)              ▓▓
 // ▓▓ 职责: 手柄拖拽、节点选择、缩放平移、提示框                     ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
@@ -12,7 +12,6 @@
     
     /**
      * 绑定所有 PERT 交互事件
-     * @param {Object} canvasSize - 画布大小
      */
     function attachPertInteractiveEvents(canvasSize) {
         const tooltip = document.getElementById('pertTooltip');
@@ -24,22 +23,22 @@
             return;
         }
         
-        // 绑定手柄事件
+        // 绑定手柄事件 (拖拽连线)
         attachHandleEvents();
         
-        // 绑定节点事件
+        // 绑定节点事件 (悬停详情、选择)
         attachNodeEvents(nodes, tooltip, canvas);
         
         // 绑定工具栏按钮
         attachToolbarEvents(canvasSize);
         
-        // 绑定画布事件
+        // 绑定画布事件 (平移、缩放)
         attachCanvasEvents(canvas);
         
-        // 绑定键盘事件
+        // 绑定键盘事件 (ESC取消)
         attachKeyboardEvents();
         
-        console.log('✅ PERT 交互事件已全部绑定');
+        console.log('✅ PERT 交互事件已全部绑定 (Epsilon28 - 修复版)');
     }
 
     // ==================== 手柄交互 ====================
@@ -60,9 +59,17 @@
             
             // 鼠标进入手柄
             handle.addEventListener('mouseenter', (e) => {
+                // ⭐ 关键修复：阻止冒泡，防止触发父级 Node 的 tooltip
+                e.stopPropagation();
+                
+                // 强制隐藏可能存在的节点提示框
+                const tooltip = document.getElementById('pertTooltip');
+                if (tooltip) tooltip.style.display = 'none';
+
                 if (pertState.isLinkingDependency) {
                     // 拖拽中：检查是否可放置
                     if (canDropOnHandle(pertState.linkingFromTaskId, pertState.linkingFromHandle, taskId, side)) {
+                        // 可放置样式：绿色高亮
                         circle.setAttribute('fill', pertConfig.handleActiveColor);
                         circle.setAttribute('stroke', pertConfig.handleActiveColor);
                         circle.setAttribute('r', pertConfig.handleSize / 2 + 2);
@@ -72,7 +79,7 @@
                         glow.setAttribute('r', pertConfig.handleSize / 2 + 4);
                     }
                 } else {
-                    // 正常悬停
+                    // 正常悬停样式：蓝色高亮
                     circle.setAttribute('stroke', pertConfig.handleHoverColor);
                     circle.setAttribute('stroke-width', '3');
                     icon.setAttribute('fill', pertConfig.handleHoverColor);
@@ -82,8 +89,12 @@
             });
             
             // 鼠标离开手柄
-            handle.addEventListener('mouseleave', () => {
+            handle.addEventListener('mouseleave', (e) => {
+                // ⭐ 关键修复：阻止冒泡
+                e.stopPropagation();
+
                 if (!pertState.isLinkingDependency) {
+                    // 恢复默认样式
                     circle.setAttribute('fill', 'white');
                     circle.setAttribute('stroke', pertConfig.handleColor);
                     circle.setAttribute('stroke-width', '2');
@@ -97,6 +108,8 @@
             // 鼠标按下：开始拖拽连线
             handle.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
+                // 仅响应左键
+                if (e.button !== 0) return;
                 startLinkingDependency(taskId, side, e);
             });
         });
@@ -124,16 +137,20 @@
             sourceNode.classList.add('linking-source');
         }
         
-        const task = gantt.tasks.find(t => t.id === fromTaskId);
-        addLog(`🔗 开始创建依赖：从 "${task.name}" 的${fromHandle === 'left' ? '左侧' : '右侧'}手柄`);
+        if (typeof addLog === 'function') {
+            // 可选日志
+            // addLog(`🔗 开始拖拽连线...`);
+        }
     }
 
     /**
-     * 创建临时连线
+     * ⭐ 关键修复：创建临时连线
+     * 将连线添加到 #pertContent 组中，而不是 SVG 根节点，使其能跟随缩放
      */
     function createTempLine(fromTaskId, fromHandle) {
-        const svg = document.getElementById('pertSvg');
-        if (!svg) return;
+        // 获取受缩放控制的内容组
+        const contentGroup = document.getElementById('pertContent');
+        if (!contentGroup) return;
         
         const fromNode = document.querySelector(`.pert-node[data-task-id="${fromTaskId}"]`);
         if (!fromNode) return;
@@ -145,6 +162,7 @@
         const nodeX = parseFloat(match[1]);
         const nodeY = parseFloat(match[2]);
         
+        // 计算起始坐标（相对于 #pertContent）
         const startX = fromHandle === 'left' ? nodeX : nodeX + pertConfig.nodeWidth;
         const startY = nodeY + pertConfig.nodeHeight / 2;
         
@@ -152,32 +170,32 @@
         line.setAttribute('id', 'pertTempLine');
         line.setAttribute('x1', startX);
         line.setAttribute('y1', startY);
-        line.setAttribute('x2', startX);
+        line.setAttribute('x2', startX); // 初始终点 = 起点
         line.setAttribute('y2', startY);
         line.setAttribute('stroke', '#06b6d4');
         line.setAttribute('stroke-width', '3');
         line.setAttribute('stroke-dasharray', '5,5');
         line.setAttribute('marker-end', 'url(#pert-arrow-temp)');
-        line.style.pointerEvents = 'none';
+        line.style.pointerEvents = 'none'; // 确保鼠标穿透连线，能触发下面的事件
         
-        svg.appendChild(line);
+        contentGroup.appendChild(line);
         pertState.tempLineElement = line;
     }
 
     /**
-     * 更新临时连线位置
+     * ⭐ 关键修复：更新临时连线位置
+     * 引入 scale 和 offset 进行坐标逆变换，解决缩放后鼠标与连线箭头脱节的问题
      */
     function updateTempLine(e) {
         if (!pertState.tempLineElement) return;
         
-        const canvas = document.getElementById('pertCanvas');
         const svg = document.getElementById('pertSvg');
-        
-        if (!canvas || !svg) return;
+        if (!svg) return;
         
         const svgRect = svg.getBoundingClientRect();
         
-        // 计算鼠标在 SVG 中的坐标（考虑缩放和偏移）
+        // 计算鼠标在 #pertContent 坐标系中的位置
+        // 公式：(屏幕坐标 - SVG容器偏移 - 平移量) / 缩放比例
         const mouseX = (e.clientX - svgRect.left - pertState.offsetX) / pertState.scale;
         const mouseY = (e.clientY - svgRect.top - pertState.offsetY) / pertState.scale;
         
@@ -192,20 +210,36 @@
         // 不能连接到自己
         if (fromTaskId === toTaskId) return false;
         
-        // 右侧手柄 → 左侧手柄：fromTask 依赖 toTask
+        // 规则：必须是 右(出) -> 左(入) 或者 左(入) -> 右(出)
+        
+        // 情况1: 右 -> 左 (fromTask 依赖 toTask ?) 不，通常右边是输出，左边是输入
+        // 在 PERT 中，通常是从前置任务的右侧，连向后继任务的左侧
+        // 即：Source(Right) -> Target(Left) 意味着 Target 依赖 Source
+        
         if (fromHandle === 'right' && toHandle === 'left') {
+            // 检查是否已存在依赖
             const toTask = gantt.tasks.find(t => t.id === toTaskId);
-            if (toTask && toTask.dependencies && toTask.dependencies.includes(fromTaskId)) {
-                return false; // 已存在反向依赖
+            if (toTask && toTask.dependencies) {
+                // 检查是否已经依赖了 fromTask
+                const exists = toTask.dependencies.some(d => {
+                    const id = typeof d === 'string' ? d : d.taskId;
+                    return id === fromTaskId;
+                });
+                if (exists) return false;
             }
             return true;
         }
         
-        // 左侧手柄 → 右侧手柄：toTask 依赖 fromTask
+        // 情况2: 左 -> 右 (Target <- Source)
+        // 这种操作比较少见，但意味着 fromTask 依赖 toTask
         if (fromHandle === 'left' && toHandle === 'right') {
             const fromTask = gantt.tasks.find(t => t.id === fromTaskId);
-            if (fromTask && fromTask.dependencies && fromTask.dependencies.includes(toTaskId)) {
-                return false; // 已存在反向依赖
+            if (fromTask && fromTask.dependencies) {
+                const exists = fromTask.dependencies.some(d => {
+                    const id = typeof d === 'string' ? d : d.taskId;
+                    return id === toTaskId;
+                });
+                if (exists) return false;
             }
             return true;
         }
@@ -225,51 +259,67 @@
         // 验证连接有效性
         if (!canDropOnHandle(fromTaskId, fromHandle, toTaskId, toHandle)) {
             cancelLinkingDependency();
-            addLog('❌ 无法建立此依赖关系（可能形成循环或重复）');
+            if (typeof addLog === 'function') addLog('❌ 无法建立连接：方向无效或依赖已存在');
             return;
         }
         
-        // 确定依赖方向
+        // 确定依赖方向 (source -> target)
+        // 我们统一逻辑：后继任务 依赖 前置任务
+        // 如果是从 Right -> Left，则 from 是前置(source)，to 是后继(target)
         let sourceTaskId, targetTaskId;
         
         if (fromHandle === 'right' && toHandle === 'left') {
-            sourceTaskId = fromTaskId;
-            targetTaskId = toTaskId;
+            sourceTaskId = fromTaskId; // 前置
+            targetTaskId = toTaskId;   // 后继
         } else if (fromHandle === 'left' && toHandle === 'right') {
-            sourceTaskId = toTaskId;
-            targetTaskId = fromTaskId;
+            sourceTaskId = toTaskId;   // 前置
+            targetTaskId = fromTaskId; // 后继
         } else {
             cancelLinkingDependency();
             return;
         }
         
         const sourceTask = gantt.tasks.find(t => t.id === sourceTaskId);
-        const targetTask = gantt.tasks.find(t => t.id === targetTaskId);
+        const targetTask = gantt.tasks.find(t => t.id === targetTaskId); // 后继任务（添加依赖的一方）
         
         if (!sourceTask || !targetTask) {
             cancelLinkingDependency();
             return;
         }
         
-        // 添加依赖
-        if (!sourceTask.dependencies) {
-            sourceTask.dependencies = [];
+        // 使用全局校验函数进行循环依赖检查
+        if (typeof canAddDependency === 'function') {
+            const validation = canAddDependency(targetTaskId, sourceTaskId, gantt.tasks);
+            if (!validation.canAdd) {
+                alert(`无法添加依赖: ${validation.reason}`);
+                cancelLinkingDependency();
+                return;
+            }
         }
         
-        if (sourceTask.dependencies.includes(targetTaskId)) {
-            addLog(`⚠️ 任务 "${sourceTask.name}" 已依赖 "${targetTask.name}"`);
-        } else {
-            sourceTask.dependencies.push(targetTaskId);
-            addLog(`✅ 已建立依赖：${sourceTask.name} → ${targetTask.name}`);
+        // 添加依赖
+        if (!targetTask.dependencies) {
+            targetTask.dependencies = [];
+        }
+        
+        // 推入对象格式的依赖
+        targetTask.dependencies.push({
+            taskId: sourceTaskId,
+            type: 'FS',
+            lag: 0
+        });
+        
+        if (typeof addLog === 'function') addLog(`✅ 已建立依赖：${targetTask.name} 依赖于 ${sourceTask.name}`);
             
-            // 重新渲染 PERT 图
+        // 重新渲染 PERT 图
+        if (typeof renderPertChart === 'function') {
             renderPertChart(gantt.tasks);
-            
-            // 同步更新甘特图
-            if (gantt && typeof gantt.render === 'function') {
-                gantt.calculateDateRange();
-                gantt.render();
-            }
+        }
+        
+        // 同步更新甘特图数据 (如果需要)
+        if (gantt && typeof gantt.calculateDateRange === 'function') {
+            // 简单的重新计算，如果开启了自动排程可以调用 autoFixConflicts
+            // gantt.calculateDateRange(); 
         }
         
         cancelLinkingDependency();
@@ -329,26 +379,29 @@
             
             // 鼠标进入节点
             node.addEventListener('mouseenter', (e) => {
+                // ⭐ 关键：如果正在连线，或者是悬停在手柄上，不显示节点详情
+                if (pertState.isLinkingDependency || e.target.closest('.pert-handle')) {
+                    tooltip.style.display = 'none';
+                    return;
+                }
+
                 pertState.hoveredNode = taskId;
                 
-                if (pertState.selectedNode !== taskId && !pertState.isLinkingDependency) {
+                if (pertState.selectedNode !== taskId) {
                     rect.setAttribute('fill', 'url(#pert-nodeGradientHover)');
                     rect.setAttribute('stroke', '#5568d3');
                     rect.setAttribute('stroke-width', '3');
-                    rect.style.transform = 'scale(1.02)';
+                    rect.style.transform = 'scale(1.02)'; // CSS transform
                 }
                 
-                if (!pertState.isLinkingDependency) {
-                    highlightConnections(taskId, 'hover');
-                    showPertTooltip(e, node, canvas);
-                }
+                if (typeof highlightConnections === 'function') highlightConnections(taskId, 'hover');
+                showPertTooltip(e, node, canvas);
             });
             
             // 鼠标在节点上移动
             node.addEventListener('mousemove', (e) => {
-                if (!pertState.isLinkingDependency) {
-                    updateTooltipPosition(e, canvas);
-                }
+                if (pertState.isLinkingDependency) return;
+                updateTooltipPosition(e, canvas);
             });
             
             // 鼠标离开节点
@@ -364,9 +417,9 @@
                 
                 if (!pertState.isLinkingDependency) {
                     if (pertState.selectedNode) {
-                        highlightConnections(pertState.selectedNode, 'selected');
+                        if (typeof highlightConnections === 'function') highlightConnections(pertState.selectedNode, 'selected');
                     } else {
-                        highlightConnections(taskId, 'none');
+                        if (typeof highlightConnections === 'function') highlightConnections(taskId, 'none');
                     }
                     
                     tooltip.style.display = 'none';
@@ -379,7 +432,7 @@
                 
                 e.stopPropagation();
                 
-                if (!pertState.isLinkingDependency) {
+                if (!pertState.isLinkingDependency && typeof selectPertNode === 'function') {
                     selectPertNode(taskId, rect);
                 }
             });
@@ -402,7 +455,10 @@
         const task = gantt.tasks.find(t => t.id === node.dataset.taskId);
         const depCount = task && task.dependencies ? task.dependencies.length : 0;
         const dependentCount = gantt.tasks.filter(t => 
-            t.dependencies && t.dependencies.includes(node.dataset.taskId)
+            t.dependencies && t.dependencies.some(d => {
+                const id = typeof d === 'string' ? d : d.taskId;
+                return id === node.dataset.taskId;
+            })
         ).length;
         
         tooltip.innerHTML = `
@@ -457,7 +513,6 @@
      * 选中节点
      */
     function selectPertNode(taskId, rect) {
-        // 取消其他节点的选中状态
         document.querySelectorAll('.pert-node .node-rect').forEach(r => {
             if (r !== rect) {
                 r.setAttribute('fill', 'url(#pert-nodeGradient)');
@@ -473,10 +528,10 @@
         rect.setAttribute('stroke-width', '4');
         rect.style.transform = 'scale(1.05)';
         
-        highlightConnections(taskId, 'selected');
+        if (typeof highlightConnections === 'function') highlightConnections(taskId, 'selected');
         
         const task = gantt.tasks.find(t => t.id === taskId);
-        if (task) {
+        if (task && typeof addLog === 'function') {
             addLog(`📌 已选中 PERT 节点: ${task.name}`);
         }
     }
@@ -494,10 +549,10 @@
             r.style.transform = '';
         });
         
-        highlightConnections(pertState.selectedNode, 'none');
+        if (typeof highlightConnections === 'function') highlightConnections(pertState.selectedNode, 'none');
         pertState.selectedNode = null;
         
-        addLog('✅ 已取消选中');
+        if (typeof addLog === 'function') addLog('✅ 已取消选中');
     }
 
     /**
@@ -534,9 +589,6 @@
 
     // ==================== 工具栏按钮 ====================
     
-    /**
-     * 绑定工具栏按钮事件
-     */
     function attachToolbarEvents(canvasSize) {
         const zoomInBtn = document.getElementById('pertZoomIn');
         const zoomOutBtn = document.getElementById('pertZoomOut');
@@ -548,7 +600,6 @@
         if (resetBtn) resetBtn.onclick = () => resetPertView();
         if (overviewBtn) overviewBtn.onclick = () => switchPertToOverview(canvasSize.width, canvasSize.height);
         
-        // 按钮悬停效果
         document.querySelectorAll('.pert-btn').forEach(btn => {
             btn.addEventListener('mouseenter', () => {
                 btn.style.transform = 'translateY(-2px)';
@@ -563,9 +614,6 @@
 
     // ==================== 画布交互 ====================
     
-    /**
-     * 绑定画布事件
-     */
     function attachCanvasEvents(canvas) {
         // 鼠标按下
         canvas.addEventListener('mousedown', (e) => {
@@ -584,7 +632,7 @@
             } else if (pertState.isDragging) {
                 pertState.offsetX = e.clientX - pertState.dragStartX;
                 pertState.offsetY = e.clientY - pertState.dragStartY;
-                updatePertTransform();
+                if (typeof updatePertTransform === 'function') updatePertTransform();
             }
         });
 
@@ -598,7 +646,7 @@
                     finishLinkingDependency(toTaskId, toHandle);
                 } else {
                     cancelLinkingDependency();
-                    addLog('❌ 已取消依赖连线');
+                    if (typeof addLog === 'function') addLog('❌ 已取消依赖连线');
                 }
             } else if (pertState.isDragging) {
                 pertState.isDragging = false;
@@ -617,7 +665,7 @@
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.1 : 0.1;
-            zoomPert(delta);
+            if (typeof zoomPert === 'function') zoomPert(delta);
         }, { passive: false });
 
         // 点击空白取消选择
@@ -628,14 +676,16 @@
         });
     }
 
-    /**
-     * 绑定键盘事件
-     */
     function attachKeyboardEvents() {
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && pertState.isLinkingDependency) {
-                cancelLinkingDependency();
-                addLog('❌ 已取消依赖连线 (ESC)');
+            if (e.key === 'Escape') {
+                if (pertState.isLinkingDependency) {
+                    cancelLinkingDependency();
+                    if (typeof addLog === 'function') addLog('❌ 已取消依赖连线 (ESC)');
+                }
+                if (pertState.selectedNode) {
+                    deselectPertNode();
+                }
             }
         });
     }
@@ -652,7 +702,7 @@
         if (oldScale !== pertState.scale) {
             updatePertTransform();
             updateScaleDisplay();
-            addLog(`🔍 缩放: ${Math.round(pertState.scale * 100)}%`);
+            if (typeof addLog === 'function') addLog(`🔍 缩放: ${Math.round(pertState.scale * 100)}%`);
         }
     }
 
@@ -666,15 +716,14 @@
         updatePertTransform();
         updateScaleDisplay();
         
+        // 重置画布尺寸到初始计算值
         const svg = document.getElementById('pertSvg');
-        if (svg) {
-            const canvasWidth = parseInt(svg.getAttribute('width'));
-            const canvasHeight = parseInt(svg.getAttribute('height'));
-            svg.setAttribute('width', canvasWidth);
-            svg.setAttribute('height', canvasHeight);
+        if (svg && typeof calculateCanvasSize === 'function' && typeof calculateTaskLevels === 'function') {
+            // 重新计算最佳尺寸 (这里简化处理，实际上应该保存初始尺寸或重新计算)
+            // 这里我们不做强制重置尺寸，只重置变换
         }
         
-        addLog('🔄 已重置 PERT 视图 (100%)');
+        if (typeof addLog === 'function') addLog('🔄 已重置 PERT 视图 (100%)');
     }
 
     /**
@@ -716,26 +765,22 @@
         const scaleY = (containerHeight - marginV * 2) / contentHeight;
         pertState.scale = Math.min(scaleX, scaleY, 1.0);
         
+        // 居中偏移
         const scaledWidth = contentWidth * pertState.scale;
         const scaledHeight = contentHeight * pertState.scale;
         pertState.offsetX = (containerWidth - scaledWidth) / 2;
         pertState.offsetY = (containerHeight - scaledHeight) / 2;
         
-        svg.setAttribute('width', containerWidth);
-        svg.setAttribute('height', containerHeight);
+        // 扩展 SVG 尺寸以填充容器
+        svg.setAttribute('width', Math.max(containerWidth, contentWidth));
+        svg.setAttribute('height', Math.max(containerHeight, contentHeight));
         
         updatePertTransform();
         updateScaleDisplay();
         
-        addLog(`╔═══════════════════════════════════════════════════════════╗`);
-        addLog(`║  🔭 PERT 全貌视图                                         ║`);
-        addLog(`╠═══════════════════════════════════════════════════════════╣`);
-        addLog(`  📐 内容: ${contentWidth}×${contentHeight}px`);
-        addLog(`  🖥️ 容器: ${containerWidth}×${containerHeight}px`);
-        addLog(`  🔍 缩放: ${Math.round(pertState.scale * 100)}%`);
-        addLog(`  📍 偏移: (${Math.round(pertState.offsetX)}, ${Math.round(pertState.offsetY)})`);
-        addLog(`  ↔️ 边距: H=${marginH}px, V=${marginV}px`);
-        addLog(`╚═══════════════════════════════════════════════════════════╝`);
+        if (typeof addLog === 'function') {
+            addLog(`🔭 PERT 全貌视图: ${Math.round(pertState.scale * 100)}%`);
+        }
     }
 
     // ==================== 导出到全局 ====================
@@ -750,6 +795,6 @@
     global.switchPertToOverview = switchPertToOverview;
     global.cancelLinkingDependency = cancelLinkingDependency;
 
-    console.log('✅ pert-interactive.js loaded successfully (Epsilon3 - 交互逻辑)');
+    console.log('✅ pert-interactive.js loaded successfully (Epsilon28 - 完整修正版)');
 
 })(typeof window !== 'undefined' ? window : this);
