@@ -18,6 +18,16 @@
 
         const dates = this.generateDates();
         const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+
+        const rowsContainer = this.container.querySelector('.gantt-rows-container');
+        const prevScrollTop = rowsContainer ? rowsContainer.scrollTop : 0;
+        // ... (生成 HTML) ...
+        this.container.innerHTML = html;
+        // ...
+        const newRowsContainer = this.container.querySelector('.gantt-rows-container');
+        if (newRowsContainer) {
+            newRowsContainer.scrollTop = prevScrollTop;
+        }
         
         // 构建基础 HTML 结构
         const html = `

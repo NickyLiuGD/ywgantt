@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 甘特图事件绑定模块                                              ▓▓
 // ▓▓ 路径: js/events/gantt-events-binding.js                        ▓▓
-// ▓▓ 版本: Epsilon8 - 完整版 (锁定拦截 + 事件绑定)                  ▓▓
+// ▓▓ 版本: Epsilon23 - 完整版 (画布拖拽 + 滚轮缩放 + 原有交互)       ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -12,9 +12,120 @@
      */
     GanttChart.prototype.attachEvents = function() {
         
-        // 注意：#expandAllBtn 和 #collapseAllBtn 已从 gantt-render.js 的 HTML 中移除，
-        // 它们的功能现在由 gantt-events-quickmenu.js 中的表头悬停菜单实现。
-        // 因此这里不再需要绑定它们的点击事件。
+        // 1. 绑定表头折叠/展开按钮 (如果有的话)
+        const expandAllBtn = this.container.querySelector('#expandAllBtn');
+        const collapseAllBtn = this.container.querySelector('#collapseAllBtn');
+
+        if (expandAllBtn) {
+            expandAllBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (typeof this.expandAllTasks === 'function') this.expandAllTasks();
+            };
+        }
+
+        if (collapseAllBtn) {
+            collapseAllBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (typeof this.collapseAllTasks === 'function') this.collapseAllTasks();
+            };
+        }
+
+        // ==================== ⭐ 新增：画布拖拽与缩放逻辑 ====================
+        
+        const rowsContainer = this.container.querySelector('.gantt-rows-container');
+        if (rowsContainer) {
+            // --- A. 画布拖拽 (Pan) ---
+            
+            // 清理旧的全局监听器，防止重复绑定
+            if (this._panMoveHandler) window.removeEventListener('mousemove', this._panMoveHandler);
+            if (this._panUpHandler) window.removeEventListener('mouseup', this._panUpHandler);
+
+            let isPanning = false;
+            let panStartX = 0;
+            let panStartY = 0;
+            let panScrollLeft = 0;
+            let panScrollTop = 0;
+
+            // 1. 鼠标按下：开始拖拽
+            rowsContainer.onmousedown = (e) => {
+                // 卫语句：如果点击的是任务条、手柄、里程碑或表单，则不触发画布拖拽
+                if (e.target.closest('.gantt-bar') || 
+                    e.target.closest('.gantt-milestone') || 
+                    e.target.closest('.gantt-bar-handle') ||
+                    e.target.closest('.inline-task-form') ||
+                    e.target.closest('.gantt-bar-label-start') || // 防止与时间标签冲突
+                    e.target.closest('.gantt-bar-label-external')) {
+                    return;
+                }
+
+                // 仅允许左键 (0) 或中键 (1)
+                if (e.button !== 0 && e.button !== 1) return;
+
+                isPanning = true;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+                panScrollLeft = rowsContainer.scrollLeft;
+                panScrollTop = rowsContainer.scrollTop;
+                
+                rowsContainer.style.cursor = 'grabbing'; // 抓取手势
+                e.preventDefault(); // 防止选中文本
+            };
+
+            // 2. 鼠标移动：执行滚动 (绑定到 window 以防鼠标移出容器)
+            this._panMoveHandler = (e) => {
+                if (!isPanning) return;
+                
+                const deltaX = e.clientX - panStartX;
+                const deltaY = e.clientY - panStartY;
+                
+                // 逻辑：鼠标向左移(负)，视野应向右(ScrollLeft变大) -> 也就是拖着纸向左
+                rowsContainer.scrollLeft = panScrollLeft - deltaX;
+                rowsContainer.scrollTop = panScrollTop - deltaY;
+            };
+
+            // 3. 鼠标松开：结束拖拽
+            this._panUpHandler = () => {
+                if (isPanning) {
+                    isPanning = false;
+                    rowsContainer.style.cursor = 'grab'; // 恢复为抓手
+                }
+            };
+
+            window.addEventListener('mousemove', this._panMoveHandler);
+            window.addEventListener('mouseup', this._panUpHandler);
+
+            // --- B. 滚轮缩放 (Zoom) ---
+            
+            rowsContainer.addEventListener('wheel', (e) => {
+                // 允许直接滚轮缩放，或者按住 Ctrl 缩放 (根据习惯调整，这里设为直接缩放)
+                // 为了避免与垂直滚动冲突，通常结合 Ctrl 键，或者检测是否横向滚动
+                // 这里假设直接滚轮用于缩放（类似地图/PERT体验）
+                
+                // 如果在全貌模式下，或者用户习惯，可以加上 e.ctrlKey 判断
+                // if (!e.ctrlKey) return; 
+
+                e.preventDefault();
+                
+                if (this._isZooming) return; // 节流锁
+                this._isZooming = true;
+
+                requestAnimationFrame(() => {
+                    const rect = rowsContainer.getBoundingClientRect();
+                    // 计算鼠标相对于容器内容的 X 坐标
+                    // 注意：handleWheelZoom 内部会处理 scrollLeft，这里传入相对于可视窗口左边缘的偏移即可
+                    const mouseX = e.clientX - rect.left;
+                    const delta = e.deltaY > 0 ? -1 : 1; // 下滚缩小，上滚放大
+                    
+                    if (typeof this.handleWheelZoom === 'function') {
+                        this.handleWheelZoom(delta, mouseX, rect.width);
+                    }
+                    
+                    this._isZooming = false;
+                });
+            }, { passive: false });
+        }
+
+        // ==================== 以下为原有逻辑 (无省略) ====================
 
         // ==================== 左侧任务名称事件 ====================
         this.container.querySelectorAll('.gantt-task-name').forEach(el => {
@@ -114,7 +225,7 @@
                     alert('里程碑的工期为0，无法修改结束日期');
                     return;
                 }
-                // ⭐ 检查锁定状态
+                // 检查锁定状态
                 if (task.progress >= 100) {
                     alert('🔒 任务已完成 (100%)，无法修改日期');
                     if (typeof addLog === 'function') addLog('🔒 操作被拒绝：任务已锁定');
@@ -168,18 +279,17 @@
             const taskId = bar.dataset.taskId;
             const task = this.tasks.find(t => t.id === taskId);
 
-            // 单击：在表单打开时处理依赖（可选交互）
+            // 单击
             bar.onclick = (e) => {
                 if (e.target.classList.contains('gantt-bar-handle')) return;
                 const formOpen = !!this.container.querySelector('.inline-task-form');
                 if (formOpen) {
                     e.stopPropagation();
-                    // 这里可以保留原有的依赖快捷添加逻辑，或者让它空着
                     return;
                 }
             };
 
-            // ⭐ 鼠标按下：拖拽入口
+            // 鼠标按下：拖拽入口
             bar.onmousedown = (e) => {
                 // 1. 检查特殊任务类型
                 if (task && (task.isMilestone || task.isSummary)) {
@@ -187,10 +297,10 @@
                     return;
                 }
                 
-                // 2. ⭐ 检查完成锁定状态
+                // 2. 检查完成锁定状态
                 if (task && task.progress >= 100) {
                     if (typeof addLog === 'function') addLog(`🔒 任务 "${task.name}" 已完成，位置已锁定`);
-                    e.preventDefault(); // 阻止后续拖拽逻辑
+                    e.preventDefault(); 
                     return;
                 }
                 
@@ -229,7 +339,7 @@
             });
         }
 
-        // ==================== 全局鼠标事件绑定 ====================
+        // ==================== 全局任务拖拽鼠标事件 ====================
         if (!this._mouseMoveHandler) {
             this._mouseMoveHandler = (e) => this.onMouseMove(e);
         }
@@ -239,7 +349,7 @@
             };
         }
         
-        // 清理旧监听器防止重复
+        // 清理并重新绑定，防止多次 render 导致累积
         document.removeEventListener('mousemove', this._mouseMoveHandler);
         document.removeEventListener('mouseup', this._mouseUpHandler);
         
@@ -338,6 +448,6 @@
         input.onclick = (e) => e.stopPropagation();
     };
 
-    console.log('✅ gantt-events-binding.js loaded successfully (Epsilon8 - 完整版)');
+    console.log('✅ gantt-events-binding.js loaded successfully (Epsilon23 - 完整无省略版)');
 
 })();

@@ -224,7 +224,101 @@
         
         return text.replace(/[&<>"']/g, m => map[m]);
     };
+    /**
+     * 处理滚轮缩放逻辑
+     * @param {number} delta - 滚轮增量 (+1 或 -1)
+     * @param {number} mouseX - 鼠标相对于容器左侧的 X 坐标
+     * @param {number} containerWidth - 容器宽度
+     */
+    GanttChart.prototype.handleWheelZoom = function(delta, mouseX, containerWidth) {
+        const oldScale = this.options.timeScale;
+        const oldCellWidth = this.options.cellWidth;
+        
+        // 1. 计算鼠标当前指向的时间点 (锚点)
+        // 当前滚动位置 + 鼠标偏移 = 绝对像素位置
+        // 绝对像素位置 / 旧单元格宽度 = 距离开始日期的天数
+        const scrollLeft = this.container.querySelector('.gantt-rows-container').scrollLeft;
+        const mouseDateOffset = (scrollLeft + mouseX) / oldCellWidth;
 
+        // 2. 定义缩放系数和阈值
+        const ZOOM_FACTOR = 1.1; // 每次缩放 10%
+        
+        // 阈值定义 (像素/天)
+        // 日视图标准: 50px
+        // 周视图标准: ~12px (84px/周) -> 2倍即 24px
+        // 月视图标准: ~4px
+        const THRESHOLD_DAY_TO_WEEK = 24; 
+        const THRESHOLD_WEEK_TO_MONTH = 6;
+        const MAX_CELL_WIDTH = 100; // 日视图最大宽度
+
+        // 计算全貌视图的最小宽度作为底线
+        const overviewParams = typeof calculateOverviewParams === 'function' ? 
+            calculateOverviewParams(this.tasks, containerWidth) : { cellWidth: 2 };
+        const MIN_CELL_WIDTH = overviewParams ? overviewParams.cellWidth : 1;
+
+        // 3. 计算新的 CellWidth
+        let newCellWidth = oldCellWidth;
+        let newScale = oldScale;
+
+        if (delta < 0) {
+            // 缩小 (Zoom Out)
+            newCellWidth = oldCellWidth / ZOOM_FACTOR;
+        } else {
+            // 放大 (Zoom In)
+            newCellWidth = oldCellWidth * ZOOM_FACTOR;
+        }
+
+        // 4. 判断是否需要切换视图层级
+        if (oldScale === 'day') {
+            if (newCellWidth < THRESHOLD_DAY_TO_WEEK) {
+                newScale = 'week';
+                // 保持视觉连续性，切换瞬间宽度不要跳变太大
+            } else if (newCellWidth > MAX_CELL_WIDTH) {
+                newCellWidth = MAX_CELL_WIDTH;
+            }
+        } else if (oldScale === 'week') {
+            if (newCellWidth > THRESHOLD_DAY_TO_WEEK) {
+                newScale = 'day';
+            } else if (newCellWidth < THRESHOLD_WEEK_TO_MONTH) {
+                newScale = 'month';
+            }
+        } else if (oldScale === 'month') {
+            if (newCellWidth > THRESHOLD_WEEK_TO_MONTH) {
+                newScale = 'week';
+            } else if (newCellWidth < MIN_CELL_WIDTH) {
+                // 限制最小缩放为全貌视图尺寸
+                newCellWidth = MIN_CELL_WIDTH;
+                // 如果已经很小，可能触发全貌模式
+                if (!this.options.isOverviewMode) {
+                    this.switchToOverviewMode();
+                    return; // 全貌模式处理接管
+                }
+            }
+        }
+
+        // 如果从全貌模式放大，退出全貌模式
+        if (this.options.isOverviewMode && delta > 0) {
+            this.options.isOverviewMode = false;
+            newScale = 'month';
+            newCellWidth = MIN_CELL_WIDTH * 1.2;
+        }
+
+        // 5. 应用变更并重新渲染
+        this.options.timeScale = newScale;
+        this.options.cellWidth = newCellWidth;
+        
+        this.render(); // 重新渲染 DOM
+
+        // 6. 恢复滚动位置 (保持锚点不动)
+        // 新的绝对像素位置 = 天数 * 新单元格宽度
+        // 新 ScrollLeft = 新绝对位置 - 鼠标偏移
+        const newScrollLeft = (mouseDateOffset * newCellWidth) - mouseX;
+        
+        const rowsContainer = this.container.querySelector('.gantt-rows-container');
+        if (rowsContainer) {
+            rowsContainer.scrollLeft = newScrollLeft;
+        }
+    };
     /**
      * 销毁实例
      */

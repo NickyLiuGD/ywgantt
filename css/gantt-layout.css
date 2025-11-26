@@ -489,6 +489,26 @@
     background: #fffbeb;
 }
 
+/* 优化容器交互体验 */
+.gantt-rows-container {
+    flex: 1;
+    overflow: auto; /* 保持滚动条作为辅助 */
+    position: relative;
+    scroll-behavior: auto; /* 禁用平滑滚动，由 JS 控制 */
+    min-height: 0;
+    cursor: grab; /* 默认显示抓手 */
+    user-select: none; /* 拖拽时防止选中文本 */
+}
+
+.gantt-rows-container:active {
+    cursor: grabbing; /* 按下时显示紧握 */
+}
+
+/* 任务条和交互元素保持自己的光标 */
+.gantt-bar, .gantt-milestone, .gantt-bar-handle {
+    cursor: pointer; /* 或者 move/ew-resize */
+}
+
 /* ======================
    响应式
    ====================== */
