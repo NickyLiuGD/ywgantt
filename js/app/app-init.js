@@ -112,17 +112,21 @@
             }
         }
 
-        // 策略C: 最小数据集兜底
+        // 策略C: 最小数据集 (新建/兜底)
         if (!loaded) {
-            console.warn('⚠️ 所有加载策略均失败，使用最小数据集');
             const minTasks = getMinimalTasks();
-            initializeGanttData(minTasks, { name: '新项目' });
+            // 默认名称
+            const defaultName = '新项目';
+            initializeGanttData(minTasks, { name: defaultName });
             
-            // ⭐ 关键：新建项目立即分配文件名，确保历史记录可用
-            const newFileName = `Project_Untitled_${Date.now()}.json`;
+            // ⭐ 生成内部文件名，确保历史记录可用
+            const newFileName = typeof generateProjectInternalFilename === 'function' 
+                ? generateProjectInternalFilename() 
+                : `proj_${Date.now()}.json`;
+                
             if (window.historyManager) window.historyManager.init(newFileName, null);
             
-            if(typeof addLog === 'function') addLog('⚠️ 已初始化空项目');
+            if(typeof addLog === 'function') addLog('⚠️ 已初始化新项目');
         }
     }
 
