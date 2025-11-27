@@ -1,8 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 云端文件管理模块                                                ▓▓
 // ▓▓ 路径: js/app/app-file-manager.js                                ▓▓
-// ▓▓ 版本: Epsilon51-Full-Restored                                  ▓▓
-// ▓▓ 状态: 逻辑全量复原 (含双名显示、Key加载、上传生成Key)           ▓▓
+// ▓▓ 版本: Epsilon60-TimestampSync                                  ▓▓
+// ▓▓ 修复: 手动加载时传递快照时间戳，确保追赶逻辑生效                ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -37,12 +37,10 @@
     async function fetchAndRender(modal) {
         try {
             const allFiles = await listKVFiles();
-            // 过滤掉历史记录文件
             const projectFiles = allFiles.filter(f => {
-                const realKey = f.key || f.name; // 兼容后端返回格式
+                const realKey = f.key || f.name; 
                 return !realKey.endsWith('_history.json');
             });
-            
             _fileListCache = projectFiles;
             _lastFetchTime = Date.now();
             renderFileList(modal, projectFiles);
@@ -62,18 +60,15 @@
                 <div class="dependency-selector-header">
                     <div class="d-flex gap-2 align-items-center">
                         <h6 class="mb-0 fw-bold text-muted">☁️ 云端项目库</h6>
-                        <span class="badge bg-light text-dark border" id="fileCountBadge">加载中...</span>
+                        <span class="badge bg-light text-dark border" id="fileCountBadge">...</span>
                     </div>
                     <div class="d-flex gap-2 align-items-center">
                         <button class="btn-header-icon" id="refreshFilesBtn" title="刷新">🔄</button>
-                        <button class="btn-header-icon btn-header-success" id="modalUploadBtn" title="上传本地文件">📤</button>
+                        <button class="btn-header-icon btn-header-success" id="modalUploadBtn" title="上传">📤</button>
                         <button class="btn-header-icon btn-header-close" id="closeFileManager" title="关闭">✖</button>
                     </div>
                 </div>
                 <div class="dependency-selector-body" id="fileManagerBody" style="padding: 0; background: #f8f9fa; min-height: 300px;"></div>
-                <div class="dependency-selector-footer bg-light border-top">
-                    <small class="text-muted">💡 列表显示的是项目外部名称 (Name)，内部使用唯一 ID (Key) 存储。</small>
-                </div>
             </div>
         `;
         document.body.appendChild(modal);
@@ -95,11 +90,8 @@
         const formatSize = b => b > 1048576 ? `${(b/1048576).toFixed(2)} MB` : `${(b/1024).toFixed(1)} KB`;
         
         body.innerHTML = `<div class="list-group list-group-flush fade-in">${files.map(f => {
-            // f.key = 内部 ID (proj_173xxx.json)
-            // f.name = 外部名称 (后端 metadata.projectName 返回值)
             const fileKey = f.key || f.name; 
             const displayName = f.name; 
-            
             return `
             <div class="list-group-item px-3 py-3 bg-white border-bottom">
                 <div class="d-flex justify-content-between align-items-center">
@@ -121,8 +113,7 @@
                     </div>
                     <div class="d-flex gap-2 ms-3">
                         <button class="btn btn-sm btn-primary load-file-btn" data-key="${fileKey}">📂 打开</button>
-                        <button class="btn btn-sm btn-outline-secondary download-file-btn" data-key="${fileKey}" title="下载JSON">⬇️</button>
-                        <button class="btn btn-sm btn-outline-danger delete-file-btn" data-key="${fileKey}" title="删除">🗑️</button>
+                        <button class="btn btn-sm btn-outline-danger delete-file-btn" data-key="${fileKey}">🗑️</button>
                     </div>
                 </div>
             </div>`;
@@ -131,6 +122,72 @@
         bindListItemEvents(modal);
     }
 
+    function bindListItemEvents(modal) {
+        const closeModal = () => modal.querySelector('#closeFileManager').click();
+        
+        modal.querySelectorAll('.load-file-btn').forEach(btn => {
+            btn.onclick = async () => {
+                const fileKey = btn.dataset.key; 
+                try {
+                    if(btn.tagName === 'BUTTON') { btn.disabled = true; btn.innerHTML = '⏳'; }
+                    
+                    const data = await loadFromKV(fileKey);
+                    const tasksRaw = Array.isArray(data) ? data : (data.tasks || []);
+                    
+                    const projectInfo = data.project || { name: "未命名项目" };
+                    const lastActionId = projectInfo.lastActionId || null;
+                    // ⭐ 提取快照时间戳
+                    const snapshotTimestamp = projectInfo.updated || 0;
+
+                    if (window.gantt) {
+                        window.gantt.tasks = tasksRaw.map(t => ({...t, id: t.id||generateId(), dependencies: t.dependencies||[]}));
+                        document.getElementById('projectTitle').textContent = projectInfo.name;
+                        
+                        // ⭐ 更新 HistoryManager (传递时间戳)
+                        if (window.historyManager) {
+                            window.historyManager.filename = fileKey;
+                            await window.historyManager.init(fileKey, lastActionId, snapshotTimestamp);
+                        }
+
+                        window.gantt.calculateDateRange();
+                        window.gantt.switchToOverviewMode();
+                        window.gantt.render();
+                        
+                        addLog(`✅ 已加载: ${projectInfo.name}`);
+                    }
+                    closeModal();
+                } catch(e) { 
+                    alert(e.message); 
+                    if(btn.tagName === 'BUTTON') { btn.disabled=false; btn.innerHTML='📂 打开'; } 
+                }
+            };
+        });
+
+        modal.querySelectorAll('.download-file-btn').forEach(btn => {
+            btn.onclick = async () => { 
+                const fileKey = btn.dataset.key;
+                try { 
+                    const data = await loadFromKV(fileKey); 
+                    const dlName = (data.project && data.project.name) ? `${data.project.name}.json` : fileKey;
+                    downloadJSON(data, dlName); 
+                } catch(e){ alert('下载失败'); } 
+            };
+        });
+
+        modal.querySelectorAll('.delete-file-btn').forEach(btn => {
+            btn.onclick = async () => {
+                if(!confirm(`确定删除此项目?`)) return;
+                try { 
+                    const fileKey = btn.dataset.key;
+                    await deleteFromKV(fileKey); 
+                    deleteFromKV(fileKey.replace('.json', '_history.json')).catch(()=>{});
+                    _fileListCache = null; 
+                    btn.closest('.list-group-item').remove(); 
+                } catch(e) { alert('删除失败'); }
+            };
+        });
+    }
+    
     function handleFileUpload(modal) {
         const input = document.createElement('input');
         input.type = 'file';
