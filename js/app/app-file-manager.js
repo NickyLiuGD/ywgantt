@@ -84,17 +84,32 @@
     }
 
     function renderFileList(modal, files) {
-        // ... (保持不变) ...
-        // 注意：f.fileKey, f.displayName 等属性现在由全局 processAndSortFiles 生成
-        // 下面的渲染逻辑依然兼容
+        const body = modal.querySelector('#fileManagerBody');
+        const badge = modal.querySelector('#fileCountBadge');
+        
+        if (badge) badge.textContent = `${files.length} 个项目`;
+
+        if (!body) return; // 安全检查
+
+        if (files.length === 0) {
+            body.innerHTML = `<div class="text-center py-5 text-muted">暂无云端存档</div>`;
+            return;
+        }
+
+        const formatSize = b => b > 1048576 ? `${(b/1048576).toFixed(2)} MB` : `${(b/1024).toFixed(1)} KB`;
         
         body.innerHTML = `<div class="list-group list-group-flush fade-in">${files.map(f => {
+            // 使用 processAndSortFiles 处理后的字段
             const fileKey = f.fileKey || f.key || f.name; 
             const displayName = f.displayName || f.name;
             
+            // 标记未保存状态
             const unsavedBadge = f.hasUnsavedChanges 
-                ? `<span class="badge bg-warning text-dark ms-2" style="font-size:0.6rem">未保存</span>` 
+                ? `<span class="badge bg-warning text-dark ms-2" style="font-size:0.6rem" title="有未保存的增量修改">未保存</span>` 
                 : '';
+
+            // 使用有效时间（可能是增量时间）
+            const displayTime = new Date(f.effectiveTimestamp || f.timestamp).toLocaleString('zh-CN');
 
             return `
             <div class="list-group-item px-3 py-3 bg-white border-bottom">
@@ -110,7 +125,7 @@
                                 ${unsavedBadge}
                             </h6>
                             <div class="d-flex align-items-center gap-2 text-muted small">
-                                <span>📅 ${new Date(f.effectiveTimestamp || f.timestamp).toLocaleString('zh-CN')}</span>
+                                <span>📅 ${displayTime}</span>
                                 <span class="border-start ps-2">📊 ${f.taskCount} 任务</span>
                                 <span class="border-start ps-2">💾 ${formatSize(f.size)}</span>
                             </div>
@@ -124,7 +139,7 @@
                 </div>
             </div>`;
         }).join('')}</div>`;
-        
+            
         bindListItemEvents(modal);
     }
 
