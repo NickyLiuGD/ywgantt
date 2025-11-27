@@ -37,13 +37,19 @@
     async function fetchAndRender(modal) {
         try {
             const allFiles = await listKVFiles();
-            const projectFiles = allFiles.filter(f => {
-                const realKey = f.key || f.name; 
-                return !realKey.endsWith('_history.json');
-            });
-            _fileListCache = projectFiles;
+            
+            // ⭐ 核心修改：调用 kv-storage.js 中的统一排序函数
+            let sortedProjects = [];
+            if (typeof processAndSortFiles === 'function') {
+                sortedProjects = processAndSortFiles(allFiles);
+            } else {
+                // 降级处理 (理论上不会发生，除非 kv-storage 未加载)
+                sortedProjects = allFiles.filter(f => !(f.key||f.name).endsWith('_history.json'));
+            }
+            
+            _fileListCache = sortedProjects;
             _lastFetchTime = Date.now();
-            renderFileList(modal, projectFiles);
+            renderFileList(modal, sortedProjects);
         } catch (error) {
             renderErrorState(modal, error.message);
         }
@@ -78,20 +84,18 @@
     }
 
     function renderFileList(modal, files) {
-        const body = modal.querySelector('#fileManagerBody');
-        const badge = modal.querySelector('#fileCountBadge');
-        if (badge) badge.textContent = `${files.length} 个项目`;
-
-        if (files.length === 0) {
-            body.innerHTML = `<div class="text-center py-5 text-muted">暂无云端存档</div>`;
-            return;
-        }
-
-        const formatSize = b => b > 1048576 ? `${(b/1048576).toFixed(2)} MB` : `${(b/1024).toFixed(1)} KB`;
+        // ... (保持不变) ...
+        // 注意：f.fileKey, f.displayName 等属性现在由全局 processAndSortFiles 生成
+        // 下面的渲染逻辑依然兼容
         
         body.innerHTML = `<div class="list-group list-group-flush fade-in">${files.map(f => {
-            const fileKey = f.key || f.name; 
-            const displayName = f.name; 
+            const fileKey = f.fileKey || f.key || f.name; 
+            const displayName = f.displayName || f.name;
+            
+            const unsavedBadge = f.hasUnsavedChanges 
+                ? `<span class="badge bg-warning text-dark ms-2" style="font-size:0.6rem">未保存</span>` 
+                : '';
+
             return `
             <div class="list-group-item px-3 py-3 bg-white border-bottom">
                 <div class="d-flex justify-content-between align-items-center">
@@ -103,9 +107,10 @@
                                 title="ID: ${fileKey}" 
                                 style="cursor:pointer;">
                                 ${displayName}
+                                ${unsavedBadge}
                             </h6>
                             <div class="d-flex align-items-center gap-2 text-muted small">
-                                <span>📅 ${new Date(f.timestamp).toLocaleString('zh-CN')}</span>
+                                <span>📅 ${new Date(f.effectiveTimestamp || f.timestamp).toLocaleString('zh-CN')}</span>
                                 <span class="border-start ps-2">📊 ${f.taskCount} 任务</span>
                                 <span class="border-start ps-2">💾 ${formatSize(f.size)}</span>
                             </div>
@@ -113,12 +118,13 @@
                     </div>
                     <div class="d-flex gap-2 ms-3">
                         <button class="btn btn-sm btn-primary load-file-btn" data-key="${fileKey}">📂 打开</button>
-                        <button class="btn btn-sm btn-outline-danger delete-file-btn" data-key="${fileKey}">🗑️</button>
+                        <button class="btn btn-sm btn-outline-secondary download-file-btn" data-key="${fileKey}" title="下载JSON">⬇️</button>
+                        <button class="btn btn-sm btn-outline-danger delete-file-btn" data-key="${fileKey}" title="删除">🗑️</button>
                     </div>
                 </div>
             </div>`;
         }).join('')}</div>`;
-            
+        
         bindListItemEvents(modal);
     }
 

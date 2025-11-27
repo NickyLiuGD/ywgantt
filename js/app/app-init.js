@@ -32,24 +32,30 @@
         try {
             console.log('☁️ 正在检查云端存档...');
             if (typeof listKVFiles === 'function') {
-                const files = await listKVFiles();
-                const projectFiles = files.filter(f => {
-                    const realKey = f.key || f.name; 
-                    return !realKey.endsWith('_history.json');
-                });
+                const allFiles = await listKVFiles();
+                
+                // ⭐ 核心修改：使用全局统一排序
+                let sortedFiles = [];
+                if (typeof processAndSortFiles === 'function') {
+                    sortedFiles = processAndSortFiles(allFiles);
+                } else {
+                    // 简单的降级过滤
+                    sortedFiles = allFiles.filter(f => !(f.key||f.name).endsWith('_history.json'));
+                }
 
-                if (projectFiles && projectFiles.length > 0) {
-                    const latestFile = projectFiles[0];
-                    const fileKey = latestFile.key || latestFile.name;
-                    const displayName = latestFile.name;
+                if (sortedFiles.length > 0) {
+                    const latestFile = sortedFiles[0];
+                    
+                    // 适配 processAndSortFiles 返回的对象结构
+                    const fileKey = latestFile.fileKey || latestFile.key || latestFile.name;
+                    const displayName = latestFile.displayName || latestFile.name;
 
-                    if(typeof addLog === 'function') addLog(`☁️ 正在同步云端数据: ${displayName}`);
+                    if(typeof addLog === 'function') addLog(`☁️ 正在同步最新项目: ${displayName}`);
 
                     const cloudData = await loadFromKV(fileKey);
                     const tasksRaw = Array.isArray(cloudData) ? cloudData : (cloudData.tasks || []);
                     const projectInfo = cloudData.project || { name: displayName };
                     
-                    // ⭐ 获取快照信息
                     const lastActionId = projectInfo.lastActionId || null;
                     const snapshotTimestamp = projectInfo.updated || 0;
 
@@ -57,9 +63,9 @@
 
                     initializeGanttData(tasks, projectInfo);
                     
-                    // ⭐ 初始化历史，传入快照时间戳
                     if (window.historyManager) {
                         window.historyManager.filename = fileKey;
+                        // 传递快照时间戳，让 historyManager 决定是否追赶
                         await window.historyManager.init(fileKey, lastActionId, snapshotTimestamp);
                         if (global.gantt) global.gantt.render();
                     }
@@ -100,7 +106,7 @@
             if(typeof addLog === 'function') addLog('⚠️ 已初始化新项目');
         }
     }
-    
+
     /**
      * 数据标准化与清洗
      * 确保任务数据的完整性，修复缺失字段
