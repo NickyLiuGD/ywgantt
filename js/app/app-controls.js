@@ -1,8 +1,8 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 应用控制按钮模块                                                ▓▓
 // ▓▓ 路径: js/app/app-controls.js                                    ▓▓
-// ▓▓ 版本: Epsilon43-Final-Fixed                                    ▓▓
-// ▓▓ 状态: 完整包含历史记录控制、全量保存锚点、快捷键                ▓▓
+// ▓▓ 版本: Epsilon45-Unabridged                                     ▓▓
+// ▓▓ 状态: 100% 完整代码，无省略，集成历史记录与锚点保存             ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
 (function() {
@@ -19,7 +19,7 @@
         console.log('🔧 app-controls.js: DOMReady, 开始绑定事件...');
 
         // ============================================================
-        // 1. ⭐ 历史记录控制 (Undo/Redo) - [核心部分]
+        // 1. 历史记录控制 (Undo/Redo) - [新增集成]
         // ============================================================
         const btnUndo = document.getElementById('btnUndo');
         const btnRedo = document.getElementById('btnRedo');
@@ -61,7 +61,7 @@
         }
 
         // ============================================================
-        // 2. 顶部 Header 区域 (视图切换 / 登录)
+        // 2. 顶部 Header 区域 (视图切换 / 登录) - [原有逻辑保留]
         // ============================================================
 
         // PERT 视图切换
@@ -69,14 +69,21 @@
         if (btnHeaderTogglePert) {
             btnHeaderTogglePert.onclick = function(e) {
                 e.preventDefault();
-                if (typeof window.switchToView !== 'function') return;
                 
+                // 检查视图切换模块
+                if (typeof window.switchToView !== 'function') {
+                    console.error('❌ app-view-switcher.js 未加载');
+                    alert('功能组件加载中，请稍后点击...');
+                    return;
+                }
+
                 const currentView = window.getCurrentView ? window.getCurrentView() : 'gantt';
                 const newView = currentView === 'gantt' ? 'pert' : 'gantt';
                 
+                console.log(`🔄 切换视图: ${currentView} -> ${newView}`);
                 window.switchToView(newView);
 
-                // 更新按钮样式
+                // 更新按钮状态
                 const isPertNow = (newView === 'pert');
                 this.classList.toggle('active', isPertNow);
                 this.classList.toggle('btn-primary', isPertNow);
@@ -108,7 +115,7 @@
         }
 
         // ============================================================
-        // 3. 项目菜单 (新建 / 重命名 / 副本)
+        // 3. 项目菜单 (新建 / 重命名 / 副本) - [逻辑增强]
         // ============================================================
 
         // 新建项目
@@ -122,13 +129,25 @@
                         window.gantt.render();
                         window.gantt.switchToOverviewMode();
                         
-                        // ⭐ 重置历史 (断开与旧文件的关联)
-                        if (window.historyManager) window.historyManager.init(null, null);
+                        // ⭐ 关键修复：新建项目立即分配文件名，确保历史记录有地方存
+                        const newName = "新项目";
+                        const newFileName = generateSafeFilename(newName);
+                        document.getElementById('projectTitle').textContent = newName;
+                        
+                        // 重置并初始化历史
+                        if (window.historyManager) {
+                            window.historyManager.init(newFileName, null);
+                        }
                     }
-                    document.getElementById('projectTitle').textContent = "新项目";
-                    if(typeof addLog === 'function') addLog('✨ 已创建空白项目');
+                    if(typeof addLog === 'function') addLog('✨ 已创建空白项目 (自动保存已启用)');
                 }
             };
+        }
+
+        // 切换/加载项目 (逻辑由 app-file-manager.js 统一处理，但保留 ID 绑定以防万一)
+        const btnSwitchProject = document.getElementById('btnSwitchProject');
+        if (btnSwitchProject) {
+            // 事件监听已在 app-file-manager.js 中处理，此处保留空位或做备用处理
         }
 
         // 重命名项目
@@ -140,6 +159,7 @@
                 if (newName) {
                     titleEl.textContent = newName;
                     document.title = `${newName} - 云端甘特图`;
+                    // 注意：单纯重命名不改变底层 KV 文件名，除非执行“另存为”或下次保存时生成新文件
                 }
             };
         }
@@ -155,11 +175,16 @@
                     tasksCopy.forEach(t => t.id = `task-${Date.now()}-${Math.random().toString(36).substr(2,5)}`);
                     window.gantt.tasks = tasksCopy;
                     window.gantt.render();
-                    const titleEl = document.getElementById('projectTitle');
-                    titleEl.textContent += " (副本)";
                     
-                    // ⭐ 副本视为新项目，清空历史关联
-                    if (window.historyManager) window.historyManager.init(null, null);
+                    const oldTitle = document.getElementById('projectTitle').textContent;
+                    const newTitle = oldTitle + " (副本)";
+                    document.getElementById('projectTitle').textContent = newTitle;
+                    
+                    // ⭐ 副本是新文件，分配新文件名并初始化历史
+                    const newFileName = generateSafeFilename(newTitle);
+                    if (window.historyManager) {
+                        window.historyManager.init(newFileName, null);
+                    }
                     
                     if(typeof addLog === 'function') addLog('📑 项目副本已创建');
                 }
@@ -167,18 +192,21 @@
         }
 
         // ============================================================
-        // 4. 悬浮工具栏 & 云端保存 (全量 + 锚点)
+        // 4. 悬浮工具栏 & 云端保存 - [核心集成点]
         // ============================================================
 
         // 添加任务快捷按钮
         const addTaskBtn = document.getElementById('addTask');
         if (addTaskBtn) {
             addTaskBtn.onclick = () => {
-                if (window.gantt) window.gantt.addTask({});
+                if (window.gantt) {
+                    // 调用 gantt-operations.js 中的 addTask
+                    window.gantt.addTask({}); 
+                }
             };
         }
 
-        // ⭐ 云端全量保存 (关键逻辑)
+        // 云端保存 (全量保存 + 锚点记录)
         const quickSaveBtn = document.getElementById('quickCloudSave');
         if (quickSaveBtn) {
             quickSaveBtn.onclick = async () => {
@@ -212,10 +240,13 @@
                     });
                     
                     // 2. 强制同步一次历史文件 (确保 _history.json 也是最新的)
-                    if (window.historyManager) await window.historyManager.syncToCloud();
+                    if (window.historyManager) {
+                        await window.historyManager.syncToCloud();
+                    }
 
                     if(typeof addLog === 'function') addLog(`☁️ 全量保存成功 (锚点: ${currentActionId || 'init'})`);
                     quickSaveBtn.innerHTML = '✅';
+                    
                     setTimeout(() => { 
                         quickSaveBtn.innerHTML = '<span class="btn-icon icon">☁️</span><span class="btn-text">云保存</span>'; 
                         quickSaveBtn.disabled = false; 
@@ -223,12 +254,13 @@
                 } catch (e) {
                     alert('保存失败: ' + e.message);
                     quickSaveBtn.disabled = false;
+                    quickSaveBtn.innerHTML = '<span class="btn-icon icon">☁️</span><span class="btn-text">云保存</span>';
                 }
             };
         }
 
         // ============================================================
-        // 5. 智能工具 (冲突检测 / 修复 / 清除)
+        // 5. 智能工具 (冲突检测 / 修复 / 清除) - [原有逻辑保留]
         // ============================================================
         ['checkConflicts', 'autoFixConflicts', 'clearHighlights'].forEach(id => {
             const btn = document.getElementById(id);
@@ -242,7 +274,7 @@
         });
 
         // ============================================================
-        // 6. 工具栏 UI 交互 (展开/收起)
+        // 6. 工具栏 UI 交互 (展开/收起) - [原有逻辑保留]
         // ============================================================
         const toolbarCollapsed = document.getElementById('toolbarCollapsed');
         const toolbarExpanded = document.getElementById('floatingToolbarExpanded');
