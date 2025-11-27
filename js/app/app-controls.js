@@ -1,7 +1,7 @@
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 // ▓▓ 应用控制按钮模块                                                ▓▓
 // ▓▓ 路径: js/app/app-controls.js                                    ▓▓
-// ▓▓ 版本: Epsilon38-FullRestored                                   ▓▓
+// ▓▓ 版本: Epsilon40-Final-Full                                     ▓▓
 // ▓▓ 状态: 包含历史记录控制、视图切换、云保存、工具栏交互等          ▓▓
 // ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
 
@@ -92,10 +92,10 @@
             };
         }
 
-        // [B] 切换/加载项目 (逻辑由 app-file-manager 处理，此处仅为备份)
+        // [B] 切换/加载项目 (逻辑由 app-file-manager 处理)
         const btnSwitchProject = document.getElementById('btnSwitchProject');
         if (btnSwitchProject) {
-            // 事件已在 file-manager 中绑定
+            // 事件已在 file-manager 中绑定，此处预留空位
         }
 
         // [C] 重命名
@@ -138,6 +138,7 @@
 
         if (btnUndo) {
             btnUndo.onclick = () => {
+                // 使用 window.historyManager 防止引用错误
                 if (window.historyManager) window.historyManager.undo();
             };
         }

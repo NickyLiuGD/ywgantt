@@ -189,30 +189,37 @@
         <div id="pertContainer" style="display: none; margin-top: 70px;"></div>
     </div>        
  
-    <!-- JS 模块 -->
-    <!-- ⭐ 引入 history-manager.js，位置在 date-utils 之后，gantt-core 之前 -->
+    <!-- 7. JS 模块 (⭐ 严格按此顺序加载 ⭐) -->
+    
+    <!-- Level 0: 核心基础工具 (必须最先加载) -->
+    <script src="js/utils/common-utils.js?v=1.0" defer></script>
+    <script src="js/utils/data-utils.js?v=1.0" defer></script>
     <script src="js/utils/date-utils.js?v=1.0" defer></script>
     <script src="js/utils/log-utils.js?v=1.0" defer></script>
-    <script src="js/utils/data-utils.js?v=1.0" defer></script>
-    <script src="js/utils/kv-storage.js?v=1.0" defer></script>
-    <script src="js/utils/history-manager.js?v=1.0" defer></script> 
     <script src="js/utils/time-scale-utils.js?v=1.0" defer></script>
-    <script src="js/utils/common-utils.js?v=1.0" defer></script>
+    <script src="js/utils/kv-storage.js?v=1.0" defer></script>
     <script src="js/utils/data-loader.js?v=1.0" defer></script>
+
+    <!-- Level 1: 历史管理器 (依赖基础工具) -->
+    <script src="js/utils/history-manager.js?v=1.0" defer></script> 
     
+    <!-- Level 2: 甘特图核心 -->
     <script src="js/gantt/gantt-core.js?v=1.0" defer></script>
     <script src="js/gantt/gantt-render.js?v=1.0" defer></script>
     <script src="js/gantt/gantt-dependencies.js?v=1.0" defer></script>
     <script src="js/gantt/gantt-operations.js?v=1.0" defer></script>
     
+    <!-- Level 3: 事件与交互 -->
     <script src="js/events/gantt-events-binding.js?v=1.0" defer></script>
     <script src="js/events/gantt-events-drag.js?v=1.0" defer></script>
     <script src="js/events/gantt-events-form.js?v=1.0" defer></script>
     <script src="js/events/gantt-events-quickmenu.js?v=1.0" defer></script>
     
+    <!-- Level 4: PERT 模块 -->
     <script src="js/pert-chart.js?v=1.0" defer></script>
     <script src="js/pert-interactive.js?v=1.0" defer></script>
     
+    <!-- Level 5: 应用逻辑 -->
     <script src="js/app/app-init.js?v=1.0" defer></script>
     <script src="js/app/app-controls.js?v=1.0" defer></script>
     <script src="js/app/app-file-manager.js?v=1.0" defer></script>
@@ -221,8 +228,10 @@
 
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
     
+    <!-- 8. 启动逻辑 -->
     <script defer>
         window.addEventListener('error', e => console.error('⚠️ 全局错误:', e.message));
+        
         document.addEventListener('DOMContentLoaded', function() {
             console.log('✅ DOMContentLoaded - 模块下载完成');
             const loader = document.getElementById('app-loader');
@@ -231,6 +240,11 @@
                 setTimeout(() => loader.remove(), 500);
             }
             document.body.classList.add('loaded');
+            
+            // ⭐ 强制刷新一次历史按钮状态，确保初始化正确
+            if (window.historyManager) {
+                setTimeout(() => window.historyManager.updateUI(), 100);
+            }
         });
     </script>
 </body>
